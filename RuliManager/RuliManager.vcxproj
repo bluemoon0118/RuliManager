@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <ProjectGuid>{6F1C3B52-8E2A-4C61-9A3D-2B7E5D4C1A90}</ProjectGuid>
+    <Keyword>MFCProj</Keyword>
+    <RootNamespace>RuliManager</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseOfMfc>Dynamic</UseOfMfc>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseOfMfc>Dynamic</UseOfMfc>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <PreprocessorDefinitions>_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+    </Link>
+    <ResourceCompile>
+      <Culture>0x0412</Culture>
+      <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Platform)'=='Win32'">
+    <ClCompile>
+      <PreprocessorDefinitions>WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+    <ResourceCompile>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="ActorDlg.h" />
+    <ClInclude Include="AliasCombo.h" />
+    <ClInclude Include="CountryCombo.h" />
+    <ClInclude Include="DarkControls.h" />
+    <ClInclude Include="DarkTheme.h" />
+    <ClInclude Include="framework.h" />
+    <ClInclude Include="ImagePreview.h" />
+    <ClInclude Include="BulkNameDlg.h" />
+    <ClInclude Include="NameListDlg.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="Resource.h" />
+    <ClInclude Include="targetver.h" />
+    <ClInclude Include="SuggestEdit.h" />
+    <ClInclude Include="TagChipCtrl.h" />
+    <ClInclude Include="TextDraw.h" />
+    <ClInclude Include="VectorIcons.h" />
+    <ClInclude Include="ZoomSlider.h" />
+    <ClInclude Include="StarRatingCtrl.h" />
+    <ClInclude Include="SettingsDlg.h" />
+    <ClInclude Include="HeartToggle.h" />
+    <ClInclude Include="MediaInfoLabel.h" />
+    <ClInclude Include="DropCounter.h" />
+    <ClInclude Include="ActorStrip.h" />
+    <ClInclude Include="ActorDetailPanel.h" />
+    <ClInclude Include="DbCrypt.h" />
+    <ClInclude Include="WebHelper.h" />
+    <ClInclude Include="ImageSearchDlg.h" />
+    <ClInclude Include="VideoGrid.h" />
+    <ClInclude Include="VideoLibrary.h" />
+    <ClInclude Include="RuliManager.h" />
+    <ClInclude Include="RuliManagerDlg.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="BulkNameDlg.cpp" />
+    <ClCompile Include="NameListDlg.cpp" />
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="ActorDlg.cpp" />
+    <ClCompile Include="AliasCombo.cpp" />
+    <ClCompile Include="CountryCombo.cpp" />
+    <ClCompile Include="DarkControls.cpp" />
+    <ClCompile Include="DarkTheme.cpp" />
+    <ClCompile Include="ImagePreview.cpp" />
+    <ClCompile Include="SuggestEdit.cpp" />
+    <ClCompile Include="TagChipCtrl.cpp" />
+    <ClCompile Include="TextDraw.cpp" />
+    <ClCompile Include="VectorIcons.cpp" />
+    <ClCompile Include="ZoomSlider.cpp" />
+    <ClCompile Include="StarRatingCtrl.cpp" />
+    <ClCompile Include="SettingsDlg.cpp" />
+    <ClCompile Include="HeartToggle.cpp" />
+    <ClCompile Include="MediaInfoLabel.cpp" />
+    <ClCompile Include="DropCounter.cpp" />
+    <ClCompile Include="ActorStrip.cpp" />
+    <ClCompile Include="ActorDetailPanel.cpp" />
+    <ClCompile Include="DbCrypt.cpp" />
+    <ClCompile Include="WebHelper.cpp" />
+    <ClCompile Include="ImageSearchDlg.cpp" />
+    <ClCompile Include="VideoGrid.cpp" />
+    <ClCompile Include="VideoLibrary.cpp" />
+    <ClCompile Include="RuliManager.cpp" />
+    <ClCompile Include="RuliManagerDlg.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="RuliManager.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="res\RuliManager.ico" />
+    <Image Include="res\flags.bmp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

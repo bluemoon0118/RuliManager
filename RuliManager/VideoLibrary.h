@@ -1,0 +1,172 @@
+﻿#pragma once
+
+// 동영상 한 개의 정보
+struct VideoItem
+{
+	CString   path;          // 전체 경로
+	CString   title;         // 제목 (파일 이름과 별개, 비어 있으면 파일 이름 사용)
+	ULONGLONG size = 0;      // 바이트
+	ULONGLONG modified = 0;  // FILETIME (UTC) 64비트 값
+	int       rating = 0;    // 0~5
+	int       oCount = 0;    // 물방울 카운트 (상세 정보 별점 오른쪽, 클릭마다 +1)
+	CString   actors;        // 쉼표로 구분된 배우
+	CString   actorAliases;  // 이 작품에서 배우가 쓴 별칭 (쉼표 구분)
+	CString   studio;        // 스튜디오 (1개)
+	CString   release;       // 발매일 "YYYY-MM-DD" (없으면 빈 문자열)
+	CString   tags;          // 쉼표로 구분된 태그
+	CString   memo;          // 메모 (여러 줄)
+	bool      pending = false; // 임시 항목: 스캔으로 찾았지만 아직 정보를 저장하지 않음 (pending.tsv 에 기록)
+
+	CString FileName() const { return CString(::PathFindFileNameW(path)); }
+};
+
+// 배우 한 명의 정보 (동영상의 actors 에는 배우 이름이 쉼표로 저장됨)
+struct ActorInfo
+{
+	CString name;      // 이름 (중복 불가)
+	CString lastAlias; // 영상 배우 칩에서 마지막으로 고른 별칭 (새로 배우를 넣을 때 초기값)
+	CString aliases;   // 별칭 (여러 개, 쉼표 구분) - 동영상의 배우 칸에 별칭으로 적혀 있어도 이 배우로 연결
+	CString gender;    // 성별 "여성" / "남성" (비어 있으면 미지정)
+	CString birth;     // 생년월일 "YYYY-MM-DD"
+	CString nationality; // 국적
+	CString height;    // 키 (cm, 숫자)
+	CString debut;     // 데뷔일 "YYYY-MM-DD"
+	CString retire;    // 은퇴일 "YYYY-MM-DD" (비어 있으면 활동 중/모름)
+	int     rating = 0; // 별점 0~5 (0 = 없음)
+	bool    favorite = false; // 즐겨찾기 (배우 카드 오른쪽 위 하트)
+	CString bust;      // 치수: 가슴 (cm, 숫자)
+	CString waist;     // 치수: 허리
+	CString hip;       // 치수: 엉덩이
+	CString cup;       // 컵 ("A" ~ "Q", 비어 있으면 미지정)
+	CString photo;     // 사진 파일 경로
+	CString memo;      // 메모
+};
+
+// 스튜디오 / 태그 한 개의 정보 (동영상에는 이름으로 저장됨)
+struct NamedInfo
+{
+	CString name;    // 이름 (중복 불가)
+	CString memo;    // 메모
+	CString image;   // 이미지(로고 등) 파일 경로
+	bool    favorite = false;   // 즐겨찾기 (태그 카드 오른쪽 위 하트)
+};
+
+enum NamedListKind { LIST_STUDIO = 0, LIST_TAG = 1 };
+
+// 동영상 라이브러리 (목록 + 등록 폴더 + 배우 + 스튜디오 + 태그 + 저장/불러오기)
+// 데이터 파일: %APPDATA%\VideoManager\library.tsv (UTF-8, 탭 구분)
+class CVideoLibrary
+{
+public:
+	std::vector<VideoItem> items;
+	std::vector<CString>   folders;
+	std::vector<ActorInfo> actors;
+	std::vector<NamedInfo> studios;
+	std::vector<NamedInfo> tagInfos;
+
+	bool Load();
+	bool Save() const;               // DB 파일은 AES 로 암호화해서 저장 (DbCrypt.h)
+	bool LoadedPlainText() const { return m_loadedPlainText; }   // 예전 평문 DB 를 읽었음 → 바로 저장하면 암호화됨
+	bool DbBroken() const { return m_dbBroken; }                 // 암호화된 DB 를 풀지 못함 (저장 안 함)
+
+	// 폴더를 등록하고 하위 폴더까지 스캔합니다. 새로 추가된 개수를 반환.
+	int  AddFolder(const CString& folder);
+	// 등록 폴더를 제거하고, 다른 등록 폴더에 속하지 않는 항목을 목록에서 제거합니다.
+	void RemoveFolder(size_t index);
+	// 모든 등록 폴더를 다시 스캔합니다.
+	void Refresh(int& added, int& removed, int* relinked = nullptr);
+	// 경로가 바뀐(옮기거나 이름을 바꾼) 파일 다시 연결: 없어진 DB 항목을 스캔에서 새로 찾은 파일과 맞춰 경로만 고침
+	//   같은 파일로 보는 기준: 크기가 같고 (파일 이름이 같거나 수정 시각이 같음)
+	int  RelinkMoved(const std::vector<VideoItem>& scanned);
+	int  RelinkOnStartup();   // 프로그램 시작 시: 없어진 항목이 있을 때만 폴더를 스캔해서 다시 연결 (추가/삭제는 안 함)
+
+	int  FindByPath(const CString& path) const;
+
+	// 배우
+	int  FindActor(const CString& name) const;                 // 이름(대소문자 무시)으로 찾기
+	// 동영상의 배우 표기(이름 또는 별칭)로 배우 찾기: 이름이 우선, 없으면 별칭
+	int  FindActorByAnyName(const CString& name) const;
+	// 이름/별칭(소문자) → 배우 인덱스 (반복 조회용, 이름이 별칭보다 우선)
+	std::map<CString, int> ActorNameIndex() const;
+	// 동영상의 배우 표기 → 연결된 배우 이름(소문자). 목록에 없으면 표기 그대로(소문자)
+	CString ActorKeyOf(const std::map<CString, int>& index, const CString& videoName) const;
+	// 영상의 배우 칸에 별칭으로 적힌 배우를 본래 이름으로 바꾸고 그 별칭은 "참여 별칭"으로 옮김,
+	// 배우 칸에 없는 배우의 참여 별칭은 정리 (변경되면 true)
+	bool NormalizeVideoActors(VideoItem& v) const;
+	bool NormalizeAllVideoActors();
+	bool SyncActorsFromVideos();                                 // 동영상에만 있는 배우 이름을 배우 목록에 추가
+	void RenameActorInVideos(const CString& oldName, const CString& newName);
+	int  RemoveActorFromVideos(const CString& name);            // 반환: 영향 받은 동영상 수
+	int  CountVideosWithActor(const CString& name) const;
+
+	// 스튜디오 / 태그 (kind = LIST_STUDIO / LIST_TAG)
+	std::vector<NamedInfo>&       NamedList(int kind)       { return kind == LIST_STUDIO ? studios : tagInfos; }
+	const std::vector<NamedInfo>& NamedList(int kind) const { return kind == LIST_STUDIO ? studios : tagInfos; }
+	int  FindNamed(int kind, const CString& name) const;
+	bool SyncNamedFromVideos();                                  // 동영상에만 있는 이름을 목록에 추가
+	void RenameNamedInVideos(int kind, const CString& oldName, const CString& newName);
+	int  RemoveNamedFromVideos(int kind, const CString& name);
+	std::map<CString, int> CountNamed(int kind) const;          // 이름(소문자) → 영상 수
+	static std::vector<CString> VideoNamedValues(const VideoItem& v, int kind);
+
+	static std::vector<CString> SplitList(const CString& text); // 쉼표 구분 → 목록 (공백 제거, 괄호 안 쉼표는 이름의 일부)
+	// 목록 구분 쉼표 찾기: 괄호 ( ) / （ ） 안의 쉼표는 구분자가 아님 → "나기 히카루(Hikaru Nagi, 凪ひかる)" 는 한 이름
+	static int  FindListComma(const CString& text, int start);          // start 이후 첫 구분 쉼표 (없으면 -1)
+	static int  ReverseFindListComma(const CString& text, int before);  // before 앞의 마지막 구분 쉼표 (없으면 -1)
+	static void RemoveListCommas(CString& text);                       // 이름에서 구분 쉼표만 지움 (괄호 안 쉼표는 유지)
+	static CString JoinList(const std::vector<CString>& list);
+	// 생년월일("YYYY-MM-DD")로 오늘 기준 만 나이 계산 (알 수 없으면 -1)
+	static int     CalcAge(const CString& birth);
+	// 배우 요약 문구: "1990-05-01 (36세)" / "36세" 등
+	static CString AgeText(const CString& birth);
+	// 텍스트에서 [YYYY.MM.DD] / [YYYYMMDD] 를 찾아 "YYYY-MM-DD" 로 반환 (없으면 빈 문자열)
+	static CString FindBracketDate(const CString& text);
+
+	static CString GetDataDir();           // DB 위치 = 실행 파일 폴더 (쓰기 권한이 없으면 %APPDATA%\VideoManager)
+	static CString GetAppDataDir();        // %APPDATA%\VideoManager (예전 DB 위치, 없으면 만듦)
+	// DB 는 두 파일: library.vmdb = 정보(library.tsv) + 임시 목록(pending.tsv), images.vmdb = 이미지 복사본 전부 (각각 AES 암호화)
+	//  - 실행 중 이미지는 캐시 폴더(%LOCALAPPDATA%\VideoManager\cache\images)에 풀어서 사용, 종료 시 지움
+	static CString GetDataFilePath();      // <실행 파일 폴더>\library.vmdb (정보 + 임시 목록)
+	static CString GetImagesDbPath();      // <실행 파일 폴더>\images.vmdb (이미지 복사본 묶음)
+	static CString GetBackupDir();         // <DB 폴더>\backup (없으면 만듦)
+	// 프로그램 시작 시 DB 백업: library.vmdb / images.vmdb 를 backup 폴더에 날짜·시각 이름으로 복사
+	//  - 가장 최근 백업과 내용이 같으면 그 파일은 건너뜀, 파일마다 최근 keep 개만 남김
+	//  - 반환: 새로 만든 백업 파일 수
+	static int     BackupDbFiles(int keep = 10);
+	static CString GetLegacyLibraryPath(); // 예전 정보 파일 library.tsv (처음 한 번 옮겨 오고 .bak 으로 바꿈)
+	static CString GetPendingFilePath();   // 예전 임시 목록 pending.tsv
+	static CString GetCacheDir();          // 실행 중 이미지를 풀어 두는 폴더
+	static void    ClearImageCache();      // 캐시 이미지 지우기 (종료 시)
+	int  PendingCount() const;
+
+	// 등록 이미지 보관소: %APPDATA%\VideoManager\images\<sub> (배우 사진 · 스튜디오/태그 이미지 복사본)
+	static CString GetImageStoreDir(LPCWSTR sub = nullptr);
+	static bool    IsInImageStore(const CString& path);
+	// 이미지를 보관소로 복사하고 복사본 경로를 반환 (이미 보관소 안이면 그대로, 실패하면 빈 문자열)
+	static CString StoreImageCopy(const CString& src, LPCWSTR sub);
+	bool MigrateImagesToStore();      // 보관소 밖 이미지(기존 데이터)를 복사본으로 교체 (변경 시 true)
+	int  CleanupImageStore() const;   // 어디에도 연결되지 않은 복사본을 휴지통으로 (반환: 정리한 수)
+	static bool    IsVideoFile(LPCWSTR path);
+	static CString MakeKey(const CString& path);
+	static bool    IsUnder(const CString& path, const CString& folder);
+
+private:
+	bool m_loadedPlainText = false;
+	bool m_dbBroken = false;
+	// 이미지가 바뀌지 않았으면 저장할 때 images.vmdb 를 다시 쓰지 않음
+	mutable CString           m_imgSig;
+	mutable bool              m_legacyToMove = false;   // 예전 파일을 옮겨 왔음 → 첫 저장 후 .bak 으로
+	bool ReadPackedDb(CString& text, CString& pending);
+	bool WritePackedDb(const CString& text, const CString& pending) const;
+	static CString ImageSignature(std::vector<CString>* files);   // 캐시 이미지 목록/크기/시각
+	static void ScanFolder(const CString& folder, std::vector<VideoItem>& out, int depth);
+	int  MergeScanned(const std::vector<VideoItem>& scanned);
+public:   // DB 삭제 시 임시 항목으로 되돌릴 때도 사용
+	// 등록 폴더 기준 폴더 구조로 배우/스튜디오 채우기 (새로 찾은 임시 항목에만 적용)
+	//   (영상 파일은 각자 영상 폴더 안에 있음 - 영상 폴더 이름은 배우/스튜디오로 쓰지 않음)
+	//   폴더\영상\영상.mp4               → 영상만
+	//   폴더\배우\영상\영상.mp4          → 배우
+	//   폴더\스튜디오\배우\영상\영상.mp4 → 스튜디오, 배우 (더 깊으면 위 두 단계 사용)
+	//   영상 파일 이름 / 영상 폴더 이름에 [YYYY.MM.DD] 또는 [YYYYMMDD] 가 있으면 발매일로 지정
+	void ApplyFolderStructure(VideoItem& v) const;
+};
