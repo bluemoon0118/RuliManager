@@ -2,6 +2,7 @@
 #include "RuliManager.h"
 #include "RuliManagerDlg.h"
 #include "ActorDlg.h"
+#include "TextInfoDlg.h"
 #include "SettingsDlg.h"
 #include "ImageSearchDlg.h"
 #include "NameListDlg.h"
@@ -225,6 +226,8 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_COMMAND(ID_ACTOR_EDIT, &CRuliManagerDlg::OnActorEdit)
 	ON_COMMAND(ID_CAT_DELETE, &CRuliManagerDlg::OnCatDelete)
 	ON_COMMAND(ID_ACTOR_DELETE, &CRuliManagerDlg::OnActorDelete)
+	ON_COMMAND(ID_VIDEO_TEXTINFO, &CRuliManagerDlg::OnVideoTextInfo)
+	ON_COMMAND(ID_ACTOR_TEXTINFO, &CRuliManagerDlg::OnActorTextInfo)
 	ON_BN_CLICKED(IDC_BTN_SAVE, &CRuliManagerDlg::OnBnClickedSave)
 	ON_BN_CLICKED(IDC_BTN_RENAME, &CRuliManagerDlg::OnBnClickedRename)
 	ON_BN_CLICKED(IDC_BTN_DELETE, &CRuliManagerDlg::OnBnClickedDelete)
@@ -546,6 +549,33 @@ BOOL CRuliManagerDlg::OnInitDialog()
 			m_syncingStudio = true;
 			m_editStudio.SetWindowText(tags.empty() ? CString() : tags[0]);
 			m_syncingStudio = false;
+		};
+		// 스튜디오 이미지가 있으면 칩 이름 왼쪽에 (비율 유지, 칩 높이에 맞춤, 너무 넓은 로고는 높이의 3배까지)
+		m_studioChips.m_iconWidth = [this](const CString& tag, int h) -> int
+		{
+			const int n = m_lib.FindNamed(LIST_STUDIO, tag);
+			Gdiplus::Bitmap* logo = (n >= 0) ? GetStudioLogo(m_lib.studios[n].image) : nullptr;
+			if (!logo || logo->GetWidth() == 0 || logo->GetHeight() == 0 || h <= 0)
+				return 0;
+			const double w = h * static_cast<double>(logo->GetWidth()) / logo->GetHeight();
+			return (std::max)(h / 2, (std::min)(h * 3, static_cast<int>(w + 0.5)));
+		};
+		m_studioChips.m_drawIcon = [this](CDC* dc, const CString& tag, const CRect& rc)
+		{
+			const int n = m_lib.FindNamed(LIST_STUDIO, tag);
+			Gdiplus::Bitmap* logo = (n >= 0) ? GetStudioLogo(m_lib.studios[n].image) : nullptr;
+			if (!logo || logo->GetWidth() == 0 || logo->GetHeight() == 0 || rc.Width() <= 0 || rc.Height() <= 0)
+				return;
+			const double lw = logo->GetWidth(), lh = logo->GetHeight();
+			const double scale = (std::min)(rc.Width() / lw, rc.Height() / lh);
+			const int w = (std::max)(1, static_cast<int>(lw * scale));
+			const int h = (std::max)(1, static_cast<int>(lh * scale));
+			const int x = rc.left + (rc.Width() - w) / 2;
+			const int y = rc.top + (rc.Height() - h) / 2;
+			Gdiplus::Graphics g(dc->GetSafeHdc());
+			g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+			g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+			g.DrawImage(logo, Gdiplus::Rect(x, y, w, h), 0, 0, static_cast<INT>(lw), static_cast<INT>(lh), Gdiplus::UnitPixel);
 		};
 		m_studioChips.m_onDropDown = [this]() { OnBnClickedPickStudio(); };
 		m_studioChips.m_onHeightChanged = m_tagChips.m_onHeightChanged;
@@ -3481,6 +3511,76 @@ bool CRuliManagerDlg::IsTagFavorite(const CString& tag) const
 	return n >= 0 && m_lib.tagInfos[n].favorite;
 }
 
+// ---------------------------------------------------------------------------
+// 텍스트로 정보 입력 (정보 txt 와 같은 "항목: 값" 규칙)
+
+void CRuliManagerDlg::OnVideoTextInfo()
+{
+	CommitDetails();   // 편집 중인 내용 먼저 저장
+	const int idx = m_curItem;
+	if (idx < 0 || idx >= static_cast<int>(m_lib.items.size()))
+		return;
+	const VideoItem& cur = m_lib.items[idx];
+	CTextInfoDlg dlg(L"텍스트로 정보 입력 - " + cur.FileName(),
+		L"정보 txt 와 같은 \"항목: 값\" 형식입니다 (스캔 때 읽는 규칙과 같음). 입력한 내용으로 바뀌고, 지운 항목은 비워집니다.\r\n"
+		L"항목: 품번 · 제목 · 발매일 · 별점 · 배우(출연) · 참여 별칭 · 스튜디오 · 태그(장르) · 물방울  (목록은 쉼표 · / · # 로 구분)",
+		CVideoLibrary::VideoInfoText(cur), this);
+	if (dlg.DoModal() != IDOK)
+		return;
+
+	VideoItem v = m_lib.items[idx];
+	CVideoLibrary::ClearVideoTextFields(v);
+	m_lib.ApplyVideoText(v, dlg.m_text);
+	VideoItem& dst = m_lib.items[idx];
+	dst.code = v.code; dst.title = v.title; dst.release = v.release; dst.rating = v.rating; dst.oCount = v.oCount;
+	dst.actors = v.actors; dst.actorAliases = v.actorAliases; dst.studio = v.studio; dst.tags = v.tags;
+	dst.pending = false;   // 정보를 입력했으면 정식 DB 로
+	m_lib.NormalizeVideoActors(dst);
+	m_lib.SyncPartGroup(static_cast<size_t>(idx));   // 분할 파일도 같은 정보
+	m_lib.SyncActorsFromVideos();   // 새 배우 / 스튜디오 / 태그는 목록에도 추가
+	m_lib.SyncNamedFromVideos();
+	if (!m_lib.Save())
+		AfxMessageBox(L"라이브러리 파일을 저장하지 못했습니다.", MB_ICONWARNING);
+
+	MarkCategoriesDirty();
+	ApplyFilter();
+	if (m_curItem == idx)
+		ShowDetails(idx);
+	UpdateStatus();
+	m_list.Invalidate(FALSE);
+	m_grid.Invalidate(FALSE);
+}
+
+void CRuliManagerDlg::OnActorTextInfo()
+{
+	if (!IsActorGridMode())
+		return;
+	const int idx = SelectedActorIndex();
+	if (idx < 0 || idx >= static_cast<int>(m_lib.actors.size()))
+		return;
+	const ActorInfo& cur = m_lib.actors[idx];
+	CTextInfoDlg dlg(L"텍스트로 정보 입력 - " + cur.name,
+		L"배우 폴더 txt 와 같은 \"항목: 값\" 형식입니다 (스캔 때 읽는 규칙과 같음). 입력한 내용으로 바뀌고, 지운 항목은 비워집니다.\r\n"
+		L"항목: 다른이름(# 구분) · 성별 · 생년월일 · 국적 · 키 · 치수 · 가슴/허리/엉덩이 · 컵 · 데뷔 · 은퇴  (이름 · 별점 · 즐겨찾기 · 메모는 바뀌지 않음)",
+		CVideoLibrary::ActorInfoText(cur), this);
+	if (dlg.DoModal() != IDOK)
+		return;
+
+	ActorInfo a = m_lib.actors[idx];
+	CVideoLibrary::ClearActorTextFields(a);
+	CVideoLibrary::ApplyActorText(a, dlg.m_text);
+	m_lib.actors[idx] = a;
+	m_lib.CleanupActorAliases();        // 이름과 같은 별칭 정리
+	m_lib.NormalizeAllVideoActors();    // 새 별칭으로 적힌 영상 배우 → 배우 이름 + 참여 별칭
+	if (!m_lib.Save())
+		AfxMessageBox(L"라이브러리 파일을 저장하지 못했습니다.", MB_ICONWARNING);
+
+	ResetThumbnails();   // 기본 이미지(성별)가 바뀌었을 수 있음
+	RebuildActorGrid();
+	ShowActorInfo(SelectedActorIndex());
+	MarkCategoriesDirty();
+}
+
 void CRuliManagerDlg::OnActorDelete()
 {
 	// 배우 탭(배우 격자): 선택한 배우를 배우 목록과 영상에서 삭제 (영상 파일·이미지 원본은 그대로)
@@ -5113,6 +5213,7 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 		menu.CreatePopupMenu();
 		menu.AppendMenu(MF_STRING, ID_ACTOR_SHOWVIDEOS, L"출연작 보기\tEnter");
 		menu.AppendMenu(MF_STRING, ID_ACTOR_EDIT,       L"배우 정보 편집...\tF2");
+		menu.AppendMenu(MF_STRING, ID_ACTOR_TEXTINFO,   L"텍스트로 정보 입력...");
 		menu.AppendMenu(MF_SEPARATOR);
 		menu.AppendMenu(MF_STRING, ID_ACTOR_DELETE,     L"배우 삭제\tDel");
 		menu.SetDefaultItem(ID_ACTOR_SHOWVIDEOS);
@@ -5232,6 +5333,7 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 	menu.CreatePopupMenu();
 	menu.AppendMenu(MF_STRING, IDC_BTN_OPENDEFAULT, L"재생 (기본 플레이어)\t더블클릭");
 	menu.AppendMenu(MF_STRING, IDC_BTN_EXPLORER,    L"탐색기에서 보기");
+	menu.AppendMenu(MF_STRING, ID_VIDEO_TEXTINFO,   L"텍스트로 정보 입력...");
 	menu.AppendMenu(MF_SEPARATOR);
 	menu.AppendMenu(MF_STRING, IDC_BTN_DELETE,      L"DB에서 삭제 (파일 유지)\tDel");
 	menu.SetDefaultItem(IDC_BTN_OPENDEFAULT);

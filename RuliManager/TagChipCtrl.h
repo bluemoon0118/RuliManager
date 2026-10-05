@@ -19,6 +19,9 @@ public:
 	std::function<CString(const CString&)> m_displayText;
 	// 칩(× 제외)을 클릭함: (칩 번호, 화면 좌표)
 	std::function<void(int, CPoint)> m_onChipClick;
+	// 칩 이름 왼쪽 아이콘 (예: 스튜디오 이미지): 높이 h 일 때 필요한 폭 (0 = 아이콘 없음) / 그리기
+	std::function<int(const CString&, int)> m_iconWidth;
+	std::function<void(CDC*, const CString&, const CRect&)> m_drawIcon;
 	CString DisplayOf(const CString& tag) const;
 
 	bool Create(CWnd* parent, UINT id);

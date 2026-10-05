@@ -174,6 +174,12 @@ int CTagChipCtrl::DoLayout(int width, bool apply)
 				tw += TextFB::Width(&dc, L" (" + sub + L")");   // 회색 보조 글자 (넘치면 칩 폭에서 잘림)
 		}
 		int w = kChipPadL + tw + kXW;
+		if (m_iconWidth && m_drawIcon)
+		{
+			const int iw = m_iconWidth(t, chipH - 4);   // 이름 왼쪽 아이콘 (스튜디오 이미지 등)
+			if (iw > 0)
+				w += iw + 4;
+		}
 		w = (std::min)(w, right - kPad);   // 한 줄보다 긴 태그는 줄임
 		if (x + w > right && x > kPad)
 		{
@@ -251,6 +257,19 @@ void CTagChipCtrl::OnPaint()
 		CRect tr = r;
 		tr.left += kChipPadL;
 		tr.right -= kXW;
+		if (m_iconWidth && m_drawIcon)
+		{
+			// 이름 왼쪽 아이콘 (칩 높이 - 4, 폭은 아이콘 비율대로)
+			const int ih = r.Height() - 4;
+			const int iw = m_iconWidth(m_tags[i], ih);
+			if (iw > 0)
+			{
+				const int left = r.left + kChipPadL - 3;
+				CRect ir(left, r.top + 2, (std::min)(left + iw, static_cast<int>(tr.right)), r.top + 2 + ih);
+				m_drawIcon(&mem, m_tags[i], ir);
+				tr.left = ir.right + 4;
+			}
+		}
 		mem.SetTextColor(enabled ? m_chipText : RGB(0x1B, 0x25, 0x2C));
 		const CString shown = DisplayOf(m_tags[i]);
 		TextFB::Draw(&mem, shown, tr, DT_LEFT, true);   // 글꼴 대체 (凪 등 일본어 한자도 표시)

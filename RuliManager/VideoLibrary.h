@@ -171,6 +171,9 @@ public:
 	static CString FindActorFolder(const CString& videoPath, const CString& actorName);   // 배우 이름과 같은 상위 폴더 (없으면 빈 문자열)
 	static CString FindActorTextFile(const CString& dir, const CString& actorName);       // 배우 폴더의 텍스트 파일 (*.txt)
 	static bool    ApplyActorTextInfo(ActorInfo& a, const CString& file);                // 텍스트(항목: 값)에서 비어 있는 배우 정보 채우기
+	static bool    ApplyActorText(ActorInfo& a, CString text);                      // 위와 같은 규칙, 파일 대신 글자 (직접 입력 창)
+	static CString ActorInfoText(const ActorInfo& a);                                    // 배우 정보 → "항목: 값" 글자 ([정보 txt 생성]과 같은 형식)
+	static void    ClearActorTextFields(ActorInfo& a);                                   // 텍스트로 읽는 항목만 비움 (직접 입력 창 = 입력한 내용으로 교체)
 	static bool    HasNoActorInfo(const ActorInfo& a);
 	// 정보 txt 내보내기 (같은 폴더, 덮어쓰기 · 내용이 같으면 건너뜀). 반환: 새로 쓴 파일 수
 	static CString ExtractCode(const CString& name);
@@ -183,6 +186,9 @@ public:
 	int  FillMissingCodes();   // 품번이 빈 영상은 파일/폴더 이름에서 찾아 채움 (반환: 채운 수)                          // 이름에서 품번 찾기 (ABC-123 / ABC123 → ABC-123, 없으면 빈 문자열)
 	static CString FindVideoTextFile(const CString& videoPath);                 // 영상 폴더의 정보 txt (같은 이름 → '_' 왼쪽 같은 이름 → 영상·txt 가 하나씩이면 그것)
 	bool ApplyVideoTextInfo(VideoItem& v, const CString& file) const;           // 텍스트(항목: 값)에서 비어 있는 영상 정보 채우기
+	bool ApplyVideoText(VideoItem& v, CString text) const;                 // 위와 같은 규칙, 파일 대신 글자 (직접 입력 창)
+	static CString VideoInfoText(const VideoItem& v);                           // 영상 정보 → "항목: 값" 글자 ([정보 txt 생성]과 같은 형식)
+	static void    ClearVideoTextFields(VideoItem& v);                          // 텍스트로 읽는 항목만 비움
 	int ExportVideoInfoTxt(int& unchanged, int& failed) const;                  // 영상 폴더\영상이름.txt (저장된 영상)
 	int ExportActorInfoTxt(int& unchanged, int& noFolder, int& failed) const;   // 배우 폴더\배우폴더이름.txt                                    // 생년월일·키·국적·치수 등이 모두 비어 있음
 	static CString StoreImageCopy(const CString& src, LPCWSTR sub, bool force = false);   // force: 보관소 안의 파일도 새 암호화 사본으로

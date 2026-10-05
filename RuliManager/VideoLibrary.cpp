@@ -2675,6 +2675,17 @@ bool CVideoLibrary::ApplyActorTextInfo(ActorInfo& a, const CString& file)
 	CString text;
 	if (!ReadTextAuto(file, text))
 		return false;
+	return ApplyActorText(a, text);
+}
+
+void CVideoLibrary::ClearActorTextFields(ActorInfo& a)
+{
+	a.birth.Empty(); a.height.Empty(); a.bust.Empty(); a.waist.Empty(); a.hip.Empty(); a.cup.Empty();
+	a.nationality.Empty(); a.gender.Empty(); a.debut.Empty(); a.retire.Empty(); a.aliases.Empty();
+}
+
+bool CVideoLibrary::ApplyActorText(ActorInfo& a, CString text)
+{
 	if (text.Find(kVideoTxtHeader) >= 0)
 		return false;   // 이 프로그램이 만든 영상 정보 파일은 배우 정보로 읽지 않음
 	text.Replace(L"\r\n", L"\n");
@@ -2887,6 +2898,62 @@ namespace
 		t += v;
 		t += L"\r\n";
 	}
+}
+
+CString CVideoLibrary::VideoInfoText(const VideoItem& v)
+{
+	CString t = CString(kVideoTxtHeader) + L"\r\n";
+	AddLine(t, L"파일", v.FileName());
+	AddLine(t, L"품번", v.code);
+	AddLine(t, L"제목", v.title);
+	AddLine(t, L"발매일", v.release);
+	if (v.rating > 0) { CString r; r.Format(L"%d", v.rating); AddLine(t, L"별점", r); }
+	AddLine(t, L"배우", v.actors);
+	AddLine(t, L"참여 별칭", v.actorAliases);
+	AddLine(t, L"스튜디오", v.studio);
+	AddLine(t, L"태그", v.tags);
+	if (v.oCount > 0) { CString o; o.Format(L"%d", v.oCount); AddLine(t, L"물방울", o); }
+	return t;
+}
+
+void CVideoLibrary::ClearVideoTextFields(VideoItem& v)
+{
+	v.code.Empty(); v.title.Empty(); v.release.Empty(); v.rating = 0; v.oCount = 0;
+	v.actors.Empty(); v.actorAliases.Empty(); v.studio.Empty(); v.tags.Empty();
+}
+
+CString CVideoLibrary::ActorInfoText(const ActorInfo& a)
+{
+	CString t = CString(kActorTxtHeader) + L"\r\n";
+	AddLine(t, L"이름", a.name);
+	{
+		// 다른 이름: 읽어 들일 때 순서를 뒤집으므로 거꾸로 써 둠 (다시 읽으면 지금 순서)
+		std::vector<CString> al = SplitList(a.aliases);
+		CString s;
+		for (auto it = al.rbegin(); it != al.rend(); ++it)
+		{
+			if (!s.IsEmpty()) s += L" ";
+			s += L"#" + *it;
+		}
+		AddLine(t, L"다른이름", s);
+	}
+	AddLine(t, L"성별", a.gender);
+	AddLine(t, L"생년월일", a.birth);
+	AddLine(t, L"국적", a.nationality);
+	if (!a.height.IsEmpty()) AddLine(t, L"키", a.height + L"cm");
+	if (!a.bust.IsEmpty() || !a.waist.IsEmpty() || !a.hip.IsEmpty())
+	{
+		CString m;
+		m.Format(L"B%s / W%s / H%s", static_cast<LPCWSTR>(a.bust), static_cast<LPCWSTR>(a.waist), static_cast<LPCWSTR>(a.hip));
+		AddLine(t, L"치수", m);
+	}
+	AddLine(t, L"컵", a.cup);
+	AddLine(t, L"데뷔", a.debut);
+	AddLine(t, L"은퇴", a.retire);
+	if (a.rating > 0) { CString r; r.Format(L"%d", a.rating); AddLine(t, L"별점", r); }
+	if (a.favorite) AddLine(t, L"즐겨찾기", L"예");
+	AddLine(t, L"메모", a.memo);   // 한 줄로
+	return t;
 }
 
 int CVideoLibrary::ExportVideoInfoTxt(int& unchanged, int& failed) const
@@ -3258,7 +3325,14 @@ bool CVideoLibrary::SameNameByLang(const CString& a, const CString& b)
 bool CVideoLibrary::ApplyVideoTextInfo(VideoItem& v, const CString& file) const
 {
 	CString text;
-	if (!ReadTextAuto(file, text) || text.Find(kActorTxtHeader) >= 0)
+	if (!ReadTextAuto(file, text))
+		return false;
+	return ApplyVideoText(v, text);
+}
+
+bool CVideoLibrary::ApplyVideoText(VideoItem& v, CString text) const
+{
+	if (text.Find(kActorTxtHeader) >= 0)
 		return false;   // 배우 정보 파일은 영상 정보로 읽지 않음
 	text.Replace(L"\r\n", L"\n");
 	text.Replace(L'\r', L'\n');

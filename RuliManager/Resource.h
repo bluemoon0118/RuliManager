@@ -8,6 +8,7 @@
 #define IDD_INPUT                   132
 #define IDD_NAMELIST                133
 #define IDD_BULK_NAMES              138
+#define IDD_TEXT_INFO               139
 #define IDD_NAME_PICK               134
 #define IDB_FLAGS                   135
 #define IDD_SETTINGS                136
@@ -61,6 +62,8 @@
 #define ID_ACTOR_EDIT               32801
 #define ID_CAT_DELETE               32813
 #define ID_ACTOR_DELETE             32814
+#define ID_VIDEO_TEXTINFO           32815
+#define ID_ACTOR_TEXTINFO           32816
 #define ID_MANAGE_ACTORS            32810
 #define ID_MANAGE_STUDIOS           32811
 #define ID_MANAGE_TAGS              32812
@@ -167,6 +170,8 @@
 #define IDC_ZOOM_SLIDER             1166
 #define IDC_ACTOR_CHIPS             1167
 #define IDC_STUDIO_CHIPS            1210
+#define IDC_TI_TEXT                 1211
+#define IDC_TI_GUIDE                1212
 #define IDC_ACT_GENDER              1159
 
 // 배우 선택 창
@@ -179,9 +184,9 @@
 // 다음은 새 개체에 사용할 기본값입니다.
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE    139
-#define _APS_NEXT_COMMAND_VALUE     32815
-#define _APS_NEXT_CONTROL_VALUE     1211
+#define _APS_NEXT_RESOURCE_VALUE    140
+#define _APS_NEXT_COMMAND_VALUE     32817
+#define _APS_NEXT_CONTROL_VALUE     1213
 #define _APS_NEXT_SYMED_VALUE       101
 #endif
 #endif

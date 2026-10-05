@@ -104,6 +104,7 @@
     <ClInclude Include="framework.h" />
     <ClInclude Include="ImagePreview.h" />
     <ClInclude Include="BulkNameDlg.h" />
+    <ClInclude Include="TextInfoDlg.h" />
     <ClInclude Include="NameListDlg.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Resource.h" />
@@ -130,6 +131,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BulkNameDlg.cpp" />
+    <ClCompile Include="TextInfoDlg.cpp" />
     <ClCompile Include="NameListDlg.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>

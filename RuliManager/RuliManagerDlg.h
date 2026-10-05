@@ -57,7 +57,9 @@ protected:
 	CActorDetailPanel m_actorPanel;  // 배우 탭 오른쪽 아래: 큰 이름 + ♥ / 별점 / 성별·나이·국적·키 …
 	void ToggleActorFavorite(int actorIdx);
 	afx_msg void OnCatDelete();
-	afx_msg void OnActorDelete();   // 배우 탭 우클릭 → 배우 삭제 (Del)   // 태그 탭 우클릭 → 삭제
+	afx_msg void OnActorDelete();
+	afx_msg void OnVideoTextInfo();   // 영상 카드 오른쪽 클릭 → 텍스트로 정보 입력 (정보 txt 와 같은 규칙)
+	afx_msg void OnActorTextInfo();   // 배우 카드 오른쪽 클릭 → 텍스트로 정보 입력   // 배우 탭 우클릭 → 배우 삭제 (Del)   // 태그 탭 우클릭 → 삭제
 	void ToggleTagFavorite(const CString& tag);   // 태그 즐겨찾기 (태그 목록에 없으면 추가)
 	bool IsTagFavorite(const CString& tag) const;
 	CDropCounter m_dropCounter;      // 영상 상세 정보: 별점 오른쪽 물방울 카운트
