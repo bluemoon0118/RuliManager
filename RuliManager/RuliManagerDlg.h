@@ -42,7 +42,7 @@ protected:
 	static const COLORREF kButtonColor = RGB(0x13, 0x7C, 0xBD); // #137CBD (버튼 배경)
 	static const COLORREF kSaveColor = RGB(0x0F, 0x99, 0x60);   // #0F9960 (저장 버튼 배경)
 	static const COLORREF kDangerColor = RGB(0xDB, 0x37, 0x37); // #DB3737 (삭제/제거 버튼 배경)
-	CDarkButton m_darkButtons[18];
+	CDarkButton m_darkButtons[20];
 	CDarkButton m_btnSettings;      // 오른쪽 위 톱니바퀴 (설정 창)
 	CDarkButton m_modeButtons[4];   // 영상 / 배우 / 스튜디오 / 태그 토글 버튼
 	void UpdateModeButtons();
@@ -56,7 +56,8 @@ protected:
 	CStarRatingCtrl m_starRating;   // 별점 (마우스 오버 미리 보기, 클릭 확정)
 	CActorDetailPanel m_actorPanel;  // 배우 탭 오른쪽 아래: 큰 이름 + ♥ / 별점 / 성별·나이·국적·키 …
 	void ToggleActorFavorite(int actorIdx);
-	afx_msg void OnCatDelete();   // 태그 탭 우클릭 → 삭제
+	afx_msg void OnCatDelete();
+	afx_msg void OnActorDelete();   // 배우 탭 우클릭 → 배우 삭제 (Del)   // 태그 탭 우클릭 → 삭제
 	void ToggleTagFavorite(const CString& tag);   // 태그 즐겨찾기 (태그 목록에 없으면 추가)
 	bool IsTagFavorite(const CString& tag) const;
 	CDropCounter m_dropCounter;      // 영상 상세 정보: 별점 오른쪽 물방울 카운트
@@ -68,11 +69,14 @@ protected:
 	void DrawStripCard(CDC* dc, int i, const CRect& rc, bool hot);   // 카드 띠의 배우 카드 하나
 	void OpenActorFromStrip(int i);                                  // 더블클릭: 배우 탭에서 그 배우 선택
 	CRect StripHeartRect(const CRect& card);                          // 카드 띠 카드의 즐겨찾기 하트 자리
-	afx_msg void OnBnClickedApplyDb();   // [DB 반영]: 작업 DB → library.vmdb
+	afx_msg void OnBnClickedApplyDb();
+	afx_msg void OnBnClickedRescan();
+	afx_msg void OnBnClickedExportTxt(); // [정보 txt 생성]: 영상 폴더 / 배우 폴더에 정보 txt    // [재 스캔]: 새로고침 + 저장된 영상에도 폴더 구조(배우·스튜디오·발매일) 다시 적용   // [DB 반영]: 작업 DB → library.vmdb
 	void UpdateApplyDbButton();          // 반영 안 한 변경이 있을 때만 [DB 반영] 활성
 	void UpdateActorPanel(const ActorInfo* a, int count);   // 배우 상세 패널 내용 (높이가 바뀌면 다시 배치)
 	int             m_actorInfoIdx = -1;   // 오른쪽 패널에 표시 중인 배우
 	CDarkCombo m_comboSort;        // 영상 정렬 기준 (격자에는 열 머리글이 없음)
+	CEdit      m_editCode;    // 품번 (제목 위)
 	CEdit      m_editTitle;
 	// 배우 / 별칭 / 스튜디오 / 태그: 입력하면 DB에서 실시간 검색해 목록으로 선택 (자동 완성)
 	CSuggestEdit m_editActors;
@@ -82,6 +86,9 @@ protected:
 	CListCtrl  m_listCat;         // 배우/스튜디오/태그 목록
 	CSuggestEdit m_editTags;        // 태그 값 보관용 (숨김) - 화면에는 m_tagChips 로 표시
 	CTagChipCtrl m_tagChips;        // 태그 칩 입력 ([태그 ×] ... × ⌄)
+	CTagChipCtrl m_studioChips;     // 스튜디오 칩 입력 (배우와 같은 모양, 하나만) - 값은 숨긴 m_editStudio 에 보관
+	bool         m_syncingStudio = false;
+	afx_msg void OnEnChangeStudio();
 	CTagChipCtrl m_actorChips;      // 배우 칩 입력 ([배우 (이 작품의 별칭) ×] ... × ⌄) - 값은 숨긴 m_editActors 에 보관
 	bool         m_syncingActors = false;
 	afx_msg void OnEnChangeActors();
@@ -179,6 +186,9 @@ protected:
 	// 데이터
 	CVideoLibrary    m_lib;
 	std::vector<int> m_view;          // 목록 행 → m_lib.items 인덱스
+	std::map<CString, int> m_partTotal;   // 나눠진 영상 묶음(폴더 + 파일 이름의 마지막 '_' 왼쪽) → 파일 수 (카드의 (1/3) 표시)
+	static bool SplitPartName(const CString& path, CString& key, int& num);
+	void RecyclePartImages(const std::vector<CString>& videoPaths, const CString& keepBase);   // 분할 파일별 이미지 → 휴지통   // "ABC-123_2.mp4" → 묶음 키 + 순번 2 (순번 없으면 false)
 	int   m_sortColumn = 0;
 	bool  m_sortAsc = true;
 	int   m_curItem = -1;             // 상세 정보에 표시 중인 항목
@@ -309,6 +319,8 @@ protected:
 	void DeleteDb(int mask);
 	CString m_pendingImage;   // 영상 상세에서 고른 새 이미지 (저장하면 영상 파일 옆에 같은 이름으로 복사)
 	afx_msg void OnBnClickedChangeImage();
+	afx_msg void OnDropFiles(HDROP hDropInfo);   // 영상 상세의 이미지 영역에 이미지 파일을 끌어다 놓으면 새 이미지로 지정
+	bool SetPendingVideoImage(const CString& path, const CString& label);   // 새 이미지 미리보기 (저장하면 적용)
 	afx_msg void OnBnClickedSearchImage();   // 영상 이미지 인터넷 검색 (배우 사진 검색과 같은 창)
 	bool ApplyVideoImage(const CString& videoPath, const CString& src);   // 이미지를 "영상이름.확장자" 로 복사
 	int  m_startupRelinked = 0;   // 시작할 때 다시 연결한 영상 수 (상태 줄 표시)   // 설정 창의 DB 삭제 (CSettingsDlg::DbMask)

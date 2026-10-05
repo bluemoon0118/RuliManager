@@ -186,6 +186,7 @@ void CRuliManagerDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_LIST_CATEGORY, m_listCat);
 	DDX_Control(pDX, IDC_EDIT_TAGS, m_editTags);
 	DDX_Control(pDX, IDC_EDIT_MEMO, m_editMemo);
+	DDX_Control(pDX, IDC_EDIT_CODE, m_editCode);
 	DDX_Control(pDX, IDC_EDIT_TITLE, m_editTitle);
 	DDX_Control(pDX, IDC_STATIC_NAME, m_staticName);
 	DDX_Control(pDX, IDC_STATIC_STATUS, m_staticStatus);
@@ -195,6 +196,7 @@ void CRuliManagerDlg::DoDataExchange(CDataExchange* pDX)
 
 BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_WM_SIZE()
+	ON_WM_DROPFILES()
 	ON_WM_MOVE()
 	ON_WM_GETMINMAXINFO()
 	ON_WM_CLOSE()
@@ -204,6 +206,8 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BTN_ADDFOLDER, &CRuliManagerDlg::OnBnClickedAddFolder)
 	ON_BN_CLICKED(IDC_BTN_REMOVEFOLDER, &CRuliManagerDlg::OnBnClickedRemoveFolder)
 	ON_BN_CLICKED(IDC_BTN_REFRESH, &CRuliManagerDlg::OnBnClickedRefresh)
+	ON_BN_CLICKED(IDC_BTN_RESCAN, &CRuliManagerDlg::OnBnClickedRescan)
+	ON_BN_CLICKED(IDC_BTN_EXPORTTXT, &CRuliManagerDlg::OnBnClickedExportTxt)
 	ON_BN_CLICKED(IDC_BTN_ACTORS, &CRuliManagerDlg::OnBnClickedActors)
 	ON_BN_CLICKED(IDC_BTN_SETTINGS, &CRuliManagerDlg::OnBnClickedSettings)
 	ON_BN_CLICKED(IDC_BTN_CHANGEIMAGE, &CRuliManagerDlg::OnBnClickedChangeImage)
@@ -220,6 +224,7 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_COMMAND(ID_ACTOR_SHOWVIDEOS, &CRuliManagerDlg::OnActorShowVideos)
 	ON_COMMAND(ID_ACTOR_EDIT, &CRuliManagerDlg::OnActorEdit)
 	ON_COMMAND(ID_CAT_DELETE, &CRuliManagerDlg::OnCatDelete)
+	ON_COMMAND(ID_ACTOR_DELETE, &CRuliManagerDlg::OnActorDelete)
 	ON_BN_CLICKED(IDC_BTN_SAVE, &CRuliManagerDlg::OnBnClickedSave)
 	ON_BN_CLICKED(IDC_BTN_RENAME, &CRuliManagerDlg::OnBnClickedRename)
 	ON_BN_CLICKED(IDC_BTN_DELETE, &CRuliManagerDlg::OnBnClickedDelete)
@@ -234,9 +239,10 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BTN_SORTDIR, &CRuliManagerDlg::OnBnClickedSortDir)
 	ON_EN_CHANGE(IDC_EDIT_ACTORS, &CRuliManagerDlg::OnEnChangeActors)
 	ON_EN_CHANGE(IDC_EDIT_VALIASES, &CRuliManagerDlg::OnEnChangeVAliases)
-	ON_EN_CHANGE(IDC_EDIT_STUDIO, &CRuliManagerDlg::OnDetailsChanged)
+	ON_EN_CHANGE(IDC_EDIT_STUDIO, &CRuliManagerDlg::OnEnChangeStudio)
 	ON_EN_CHANGE(IDC_EDIT_TAGS, &CRuliManagerDlg::OnEnChangeTags)
 	ON_EN_CHANGE(IDC_EDIT_MEMO, &CRuliManagerDlg::OnDetailsChanged)
+	ON_EN_CHANGE(IDC_EDIT_CODE, &CRuliManagerDlg::OnDetailsChanged)
 	ON_EN_CHANGE(IDC_EDIT_TITLE, &CRuliManagerDlg::OnDetailsChanged)
 	ON_NOTIFY(DTN_DATETIMECHANGE, IDC_DATE_RELEASE, &CRuliManagerDlg::OnDtnReleaseChanged)
 
@@ -309,7 +315,7 @@ BOOL CRuliManagerDlg::OnInitDialog()
 		m_actorGrid.Invalidate(FALSE);   // 카드의 별점 리본
 	};
 	m_actorPanel.m_onFavorite = [this]() { ToggleActorFavorite(m_actorInfoIdx); };
-	// 영상 상세 정보: 메모 아래 출연 배우 카드
+	// 영상 상세 정보: 태그 아래 출연 배우 카드
 	// 영상 상세 정보: [이미지 변경] 버튼 위 fps / 해상도
 	m_mediaInfo.Create(this, IDC_MEDIA_INFO);
 	m_mediaInfo.SetColors(kBackColor, RGB(0xA7, 0xB6, 0xC2), RGB(0xF5, 0xF8, 0xFA));
@@ -363,7 +369,11 @@ BOOL CRuliManagerDlg::OnInitDialog()
 		CommitDetails();
 		m_grid.Invalidate(FALSE);   // 카드의 별점 리본
 	};
-	m_editTitle.SetCueBanner(L"비어 있으면 파일 이름을 사용");
+	// 제목 칸: 여러 줄 에디트(자동 줄바꿈, 4줄 높이) - 여러 줄 에디트는 안내 문구(Cue Banner)를 지원하지 않음
+	// 영상 메모 기능 삭제: 메모 칸 / 라벨은 항상 숨김
+	m_editMemo.ShowWindow(SW_HIDE);
+	GetDlgItem(IDC_STATIC_MEMO_LBL)->ShowWindow(SW_HIDE);
+	m_editCode.SetCueBanner(L"예: ABC-123");
 
 	// 영상 정렬 기준 (Column 순서와 같음)
 	{
@@ -387,6 +397,11 @@ BOOL CRuliManagerDlg::OnInitDialog()
 
 	// 미리보기 이미지 영역
 	m_preview.SetPlaceholder(L"동영상을 선택하세요.");
+	// 탐색기에서 이미지 파일을 끌어다 놓기 (영상 상세의 이미지 영역) - 관리자 권한으로 실행해도 받도록 메시지 허용
+	DragAcceptFiles(TRUE);
+	::ChangeWindowMessageFilterEx(m_hWnd, WM_DROPFILES, MSGFLT_ALLOW, nullptr);
+	::ChangeWindowMessageFilterEx(m_hWnd, WM_COPYDATA, MSGFLT_ALLOW, nullptr);
+	::ChangeWindowMessageFilterEx(m_hWnd, 0x0049 /* WM_COPYGLOBALDATA */, MSGFLT_ALLOW, nullptr);
 
 	ApplyColors();
 
@@ -506,6 +521,36 @@ BOOL CRuliManagerDlg::OnInitDialog()
 		m_actorChips.m_onHeightChanged = m_tagChips.m_onHeightChanged;
 		GetDlgItem(IDC_EDIT_ACTORS)->ShowWindow(SW_HIDE);
 		GetDlgItem(IDC_BTN_PICKACTORS)->ShowWindow(SW_HIDE);
+
+		// 스튜디오 칩 입력 (배우 선택과 같은 모양, 스튜디오는 하나만 - 새로 고르면 바뀜)
+		m_studioChips.Create(this, IDC_STUDIO_CHIPS);
+		m_studioChips.SetColors(kEditColor, RGB(0xCE, 0xD9, 0xE0), RGB(0x18, 0x20, 0x26), RGB(0xA7, 0xB6, 0xC2), kTextColor);
+		m_studioChips.m_edit.SetColors(kEditColor, kTextColor, kButtonColor, RGB(140, 155, 168));
+		m_studioChips.m_edit.SetCueBanner(L"스튜디오 입력 (↓ 목록)");
+		m_studioChips.m_edit.Setup([this](std::vector<SuggestItem>& out)
+		{
+			const CString cur = m_studioChips.Tags().empty() ? CString() : m_studioChips.Tags()[0];
+			for (const NamedInfo& n : m_lib.studios)
+				if (n.name.CompareNoCase(cur) != 0)   // 지금 스튜디오는 후보에서 뺌
+					out.push_back({ n.name, n.name });
+		}, false);
+		m_studioChips.m_onChanged = [this]()
+		{
+			// 하나만: 새로 추가하면 마지막 것만 남김 → 숨긴 스튜디오 칸 (EN_CHANGE 로 변경 표시)
+			std::vector<CString> tags = m_studioChips.Tags();
+			if (tags.size() > 1)
+			{
+				tags.erase(tags.begin(), tags.end() - 1);
+				m_studioChips.SetTags(tags);
+			}
+			m_syncingStudio = true;
+			m_editStudio.SetWindowText(tags.empty() ? CString() : tags[0]);
+			m_syncingStudio = false;
+		};
+		m_studioChips.m_onDropDown = [this]() { OnBnClickedPickStudio(); };
+		m_studioChips.m_onHeightChanged = m_tagChips.m_onHeightChanged;
+		GetDlgItem(IDC_EDIT_STUDIO)->ShowWindow(SW_HIDE);
+		GetDlgItem(IDC_BTN_PICKSTUDIO)->ShowWindow(SW_HIDE);
 		// [별칭] 줄은 배우 칩에 합침 (값은 숨긴 별칭 칸에 보관)
 		GetDlgItem(IDC_STATIC_VALIASES_LBL)->ShowWindow(SW_HIDE);
 		GetDlgItem(IDC_EDIT_VALIASES)->ShowWindow(SW_HIDE);
@@ -539,6 +584,10 @@ BOOL CRuliManagerDlg::OnInitDialog()
 		// 기존 데이터의 배우/스튜디오/태그 이름을 각 목록으로 옮김
 		const bool a = m_lib.SyncActorsFromVideos() || va;
 		const bool n = m_lib.SyncNamedFromVideos();
+		// 품번이 빈 영상은 파일 / 영상 폴더 이름에서 찾아 채움
+		const bool codes = m_lib.FillMissingCodes() > 0;
+		// 분할 파일(ABC-123_1 / _2 …)은 같은 정보를 사용: 묶음마다 빈 정보를 서로 채움
+		const bool parts = m_lib.UnifyPartGroups() > 0;
 		// 예전에 원본 경로로 등록한 이미지를 DB 폴더(images)의 복사본으로 교체
 		bool img = m_lib.MigrateImagesToStore();
 		// Image 폴더의 평문 이미지 → 암호화(.vmimg)로 바꿈 (DB 를 정상적으로 읽었을 때만, 평문은 저장 후 삭제)
@@ -550,7 +599,7 @@ BOOL CRuliManagerDlg::OnInitDialog()
 			CWaitCursor wait;
 			m_startupRelinked = m_lib.RelinkOnStartup();
 		}
-		if (a || n || img || m_startupRelinked > 0 || m_lib.LoadedPlainText())   // 예전 평문 DB 는 바로 암호화해서 다시 저장
+		if (a || n || img || codes || parts || m_startupRelinked > 0 || m_lib.LoadedPlainText())   // 예전 평문 DB 는 바로 암호화해서 다시 저장
 		{
 			if (m_lib.Save())
 			{
@@ -646,6 +695,7 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 	MoveCtrl(IDC_BTN_ADDFOLDER,    x, y, DX(55), btnH);  x += DX(55) + gap;
 	MoveCtrl(IDC_BTN_REMOVEFOLDER, x, y, DX(55), btnH);  x += DX(55) + gap;
 	MoveCtrl(IDC_BTN_REFRESH,      x, y, DX(50), btnH);  x += DX(50) + gap;
+	MoveCtrl(IDC_BTN_RESCAN,       x, y, DX(40), btnH);  x += DX(40) + gap;
 	MoveCtrl(IDC_BTN_ACTORS,       x, y, DX(50), btnH);  x += DX(50) + gap * 3;
 	MoveCtrl(IDC_STATIC_SEARCH,    x, y + DY(3), DX(20), DY(9));  x += DX(20);
 	MoveCtrl(IDC_EDIT_SEARCH,      x, y, DX(140), rowH);  x += DX(140) + gap * 3;
@@ -661,7 +711,7 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 	const int by = cy - m - btnH;
 	x = m;
 	MoveCtrl(IDC_BTN_OPENDEFAULT, x, by, DX(76), btnH);  x += DX(76) + gap;
-	const UINT bottomIds[] = { IDC_BTN_DELETE, IDC_BTN_EXPLORER, IDC_BTN_OPENDB, IDC_BTN_APPLYDB };
+	const UINT bottomIds[] = { IDC_BTN_DELETE, IDC_BTN_EXPLORER, IDC_BTN_OPENDB, IDC_BTN_APPLYDB, IDC_BTN_EXPORTTXT };
 	const int bw = DX(62);
 	for (UINT id : bottomIds)
 	{
@@ -740,8 +790,21 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 		? (std::max)(rowH, m_tagChips.CalcHeight(rw - lblW0)) : rowH;
 	const int actorChipsH = (showDetail && m_actorChips.GetSafeHwnd())
 		? (std::max)(rowH, m_actorChips.CalcHeight(rw - lblW0)) : rowH;
-	const int stripH = (m_mode == MODE_VIDEO && m_actorStrip.GetSafeHwnd()) ? m_actorStrip.CalcHeight() : 0;   // 메모 아래 배우 카드 (영상 탭에서만)
-	const int detailH = showDetail ? DY(175) + (chipsH - rowH) + (actorChipsH - rowH) + (stripH > 0 ? stripH + gap : 0)   // [이미지 변경] 줄 +2, 메모 칸은 예전의 반 높이
+	const int studioChipsH = (showDetail && m_studioChips.GetSafeHwnd())
+		? (std::max)(rowH, m_studioChips.CalcHeight(rw - lblW0)) : rowH;
+	const int stripH = (m_mode == MODE_VIDEO && m_actorStrip.GetSafeHwnd()) ? m_actorStrip.CalcHeight() : 0;   // 태그 아래 배우 카드 (영상 탭에서만)
+	// 제목 칸 높이: 글꼴 4줄 + 테두리 / 여백
+	int titleH = rowH;
+	if (showDetail && m_editTitle.GetSafeHwnd())
+	{
+		CClientDC tdc(&m_editTitle);
+		CFont* old = tdc.SelectObject(m_editTitle.GetFont());
+		TEXTMETRIC tm = {};
+		tdc.GetTextMetrics(&tm);
+		tdc.SelectObject(old);
+		titleH = (std::max)(rowH, static_cast<int>(tm.tmHeight) * 4 + 8);
+	}
+	const int detailH = showDetail ? DY(116) + (titleH - rowH) + (studioChipsH - rowH) + chipsH + actorChipsH + (stripH > 0 ? stripH + gap : 0)   // 파일 / 이미지 / 품번 / 제목 / 별점 / 발매일 / 배우 / 스튜디오 / 태그 (메모 칸 삭제 → 이미지가 커짐)
 		: ((IsActorGridMode() && m_actorPanel.GetSafeHwnd()) ? m_actorPanel.CalcHeight(rw) : DY(26));   // 배우 격자: [별점] 줄 추가   // [별칭] 줄은 배우 칩에 합침
 	const int previewBottom = (std::max)(top + DY(60), bottom - detailH - gap);
 	MoveCtrl(IDC_PREVIEW, rx, top, rw, previewBottom - top);
@@ -790,9 +853,13 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 		return;
 	}
 
-	MoveCtrl(IDC_STATIC_TITLE_LBL, rx, dy + DY(3), lblW, DY(9));
-	MoveCtrl(IDC_EDIT_TITLE, rx + lblW, dy, rw - lblW, rowH);
+	MoveCtrl(IDC_STATIC_CODE_LBL, rx, dy + DY(3), lblW, DY(9));     // 품번 (제목 위)
+	MoveCtrl(IDC_EDIT_CODE, rx + lblW, dy, rw - lblW, rowH);
 	dy += DY(17);
+
+	MoveCtrl(IDC_STATIC_TITLE_LBL, rx, dy + DY(3), lblW, DY(9));
+	MoveCtrl(IDC_EDIT_TITLE, rx + lblW, dy, rw - lblW, titleH);   // 여러 줄 (4줄)
+	dy += titleH + DY(4);
 
 	MoveCtrl(IDC_STATIC_RATING_LBL, rx, dy + DY(3), lblW, DY(9));
 	MoveCtrl(IDC_COMBO_RATING, rx + lblW, dy, DX(80), rowH);
@@ -811,23 +878,17 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 
 
 	MoveCtrl(IDC_STATIC_STUDIO_LBL, rx, dy + DY(3), lblW, DY(9));
-	MoveCtrl(IDC_EDIT_STUDIO, rx + lblW, dy, rw - lblW - DX(40), rowH);
-	MoveCtrl(IDC_BTN_PICKSTUDIO, rx + rw - DX(36), dy - 1, DX(36), btnH);
-	dy += DY(17);
+	MoveCtrl(IDC_EDIT_STUDIO, rx + lblW, dy, rw - lblW - DX(40), rowH);   // 숨김 (값 보관용)
+	MoveCtrl(IDC_STUDIO_CHIPS, rx + lblW, dy, rw - lblW, studioChipsH);   // 배우 선택과 같은 칩 입력
+	dy += studioChipsH + DY(4);
 
 	MoveCtrl(IDC_STATIC_TAGS_LBL, rx, dy + DY(3), lblW, DY(9));
 	MoveCtrl(IDC_EDIT_TAGS, rx + lblW, dy, rw - lblW - DX(40), rowH);   // 숨김 (값 보관용)
 	MoveCtrl(IDC_TAG_CHIPS, rx + lblW, dy, rw - lblW, chipsH);
 	dy += chipsH + DY(4);
 
-	MoveCtrl(IDC_STATIC_MEMO_LBL, rx, dy + DY(3), lblW, DY(9));
-	{
-		// 메모 아래에 출연 배우 카드 띠 (전체 폭)
-		const int memoBottom = (stripH > 0) ? bottom - stripH - gap : bottom;
-		MoveCtrl(IDC_EDIT_MEMO, rx + lblW, dy, rw - lblW, (std::max)(DY(20), memoBottom - dy));
-		if (stripH > 0)
-			MoveCtrl(IDC_ACTOR_STRIP, rx, (std::max)(dy + DY(20) + gap, memoBottom + gap), rw, stripH);
-	}
+	if (stripH > 0)
+		MoveCtrl(IDC_ACTOR_STRIP, rx, (std::max)(dy, bottom - stripH), rw, stripH);   // 태그 아래 출연 배우 카드 띠 (전체 폭)
 
 	RedrawWindow(nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
 }
@@ -918,6 +979,8 @@ void CRuliManagerDlg::HideSuggestions()
 	m_editTags.HidePopup();
 	m_tagChips.m_edit.HidePopup();
 	m_actorChips.m_edit.HidePopup();
+	if (m_studioChips.GetSafeHwnd())
+		m_studioChips.m_edit.HidePopup();
 }
 
 void CRuliManagerDlg::OnMove(int x, int y)
@@ -1025,6 +1088,15 @@ void CRuliManagerDlg::ApplyFilter()
 	actorTarget.MakeLower();
 
 	m_list.SetItemState(-1, 0, LVIS_SELECTED | LVIS_FOCUSED);
+	// 카드의 순번 (1/3): 같은 폴더 · 같은 묶음 이름(마지막 '_' 왼쪽)의 파일 수
+	m_partTotal.clear();
+	for (const VideoItem& pv : m_lib.items)
+	{
+		CString key;
+		int num = 0;
+		SplitPartName(pv.path, key, num);
+		++m_partTotal[key];
+	}
 	m_view.clear();
 	for (size_t i = 0; i < m_lib.items.size(); ++i)
 	{
@@ -1051,7 +1123,7 @@ void CRuliManagerDlg::ApplyFilter()
 		}
 		if (!terms.empty())
 		{
-			CString hay = v.FileName() + L"\n" + v.title + L"\n" + v.release + L"\n" + v.actors + L"\n" + v.actorAliases + L"\n" + v.studio + L"\n" + v.tags + L"\n" + v.memo;
+			CString hay = v.FileName() + L"\n" + v.code + L"\n" + v.title + L"\n" + v.release + L"\n" + v.actors + L"\n" + v.actorAliases + L"\n" + v.studio + L"\n" + v.tags;   // 영상 메모 기능 삭제
 			if (!aliasMap.empty() && !v.actors.IsEmpty())
 			{
 				for (const CString& n : CVideoLibrary::SplitList(v.actors))
@@ -1683,7 +1755,7 @@ void CRuliManagerDlg::GridGetItem(int row, int& image, CString& name, CString& r
 	image = GetThumbIndex(idx);
 	name = v.title.IsEmpty() ? v.FileName() : v.title;   // 제목이 있으면 제목
 	release = v.pending ? CString(L"● 임시 (정보 저장 전)") : v.release;   // 발매일 (날짜만, 없으면 빈 줄)
-	memo = v.memo;
+	memo.Empty();   // 영상 메모 기능 삭제
 }
 
 void CRuliManagerDlg::GridActivate(int /*row*/)
@@ -1917,6 +1989,7 @@ void CRuliManagerDlg::ShowDetails(int idx)
 		}
 		m_starRating.SetRating(v.rating);
 		m_dropCounter.SetCount(v.oCount);
+		m_editCode.SetWindowText(v.code);
 		m_editTitle.SetWindowText(v.title);
 		SYSTEMTIME st = {};
 		if (ParseDate(v.release, st))
@@ -1927,11 +2000,6 @@ void CRuliManagerDlg::ShowDetails(int idx)
 		m_editVAliases.SetWindowText(v.actorAliases);
 		m_editStudio.SetWindowText(v.studio);
 		m_editTags.SetWindowText(v.tags);
-		CString memo = v.memo;
-		// 멀티라인 에디트는 CRLF가 필요
-		memo.Replace(L"\r\n", L"\n");
-		memo.Replace(L"\n", L"\r\n");
-		m_editMemo.SetWindowText(memo);
 	}
 	else
 	{
@@ -1948,18 +2016,19 @@ void CRuliManagerDlg::ShowDetails(int idx)
 		}
 		m_starRating.SetRating(0);
 		m_dropCounter.SetCount(0);
+		m_editCode.SetWindowText(L"");
 		m_editTitle.SetWindowText(L"");
 		m_dateRelease.SetTime(static_cast<LPSYSTEMTIME>(nullptr));
 		m_editActors.SetWindowText(L"");
 		m_editVAliases.SetWindowText(L"");
 		m_editStudio.SetWindowText(L"");
 		m_editTags.SetWindowText(L"");
-		m_editMemo.SetWindowText(L"");
 	}
 	UpdatePreview(m_curItem);
 
 	m_starRating.EnableWindow(enable);
 	m_dropCounter.EnableWindow(enable);
+	m_editCode.EnableWindow(enable);
 	m_editTitle.EnableWindow(enable);
 	GetDlgItem(IDC_BTN_CHANGEIMAGE)->EnableWindow(enable);
 	GetDlgItem(IDC_BTN_SEARCHIMAGE)->EnableWindow(enable);
@@ -1970,11 +2039,11 @@ void CRuliManagerDlg::ShowDetails(int idx)
 	GetDlgItem(IDC_BTN_PICKVALIASES)->EnableWindow(enable);
 	m_editStudio.EnableWindow(enable);
 	GetDlgItem(IDC_BTN_PICKSTUDIO)->EnableWindow(enable);
+	m_studioChips.EnableWindow(enable);
 	GetDlgItem(IDC_BTN_PICKTAGS)->EnableWindow(enable);
 	m_editTags.EnableWindow(enable);
 	m_tagChips.EnableWindow(enable);
 	m_actorChips.EnableWindow(enable);
-	m_editMemo.EnableWindow(enable);
 
 	m_detailsDirty = false;
 	// 임시 항목은 바꾼 내용이 없어도 [저장]으로 정식 DB에 등록할 수 있음
@@ -2010,7 +2079,12 @@ void CRuliManagerDlg::CommitDetails()
 	v.rating = m_starRating.GetRating();
 	v.oCount = m_dropCounter.GetCount();
 
+	m_editCode.GetWindowText(v.code);
+	v.code.Trim();
 	m_editTitle.GetWindowText(v.title);
+	v.title.Replace(L"\r\n", L" ");   // 붙여 넣은 줄바꿈은 공백으로 (제목은 한 줄 값, 칸에서만 줄바꿈 표시)
+	v.title.Replace(L'\r', L' ');
+	v.title.Replace(L'\n', L' ');
 	v.title.Trim();
 
 	SYSTEMTIME st = {};
@@ -2034,14 +2108,28 @@ void CRuliManagerDlg::CommitDetails()
 	m_editTags.GetWindowText(tags);
 	v.tags = NormalizeTags(tags);
 
-	m_editMemo.GetWindowText(v.memo);
 
 	// 새로 고른 이미지: 영상 파일 옆에 "영상이름.확장자" 로 저장
 	if (!m_pendingImage.IsEmpty())
 	{
 		const CString src = m_pendingImage;
 		m_pendingImage.Empty();
-		if (ApplyVideoImage(v.path, src))
+		// 분할 파일은 순번을 뗀 이름(ABC-123.jpg)으로 저장 → '_' 왼쪽 일치로 묶음 전체가 같은 이미지 사용
+		bool ok = ApplyVideoImage(CVideoLibrary::PartGroupPath(v.path), src);
+		if (ok)
+		{
+			const std::vector<size_t> sibs = m_lib.PartSiblings(static_cast<size_t>(m_curItem));
+			if (!sibs.empty() || CVideoLibrary::PartGroupPath(v.path) != v.path)
+			{
+				// 파일별 이미지(ABC-123_2.jpg 등)가 남아 있으면 그쪽이 먼저 보이므로 휴지통으로
+				std::vector<CString> paths;
+				paths.push_back(v.path);
+				for (size_t si : sibs)
+					paths.push_back(m_lib.items[si].path);
+				RecyclePartImages(paths, CVideoLibrary::PartGroupPath(v.path));
+			}
+		}
+		if (ok)
 		{
 			ResetThumbnails();      // 카드 / 목록 이미지 다시 읽기
 			UpdatePreview(m_curItem);
@@ -2053,6 +2141,9 @@ void CRuliManagerDlg::CommitDetails()
 	// 영상 정보를 저장하면 임시 목록에서 정식 DB로 옮김
 	const bool registered = v.pending;
 	v.pending = false;
+	// 분할 파일: 같은 묶음의 다른 파일도 같은 정보로 (임시 파일도 함께 등록)
+	if (m_lib.SyncPartGroup(static_cast<size_t>(m_curItem)) > 0)
+		UpdateStatus();
 
 	m_detailsDirty = false;
 	GetDlgItem(IDC_BTN_SAVE)->EnableWindow(FALSE);
@@ -2434,6 +2525,22 @@ void CRuliManagerDlg::OnEnChangeVAliases()
 	OnDetailsChanged();
 }
 
+void CRuliManagerDlg::OnEnChangeStudio()
+{
+	// 숨긴 스튜디오 칸이 바뀌면 (영상 선택, [선택...] 결과, 저장 후 정리) 칩도 갱신
+	if (!m_syncingStudio && m_studioChips.GetSafeHwnd())
+	{
+		CString text;
+		m_editStudio.GetWindowText(text);
+		text.Trim();
+		std::vector<CString> tags;
+		if (!text.IsEmpty())
+			tags.push_back(text);
+		m_studioChips.SetTags(tags);
+	}
+	OnDetailsChanged();
+}
+
 void CRuliManagerDlg::OnEnChangeActors()
 {
 	// 숨긴 배우 칸이 바뀌면 (영상 선택, [선택...] 결과, 별칭 칸에서 추가, 저장 후 정리) 칩도 갱신
@@ -2443,7 +2550,7 @@ void CRuliManagerDlg::OnEnChangeActors()
 		m_editActors.GetWindowText(text);
 		m_actorChips.SetTags(CVideoLibrary::SplitList(text));
 	}
-	RefreshActorStrip();   // 메모 아래 배우 카드도 갱신
+	RefreshActorStrip();   // 태그 아래 배우 카드도 갱신
 	OnDetailsChanged();
 }
 
@@ -2610,19 +2717,18 @@ void CRuliManagerDlg::UpdateLeftPane()
 	for (UINT id : sortIds)
 		GetDlgItem(id)->ShowWindow(showVideos ? SW_SHOW : SW_HIDE);
 
-	// 영상 상세 정보(편집 칸)는 영상 탭 + 배우 출연작 화면에서 표시 (메모 아래 배우 카드는 영상 탭에서만)
+	// 영상 상세 정보(편집 칸)는 영상 탭 + 배우 출연작 화면에서 표시 (태그 아래 배우 카드는 영상 탭에서만)
 	const bool showDetail = ShowVideoDetail();
 	if (!showDetail)
 		HideSuggestions();
 	const UINT detailIds[] = {
 		IDC_STATIC_NAME_LBL,
-		IDC_STATIC_TITLE_LBL, IDC_EDIT_TITLE, IDC_BTN_CHANGEIMAGE, IDC_BTN_SEARCHIMAGE, IDC_MEDIA_INFO,
+		IDC_STATIC_CODE_LBL, IDC_EDIT_CODE, IDC_STATIC_TITLE_LBL, IDC_EDIT_TITLE, IDC_BTN_CHANGEIMAGE, IDC_BTN_SEARCHIMAGE, IDC_MEDIA_INFO,
 		IDC_STATIC_RATING_LBL, IDC_COMBO_RATING, IDC_DROP_COUNTER, IDC_BTN_SAVE,
 		IDC_STATIC_RELEASE_LBL, IDC_DATE_RELEASE,
 		IDC_STATIC_ACTORS_LBL, IDC_ACTOR_CHIPS,
-		IDC_STATIC_STUDIO_LBL, IDC_EDIT_STUDIO, IDC_BTN_PICKSTUDIO,
-		IDC_STATIC_TAGS_LBL, IDC_TAG_CHIPS,
-		IDC_STATIC_MEMO_LBL, IDC_EDIT_MEMO
+		IDC_STATIC_STUDIO_LBL, IDC_STUDIO_CHIPS,
+		IDC_STATIC_TAGS_LBL, IDC_TAG_CHIPS
 	};
 	for (UINT id : detailIds)
 	{
@@ -3053,6 +3159,22 @@ namespace
 	const COLORREF kCardIcon   = RGB(0xCE, 0xD9, 0xE0);   // ▶ / 필름 아이콘
 	const COLORREF kFemale     = RGB(0xF5, 0x49, 0x8B);   // ♀
 	const COLORREF kMale       = RGB(0x48, 0xAF, 0xF0);   // ♂
+	const COLORREF kTransF     = RGB(0xF5, 0xA9, 0xB8);   // ⚧ 트랜스젠더 여성 (트랜스 깃발 분홍)
+	const COLORREF kTransM     = RGB(0x5B, 0xCE, 0xFA);   // ⚧ 트랜스젠더 남성 (트랜스 깃발 하늘색)
+	const COLORREF kIntersex   = RGB(0xFF, 0xD8, 0x00);   // ⚥ 인터섹스 (인터섹스 깃발 노랑)
+	const COLORREF kNonBinary  = RGB(0xB5, 0x7E, 0xDC);   // ⚲ 논바이너리 (논바이너리 깃발 보라)
+
+	// 성별 기호 + 색 (미지정이면 false). 기호는 TextFB 로 그려서 글꼴에 없으면 Segoe UI Symbol 등으로 대체
+	bool GenderSymbol(const CString& g, CString& sym, COLORREF& col)
+	{
+		if (g == L"여성")                { sym = L"\x2640"; col = kFemale;    return true; }   // ♀
+		if (g == L"남성")                { sym = L"\x2642"; col = kMale;      return true; }   // ♂
+		if (g == L"트랜스젠더 여성")     { sym = L"\x26A7"; col = kTransF;    return true; }   // ⚧
+		if (g == L"트랜스젠더 남성")     { sym = L"\x26A7"; col = kTransM;    return true; }   // ⚧
+		if (g == L"인터섹스")            { sym = L"\x26A5"; col = kIntersex;  return true; }   // ⚥
+		if (g == L"논바이너리")          { sym = L"\x26B2"; col = kNonBinary; return true; }   // ⚲
+		return false;
+	}
 
 	// 폭 안에 들어가는 만큼 자르기 (공백이 있으면 공백에서 줄바꿈)
 	int FitChars(CDC* dc, const CString& s, int start, int width, bool preferSpace)
@@ -3189,7 +3311,7 @@ namespace
 	void DrawDefaultActorImage(CDC* dc, const CRect& img, const ActorInfo& a)
 	{
 		const CString& gender = a.gender;
-		const bool female = (gender == L"여성"), male = (gender == L"남성");
+		const bool female = CVideoLibrary::IsFemaleLike(gender), male = CVideoLibrary::IsMaleLike(gender);   // 트랜스젠더 여성 / 남성도 같은 실루엣
 		const int count = female ? VectorIcon::FemaleCount() : (male ? VectorIcon::MaleCount() : 0);
 		if (count > 0)
 		{
@@ -3204,7 +3326,7 @@ namespace
 				VectorIcon::Male(dc, img, RGB(255, 255, 255), index, 0.94);
 			return;
 		}
-		if (gender != L"여성" && gender != L"남성")
+		if (!female && !male)   // 미지정 · 인터섹스 · 논바이너리: 흰 사람
 		{
 			const int side = (std::max)(1, (std::min)(img.Width(), img.Height()));
 			const double fill = (std::min)(1.0, img.Height() * (512.0 / 1080.0) / (side * 22.0 / 24.0));
@@ -3357,6 +3479,43 @@ bool CRuliManagerDlg::IsTagFavorite(const CString& tag) const
 {
 	const int n = m_lib.FindNamed(LIST_TAG, tag);
 	return n >= 0 && m_lib.tagInfos[n].favorite;
+}
+
+void CRuliManagerDlg::OnActorDelete()
+{
+	// 배우 탭(배우 격자): 선택한 배우를 배우 목록과 영상에서 삭제 (영상 파일·이미지 원본은 그대로)
+	if (!IsActorGridMode())
+		return;
+	const int idx = SelectedActorIndex();
+	if (idx < 0 || idx >= static_cast<int>(m_lib.actors.size()))
+		return;
+	const CString name = m_lib.actors[idx].name;
+	const int count = m_lib.CountVideosWithActor(name);
+	CString msg;
+	if (count > 0)
+		msg.Format(L"배우 '%s'을(를) 삭제할까요?\n\n이 배우가 연결된 동영상 %d개에서도 빠집니다.", static_cast<LPCWSTR>(name), count);
+	else
+		msg.Format(L"배우 '%s'을(를) 삭제할까요?", static_cast<LPCWSTR>(name));
+	if (AfxMessageBox(msg, MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
+		return;
+
+	// 삭제 후에는 옆 배우를 선택 (목록 순서 기준)
+	const int row = m_actorSel;
+	m_lib.RemoveActorFromVideos(name);
+	m_lib.actors.erase(m_lib.actors.begin() + idx);
+	m_lib.Save();
+
+	m_actorSelName.Empty();
+	RebuildActorGrid();
+	if (!m_actorRows.empty())
+	{
+		const int next = (std::min)((std::max)(0, row), static_cast<int>(m_actorRows.size()) - 1);
+		SelectActorRow(next);
+	}
+	else
+		ShowActorInfo(-1);
+	m_catsDirty = true;   // 다른 탭의 개수도 다시 계산
+	UpdateStatus();
 }
 
 void CRuliManagerDlg::OnCatDelete()
@@ -3601,16 +3760,16 @@ CBitmap* CRuliManagerDlg::GetVideoCover(int itemIdx, int w, int h)
 		mem.CreateCompatibleDC(&screen);
 		CBitmap* old = mem.SelectObject(bmp.get());
 		mem.FillSolidRect(0, 0, w, h, kThumbBackColor);
-		// 카드 폭을 꽉 채우도록 확대하고 넘치는 부분은 가운데 기준으로 자름
+		// 비율을 유지한 채 이미지 전체가 카드 이미지 칸에 들어가도록 맞춤 (자르지 않음, 남는 곳은 배경색 여백 - 가운데 정렬)
 		const double iw = img.GetWidth(), ih = img.GetHeight();
-		const double scale = (std::max)(w / iw, h / ih);
-		const int sw = (std::max)(1, static_cast<int>(w / scale));
-		const int sh = (std::max)(1, static_cast<int>(h / scale));
-		const int sx = (std::max)(0, static_cast<int>((iw - sw) / 2));
-		const int sy = (std::max)(0, static_cast<int>((ih - sh) / 2));
+		const double scale = (std::min)(w / iw, h / ih);
+		const int dw = (std::max)(1, (std::min)(w, static_cast<int>(iw * scale + 0.5)));
+		const int dh = (std::max)(1, (std::min)(h, static_cast<int>(ih * scale + 0.5)));
+		const int dx = (w - dw) / 2;
+		const int dy = (h - dh) / 2;
 		mem.SetStretchBltMode(HALFTONE);
 		::SetBrushOrgEx(mem.GetSafeHdc(), 0, 0, nullptr);
-		img.StretchBlt(mem.GetSafeHdc(), 0, 0, w, h, sx, sy, sw, sh, SRCCOPY);
+		img.StretchBlt(mem.GetSafeHdc(), dx, dy, dw, dh, 0, 0, static_cast<int>(iw), static_cast<int>(ih), SRCCOPY);
 		mem.SelectObject(old);
 	}
 	CBitmap* result = bmp.get();
@@ -3735,6 +3894,11 @@ void CRuliManagerDlg::DrawStudioMark(CDC* dc, const CRect& img, const CString& s
 	g.DrawString(name, -1, &font, box, &fmt, &brush);
 }
 
+bool CRuliManagerDlg::SplitPartName(const CString& path, CString& key, int& num)
+{
+	return CVideoLibrary::PartGroupKey(path, key, num);   // "ABC-123_2.mp4" → 묶음 키 + 순번 2
+}
+
 void CRuliManagerDlg::DrawVideoCard(CDC* dc, int row, const CRect& rc, bool selected, bool focused)
 {
 	if (row < 0 || row >= static_cast<int>(m_view.size()))
@@ -3791,14 +3955,41 @@ void CRuliManagerDlg::DrawVideoCard(CDC* dc, int row, const CRect& rc, bool sele
 	int y = img.bottom + m_cardPad;
 
 	// 제목 (없으면 파일 이름) - 굵게, 한 줄
-	const CString title = v.title.IsEmpty() ? v.FileName() : v.title;
+	// 카드 첫 줄: 제목 대신 품번 (품번이 없으면 제목, 제목도 없으면 파일 이름)
+	const CString title = !v.code.IsEmpty() ? v.code : (v.title.IsEmpty() ? v.FileName() : v.title);
+	// 품번 오른쪽에 파일 순번 "(2/3)" - 파일 이름의 마지막 '_' 오른쪽 숫자 기준, 같은 묶음 파일이 2개 이상일 때만
+	CString partLabel;
+	{
+		CString key;
+		int num = 0;
+		if (SplitPartName(v.path, key, num))
+		{
+			const auto it = m_partTotal.find(key);
+			const int total = (it != m_partTotal.end()) ? it->second : 1;
+			if (total > 1)
+				partLabel.Format(L"(%d/%d)", num, total);
+		}
+	}
 	dc->SetTextColor(kTextColor);
 	CRect tr(x, y, right, y + m_videoLineB);
-	TextFB::Draw(dc, title, tr, DT_LEFT, true);   // 글꼴 대체 (일본어 한자 등)
+	if (partLabel.IsEmpty())
+		TextFB::Draw(dc, title, tr, DT_LEFT, true);   // 글꼴 대체 (일본어 한자 등)
+	else
+	{
+		const int labelW = TextFB::Width(dc, partLabel);
+		const int gapW = DX(3);
+		CRect cr = tr;
+		cr.right = (std::max)(cr.left, tr.right - labelW - gapW);   // 순번이 잘리지 않게 품번 쪽을 줄임
+		const int codeW = (std::min)(TextFB::Width(dc, title), cr.Width());
+		TextFB::Draw(dc, title, cr, DT_LEFT, true);
+		CRect lr(tr.left + codeW + gapW, tr.top, tr.right, tr.bottom);
+		dc->SetTextColor(kCardSub);
+		TextFB::Draw(dc, partLabel, lr, DT_LEFT, false);
+	}
 	y += m_videoLineB + DX(2);
 
 	// 발매일, 임시 항목은 예전처럼 "● 임시 (정보 저장 전)" (강조색)
-	dc->SelectObject(&m_vcardSubFont);   // 발매일 · 메모: 기본보다 1pt 큰 굵은 글꼴
+	dc->SelectObject(&m_vcardSubFont);   // 발매일 · 제목: 기본보다 1pt 큰 굵은 글꼴
 	CRect dr(x, y, right, y + m_vcardSubLine);
 	if (v.pending)
 	{
@@ -3810,15 +4001,36 @@ void CRuliManagerDlg::DrawVideoCard(CDC* dc, int row, const CRect& rc, bool sele
 		dc->SetTextColor(kCardSub);
 		dc->DrawText(v.release, dr, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
 	}
-	y += m_vcardSubLine + m_vcardMemoGap;   // 발매일과 메모 사이 2pt 더
+	y += m_vcardSubLine + m_vcardMemoGap;   // 발매일과 제목 사이 2pt 더
 
-	// 메모 3줄
-	CString memo = v.memo;
-	memo.Replace(L"\r\n", L" ");
-	memo.Replace(L'\n', L' ');
-	CRect mr(x, y, right, y + m_vcardSubLine * 3);
-	dc->SetTextColor(RGB(0xCE, 0xD9, 0xE0));
-	dc->DrawText(memo, mr, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL | DT_END_ELLIPSIS | DT_NOPREFIX);
+	// 제목 3줄 (메모 대신, 제목이 없으면 빈칸) - 일본어 한자 등은 글꼴 대체로 그리고, 줄바꿈은 직접 계산
+	{
+		CString rest = v.title;
+		rest.Replace(L"\r\n", L" ");
+		rest.Replace(L'\n', L' ');
+		rest.Trim();
+		dc->SetTextColor(RGB(0xCE, 0xD9, 0xE0));
+		const int lineW = right - x;
+		for (int line = 0; line < 3 && !rest.IsEmpty() && lineW > 0; ++line)
+		{
+			CRect lr(x, y + m_vcardSubLine * line, right, y + m_vcardSubLine * (line + 1));
+			if (line == 2 || TextFB::Width(dc, rest) <= lineW)
+			{
+				TextFB::Draw(dc, rest, lr, DT_LEFT, true);   // 마지막 줄: 넘치면 "…"
+				break;
+			}
+			// 이 줄에 들어가는 글자 수 (최소 1자), 가능하면 공백에서 끊음
+			int fit = 1;
+			while (fit < rest.GetLength() && TextFB::Width(dc, rest.Left(fit + 1)) <= lineW)
+				++fit;
+			const int sp = rest.Left(fit + 1).ReverseFind(L' ');
+			if (sp > 0 && sp <= fit)
+				fit = sp;
+			TextFB::Draw(dc, rest.Left(fit), lr, DT_LEFT, false);
+			rest = rest.Mid(fit);
+			rest.TrimLeft();
+		}
+	}
 	y += m_vcardSubLine * 3 + m_cardPad;
 	dc->SelectObject(normal);   // 아래 개수 줄은 기본 글꼴
 
@@ -3993,15 +4205,15 @@ void CRuliManagerDlg::DrawActorCard(CDC* dc, int row, const CRect& rc, bool sele
 	int y = img.bottom + m_actorNameGap;   // 사진 바로 아래 (기본 여백보다 2pt 좁게)
 	const int right = rc.right - m_cardPad;
 	int textX = x;
-	if (a.gender == L"여성" || a.gender == L"남성")
+	CString gsym;
+	COLORREF gcol = kTextColor;
+	if (GenderSymbol(a.gender, gsym, gcol))
 	{
-		const bool female = (a.gender == L"여성");
 		dc->SelectObject(&m_actorSymbolFont);   // 배우 탭 카드: 2pt 큰 성별 기호
-		dc->SetTextColor(female ? kFemale : kMale);
-		const CString sym = female ? L"\x2640" : L"\x2642";   // ♀ / ♂
-		const int symW = dc->GetTextExtent(sym).cx;
+		dc->SetTextColor(gcol);
+		const int symW = TextFB::Width(dc, gsym);   // ♀ ♂ ⚧ ⚥ ⚲ (글꼴에 없으면 대체 글꼴)
 		CRect sr(x, y, x + symW, y + m_actorLineB * 2);   // 이름 첫 두 줄 높이에 맞춰 가운데
-		dc->DrawText(sym, sr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+		TextFB::Draw(dc, gsym, sr, DT_LEFT, false);
 		textX = x + symW + DX(3) + m_vcardMemoGap;   // 성별 기호 오른쪽 여백 (+2pt)
 	}
 
@@ -4217,6 +4429,7 @@ void CRuliManagerDlg::ActorGridOwner::GridKey(UINT vk)
 	switch (vk)
 	{
 	case VK_F2:    dlg->OnActorEdit(); break;
+	case VK_DELETE: dlg->OnActorDelete(); break;
 	case VK_SPACE: dlg->OnActorShowVideos(); break;
 	case VK_F5:    dlg->OnBnClickedRefresh(); break;
 	case 'F':
@@ -4242,18 +4455,58 @@ void CRuliManagerDlg::OnBnClickedChangeImage()
 	if (dlg.DoModal() != IDOK)
 		return;
 	const CString path = dlg.GetPathName();
+	if (!SetPendingVideoImage(path, L"새 이미지: " + CString(::PathFindFileNameW(path)) + L"  (저장하면 적용)"))
+		AfxMessageBox(L"이미지 파일을 열 수 없습니다.", MB_ICONWARNING);
+}
+
+bool CRuliManagerDlg::SetPendingVideoImage(const CString& path, const CString& label)
+{
+	if (m_curItem < 0 || m_curItem >= static_cast<int>(m_lib.items.size()))
+		return false;
 	CImage test;
 	if (!LoadImageFile(test, path))
-	{
-		AfxMessageBox(L"이미지 파일을 열 수 없습니다.", MB_ICONWARNING);
-		return;
-	}
+		return false;
 	// 저장 전까지는 미리보기만 바꿈 → [저장] 하면 영상 파일 옆에 복사
 	m_pendingImage = path;
 	m_preview.Clear();
 	m_preview.SetImageFile(path);
-	m_staticImage.SetWindowText(L"새 이미지: " + CString(::PathFindFileNameW(path)) + L"  (저장하면 적용)");
+	m_staticImage.SetWindowText(label);
 	OnDetailsChanged();
+	return true;
+}
+
+void CRuliManagerDlg::OnDropFiles(HDROP hDropInfo)
+{
+	// 영상 상세(영상 탭 / 배우 출연작)의 이미지 영역에 놓은 첫 번째 파일 → 새 이미지 (저장하면 적용)
+	CPoint pt;
+	::DragQueryPoint(hDropInfo, &pt);   // 대화상자 클라이언트 좌표
+	CString file;
+	const UINT count = ::DragQueryFileW(hDropInfo, 0xFFFFFFFF, nullptr, 0);
+	if (count > 0)
+	{
+		const UINT len = ::DragQueryFileW(hDropInfo, 0, nullptr, 0);
+		::DragQueryFileW(hDropInfo, 0, file.GetBuffer(len + 1), len + 1);
+		file.ReleaseBuffer();
+	}
+	::DragFinish(hDropInfo);
+
+	if (file.IsEmpty() || !ShowVideoDetail() || !m_preview.GetSafeHwnd() || !m_preview.IsWindowVisible())
+		return;
+	CRect pr;
+	m_preview.GetWindowRect(&pr);
+	ScreenToClient(&pr);
+	if (!pr.PtInRect(pt))
+		return;   // 이미지 영역 밖에 놓음
+	if (m_curItem < 0 || m_curItem >= static_cast<int>(m_lib.items.size()))
+	{
+		AfxMessageBox(L"이미지를 지정할 영상을 먼저 선택하세요.", MB_ICONINFORMATION);
+		return;
+	}
+	if (::GetFileAttributesW(file) & FILE_ATTRIBUTE_DIRECTORY)
+		return;
+	SetForegroundWindow();
+	if (!SetPendingVideoImage(file, L"끌어다 놓은 새 이미지: " + CString(::PathFindFileNameW(file)) + L"  (저장하면 적용)"))
+		AfxMessageBox(L"이미지 파일을 열 수 없습니다.", MB_ICONWARNING);
 }
 
 void CRuliManagerDlg::OnBnClickedSearchImage()
@@ -4261,9 +4514,15 @@ void CRuliManagerDlg::OnBnClickedSearchImage()
 	if (m_curItem < 0 || m_curItem >= static_cast<int>(m_lib.items.size()))
 		return;
 	// 검색어: 제목 칸 (비었으면 파일 이름), [2024.01.01] 같은 대괄호 부분은 뺌
+	// 검색어: 품번이 있으면 품번, 없으면 제목 칸 (비었으면 파일 이름)
 	CString query;
-	m_editTitle.GetWindowText(query);
+	m_editCode.GetWindowText(query);
 	query.Trim();
+	if (query.IsEmpty())
+	{
+		m_editTitle.GetWindowText(query);
+		query.Trim();
+	}
 	if (query.IsEmpty())
 	{
 		query = m_lib.items[m_curItem].FileName();
@@ -4290,6 +4549,47 @@ void CRuliManagerDlg::OnBnClickedSearchImage()
 	m_preview.SetImageFile(m_pendingImage);
 	m_staticImage.SetWindowText(L"검색한 새 이미지  (저장하면 적용)");
 	OnDetailsChanged();
+}
+
+void CRuliManagerDlg::RecyclePartImages(const std::vector<CString>& videoPaths, const CString& keepBase)
+{
+	// 분할 파일마다 같은 이름의 이미지(ABC-123_2.jpg / ABC-123_2.mp4.jpg)를 휴지통으로 (대표 이름 이미지는 유지)
+	static const wchar_t* const kImageExts[] = { L".jpg", L".jpeg", L".png", L".webp", L".bmp", L".gif", L".tif", L".tiff" };
+	CString keepStem = keepBase;
+	const int kext = static_cast<int>(::PathFindExtensionW(keepBase) - static_cast<LPCWSTR>(keepBase));
+	if (kext > 0)
+		keepStem = keepBase.Left(kext);
+	std::vector<wchar_t> from;
+	for (const CString& vp : videoPaths)
+	{
+		CString stem = vp;
+		const int extPos = static_cast<int>(::PathFindExtensionW(vp) - static_cast<LPCWSTR>(vp));
+		if (extPos > 0)
+			stem = vp.Left(extPos);
+		if (stem.CompareNoCase(keepStem) == 0)
+			continue;   // 대표 이름 그 자체 (ABC-123.mp4) → 방금 저장한 이미지
+		for (const wchar_t* e : kImageExts)
+		{
+			const CString c1 = stem + e, c2 = vp + e;
+			for (const CString& c : { c1, c2 })
+			{
+				if (::PathFileExistsW(c))
+				{
+					from.insert(from.end(), static_cast<LPCWSTR>(c), static_cast<LPCWSTR>(c) + c.GetLength());
+					from.push_back(L'\0');
+				}
+			}
+		}
+	}
+	if (from.empty())
+		return;
+	from.push_back(L'\0');   // 이중 NULL 종료
+	SHFILEOPSTRUCTW op = {};
+	op.hwnd = m_hWnd;
+	op.wFunc = FO_DELETE;
+	op.pFrom = from.data();
+	op.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI;
+	::SHFileOperationW(&op);
 }
 
 bool CRuliManagerDlg::ApplyVideoImage(const CString& videoPath, const CString& src)
@@ -4813,6 +5113,8 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 		menu.CreatePopupMenu();
 		menu.AppendMenu(MF_STRING, ID_ACTOR_SHOWVIDEOS, L"출연작 보기\tEnter");
 		menu.AppendMenu(MF_STRING, ID_ACTOR_EDIT,       L"배우 정보 편집...\tF2");
+		menu.AppendMenu(MF_SEPARATOR);
+		menu.AppendMenu(MF_STRING, ID_ACTOR_DELETE,     L"배우 삭제\tDel");
 		menu.SetDefaultItem(ID_ACTOR_SHOWVIDEOS);
 		menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
 		return;
@@ -4959,7 +5261,9 @@ void CRuliManagerDlg::OnOK()
 	else if (focus && (focus->GetSafeHwnd() == m_editTags.GetSafeHwnd() ||
 	                   focus->GetSafeHwnd() == m_tagChips.m_edit.GetSafeHwnd() ||
 	                   focus->GetSafeHwnd() == m_actorChips.m_edit.GetSafeHwnd() ||
+	                   focus->GetSafeHwnd() == m_studioChips.m_edit.GetSafeHwnd() ||
 	                   focus->GetSafeHwnd() == m_editTitle.GetSafeHwnd() ||
+	                   focus->GetSafeHwnd() == m_editCode.GetSafeHwnd() ||
 	                   focus->GetSafeHwnd() == m_editActors.GetSafeHwnd() ||
 	                   focus->GetSafeHwnd() == m_editVAliases.GetSafeHwnd() ||
 	                   focus->GetSafeHwnd() == m_editStudio.GetSafeHwnd()))
@@ -5010,10 +5314,10 @@ void CRuliManagerDlg::ApplyColors()
 
 	// 버튼 (#137CBD)
 	const UINT buttons[] = {
-		IDC_BTN_ADDFOLDER, IDC_BTN_REMOVEFOLDER, IDC_BTN_REFRESH, IDC_BTN_ACTORS,
+		IDC_BTN_ADDFOLDER, IDC_BTN_REMOVEFOLDER, IDC_BTN_REFRESH, IDC_BTN_RESCAN, IDC_BTN_ACTORS,
 		IDC_BTN_ACTOR_BACK, IDC_BTN_SAVE, IDC_BTN_PICKACTORS, IDC_BTN_PICKVALIASES, IDC_BTN_PICKSTUDIO, IDC_BTN_PICKTAGS,
 		IDC_BTN_OPENDEFAULT, IDC_BTN_DELETE, IDC_BTN_EXPLORER, IDC_BTN_SORTDIR, IDC_BTN_OPENDB, IDC_BTN_CHANGEIMAGE, IDC_BTN_SEARCHIMAGE,
-		IDC_BTN_APPLYDB
+		IDC_BTN_APPLYDB, IDC_BTN_EXPORTTXT
 	};
 	for (size_t i = 0; i < _countof(buttons) && i < _countof(m_darkButtons); ++i)
 	{
@@ -5192,7 +5496,7 @@ void CRuliManagerDlg::RestoreWindowPlacement()
 }
 
 // ---------------------------------------------------------------------------
-// 영상 상세 정보: 메모 아래 출연 배우 카드
+// 영상 상세 정보: 태그 아래 출연 배우 카드
 
 void CRuliManagerDlg::RefreshActorStrip()
 {
@@ -5313,13 +5617,12 @@ void CRuliManagerDlg::DrawStripCard(CDC* dc, int i, const CRect& rc, bool hot)
 		// 성별 기호(♀ 분홍 / ♂ 파랑) + 이름을 한 덩어리로 가운데 정렬
 		CString sym;
 		COLORREF symColor = kTextColor;
-		if (a.gender == L"여성")      { sym = L"\x2640"; symColor = kFemale; }
-		else if (a.gender == L"남성") { sym = L"\x2642"; symColor = kMale; }
+		GenderSymbol(a.gender, sym, symColor);   // ♀ ♂ ⚧ ⚥ ⚲
 		int symW = 0;
 		if (!sym.IsEmpty())
 		{
 			dc->SelectObject(&m_cardSymbolFont);
-			symW = dc->GetTextExtent(sym).cx + DX(2);
+			symW = TextFB::Width(dc, sym) + DX(2);
 			dc->SelectObject(&m_cardNameFont);
 		}
 		const int avail = right - x;
@@ -5330,7 +5633,7 @@ void CRuliManagerDlg::DrawStripCard(CDC* dc, int i, const CRect& rc, bool hot)
 			dc->SelectObject(&m_cardSymbolFont);
 			dc->SetTextColor(symColor);
 			CRect sr(startX, y, startX + symW, y + m_cardLineB);
-			dc->DrawText(sym, sr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_NOCLIP);
+			TextFB::Draw(dc, sym, sr, DT_LEFT, false);
 			dc->SelectObject(&m_cardNameFont);
 		}
 		dc->SetTextColor(kTextColor);
@@ -5475,4 +5778,80 @@ void CRuliManagerDlg::OnBnClickedApplyDb()
 	else
 		AfxMessageBox(L"DB 에 반영하지 못했습니다 (파일이 사용 중이거나 쓰기 권한 없음).", MB_ICONWARNING);
 	UpdateApplyDbButton();
+}
+
+// ---------------------------------------------------------------------------
+// 재 스캔: 새로고침 + 이미 저장된 영상에도 폴더 구조 다시 적용
+
+void CRuliManagerDlg::OnBnClickedRescan()
+{
+	if (AfxMessageBox(L"재 스캔할까요?\n\n"
+		L"등록 폴더를 다시 읽고, 이미 저장된 영상에도 영상 폴더의 정보 txt 와 폴더 구조를 다시 적용해\n"
+		L"비어 있는 칸(제목 · 발매일 · 배우 · 스튜디오 · 태그 · 메모 등)을 채웁니다. (값이 있는 칸은 바꾸지 않음)\n\n"
+		L"영상이 많으면 시간이 걸릴 수 있습니다.",
+		MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
+		return;
+	CommitDetails();
+	const CString keep = (m_curItem >= 0) ? m_lib.items[m_curItem].path : CString();
+
+	int added = 0, removed = 0, relinked = 0, filled = 0;
+	{
+		CWaitCursor wait;
+		BeginLibraryChange();
+		m_lib.Refresh(added, removed, &relinked);   // 새 파일 · 없어진 파일 · 경로가 바뀐 파일
+		// 저장된 영상도 폴더/파일 이름에서 비어 있는 배우 · 스튜디오 · 발매일을 다시 채움 (값이 있는 칸은 그대로)
+		for (VideoItem& v : m_lib.items)
+		{
+			const VideoItem before = v;
+			m_lib.ApplyFolderStructure(v);   // 영상 폴더 txt → 폴더 구조 순서로 빈칸 채움
+			if (v.code != before.code || v.actors != before.actors || v.studio != before.studio || v.release != before.release ||
+				v.title != before.title || v.tags != before.tags || v.memo != before.memo ||
+				v.rating != before.rating || v.oCount != before.oCount)
+				++filled;
+		}
+		m_lib.SyncActorsFromVideos();   // 새 배우 추가 (배우 폴더의 사진 · 텍스트 정보 포함)
+		m_lib.SyncNamedFromVideos();
+		ResetThumbnails();
+		m_lib.Save();
+		RebuildActorGrid();
+		m_catsDirty = true;
+		ApplyFilter();
+		SelectPath(keep);
+		if (m_curItem >= 0)
+			ShowDetails(m_curItem);   // 채워진 배우 · 스튜디오 · 발매일을 상세 정보에도
+	}
+
+	CString s;
+	s.Format(L"재 스캔 완료: txt · 폴더 구조로 정보를 채운 영상 %d개, 경로가 바뀐 파일 %d개 다시 연결, 새 파일 %d개 임시 목록에 추가, 없어진 파일 %d개 제거",
+		filled, relinked, added, removed);
+	m_staticStatus.SetWindowText(s);
+}
+
+// ---------------------------------------------------------------------------
+// 정보 txt 생성: 영상 정보 → 영상 폴더\영상이름.txt, 배우 정보 → 배우 폴더\배우폴더이름.txt
+
+void CRuliManagerDlg::OnBnClickedExportTxt()
+{
+	if (AfxMessageBox(L"배우 · 영상 정보를 txt 파일로 만들까요?\n\n"
+		L"· 영상: 저장된 영상마다 같은 폴더에 '영상 이름.txt' (예: ABC-123.mp4 → ABC-123.txt)\n"
+		L"· 배우: 배우 폴더가 있는 배우마다 배우 폴더에 '배우 폴더 이름.txt'\n\n"
+		L"같은 이름의 txt 가 있으면 덮어씁니다. (내용이 같으면 그대로 둠)",
+		MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
+		return;
+	CommitDetails();   // 편집 중인 내용도 포함
+
+	int vSame = 0, vFail = 0, aSame = 0, aNoFolder = 0, aFail = 0;
+	int vWritten = 0, aWritten = 0;
+	{
+		CWaitCursor wait;
+		vWritten = m_lib.ExportVideoInfoTxt(vSame, vFail);
+		aWritten = m_lib.ExportActorInfoTxt(aSame, aNoFolder, aFail);
+	}
+	CString vFailText, aFailText;
+	if (vFail) vFailText.Format(L", 실패 %d개", vFail);
+	if (aFail) aFailText.Format(L", 실패 %d개", aFail);
+	CString msg;
+	msg.Format(L"정보 txt 생성 완료\n\n영상: %d개 생성/갱신, %d개 변경 없음%s\n배우: %d개 생성/갱신, %d개 변경 없음, 배우 폴더 없음 %d명%s",
+		vWritten, vSame, static_cast<LPCWSTR>(vFailText), aWritten, aSame, aNoFolder, static_cast<LPCWSTR>(aFailText));
+	AfxMessageBox(msg, (vFail || aFail) ? MB_ICONWARNING : MB_ICONINFORMATION);
 }

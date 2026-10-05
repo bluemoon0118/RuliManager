@@ -60,6 +60,7 @@
 #define ID_ACTOR_SHOWVIDEOS         32800
 #define ID_ACTOR_EDIT               32801
 #define ID_CAT_DELETE               32813
+#define ID_ACTOR_DELETE             32814
 #define ID_MANAGE_ACTORS            32810
 #define ID_MANAGE_STUDIOS           32811
 #define ID_MANAGE_TAGS              32812
@@ -76,6 +77,10 @@
 #define IDC_BTN_SORTDIR             1053
 #define IDC_BTN_OPENDB              1054
 #define IDC_BTN_APPLYDB             1205
+#define IDC_BTN_RESCAN              1206
+#define IDC_BTN_EXPORTTXT           1207
+#define IDC_STATIC_CODE_LBL         1208
+#define IDC_EDIT_CODE               1209
 
 // 스튜디오 / 태그 관리 창
 #define IDC_NL_SEARCH               1140
@@ -161,6 +166,7 @@
 #define IDC_TAG_CHIPS               1165
 #define IDC_ZOOM_SLIDER             1166
 #define IDC_ACTOR_CHIPS             1167
+#define IDC_STUDIO_CHIPS            1210
 #define IDC_ACT_GENDER              1159
 
 // 배우 선택 창
@@ -174,8 +180,8 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE    139
-#define _APS_NEXT_COMMAND_VALUE     32814
-#define _APS_NEXT_CONTROL_VALUE     1206
+#define _APS_NEXT_COMMAND_VALUE     32815
+#define _APS_NEXT_CONTROL_VALUE     1211
 #define _APS_NEXT_SYMED_VALUE       101
 #endif
 #endif

@@ -1,6 +1,9 @@
 ﻿#include "pch.h"
 #include "VideoLibrary.h"
 #include "DbCrypt.h"
+#include "CountryCombo.h"
+#include <cwctype>
+#include <string>
 
 namespace
 {
@@ -1087,7 +1090,7 @@ bool CVideoLibrary::Load()
 			v.modified = _wcstoui64(fields[3], nullptr, 10);
 			v.rating   = (std::min)(5, (std::max)(0, _wtoi(fields[4])));
 			v.tags     = Unescape(fields[5]);
-			v.memo     = Unescape(fields[6]);
+			// fields[6] = 예전 영상 메모 (영상 메모 기능 삭제 - 읽지 않음, 다음 저장 때 빈칸으로 기록)
 			if (fields.size() >= 8)          // v1 이후 추가된 배우 필드 (이전 파일과 호환)
 				v.actors = Unescape(fields[7]);
 			if (fields.size() >= 9)          // 스튜디오 필드
@@ -1100,6 +1103,8 @@ bool CVideoLibrary::Load()
 				v.actorAliases = Unescape(fields[11]);
 			if (fields.size() >= 13)         // 물방울 카운트 필드
 				v.oCount = (std::max)(0, _wtoi(fields[12]));
+			if (fields.size() >= 14)         // 품번 필드
+				v.code = Unescape(fields[13]);
 			if (!v.path.IsEmpty())
 				items.push_back(v);
 		}
@@ -1183,7 +1188,7 @@ bool CVideoLibrary::Save() const
 			continue;   // 임시 항목은 정식 DB에 쓰지 않음
 		}
 		CString line;
-		line.Format(L"V\t%s\t%llu\t%llu\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\n",
+		line.Format(L"V\t%s\t%llu\t%llu\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\n",
 			static_cast<LPCWSTR>(Escape(v.path)),
 			v.size, v.modified, v.rating,
 			static_cast<LPCWSTR>(Escape(v.tags)),
@@ -1193,7 +1198,8 @@ bool CVideoLibrary::Save() const
 			static_cast<LPCWSTR>(Escape(v.release)),
 			static_cast<LPCWSTR>(Escape(v.title)),
 			static_cast<LPCWSTR>(Escape(v.actorAliases)),
-			v.oCount);
+			v.oCount,
+			static_cast<LPCWSTR>(Escape(v.code)));
 		text += line;
 	}
 
@@ -1298,6 +1304,28 @@ CString CVideoLibrary::FindBracketDate(const CString& text)
 
 void CVideoLibrary::ApplyFolderStructure(VideoItem& v) const
 {
+	// 영상 폴더의 텍스트 파일(항목: 값)을 먼저 반영 → 남은 빈칸은 아래 폴더 구조로
+	{
+		const CString txt = FindVideoTextFile(v.path);
+		if (!txt.IsEmpty())
+			ApplyVideoTextInfo(v, txt);
+	}
+	// 품번: 비어 있으면 파일 이름 → 영상 폴더 이름에서 찾기 (예: SONE-479.mp4, [2024.12.10]SONE-479)
+	if (v.code.IsEmpty())
+	{
+		CString stem = v.FileName();
+		::PathRemoveExtensionW(stem.GetBuffer());
+		stem.ReleaseBuffer();
+		v.code = ExtractCode(stem);
+		if (v.code.IsEmpty())
+		{
+			const CString dir = v.path.Left(static_cast<int>(::PathFindFileNameW(v.path) - static_cast<LPCWSTR>(v.path)));
+			CString folder = dir;
+			folder.TrimRight(L"\\");
+			v.code = ExtractCode(::PathFindFileNameW(folder));
+		}
+	}
+
 	// 영상이 속한 등록 폴더 (여러 개가 겹치면 가장 깊은 폴더)
 	CString root;
 	for (const CString& f : folders)
@@ -1356,6 +1384,165 @@ void CVideoLibrary::ApplyFolderStructure(VideoItem& v) const
 		v.studio = studio;
 }
 
+// ---------------------------------------------------------------------------
+// 분할 파일 묶음 (같은 정보 사용)
+
+bool CVideoLibrary::PartGroupKey(const CString& path, CString& key, int& num)
+{
+	// 파일 이름(확장자 제외)의 마지막 '_' 오른쪽이 숫자(4자리 이하)면 순번: "ABC-123_2.mp4" → 키 "폴더\abc-123", 순번 2
+	// 순번이 없으면 키 = 폴더 + 파일 이름 전체 ("ABC-123.mp4" 도 "ABC-123_2.mp4" 와 같은 묶음)
+	const CString folder = path.Left(static_cast<int>(::PathFindFileNameW(path) - static_cast<LPCWSTR>(path)));
+	CString name = ::PathFindFileNameW(path);
+	const int ext = name.ReverseFind(L'.');
+	if (ext > 0)
+		name = name.Left(ext);
+	num = 0;
+	const int us = name.ReverseFind(L'_');
+	if (us > 0 && us + 1 < name.GetLength() && name.GetLength() - us - 1 <= 4)
+	{
+		const CString right = name.Mid(us + 1);
+		if (right.SpanIncluding(L"0123456789") == right)
+		{
+			num = _wtoi(right);
+			name = name.Left(us);
+		}
+	}
+	name.Trim();
+	key = folder + name;
+	key.MakeLower();
+	return num > 0;
+}
+
+CString CVideoLibrary::PartGroupPath(const CString& path)
+{
+	CString key;
+	int num = 0;
+	if (!PartGroupKey(path, key, num))
+		return path;
+	const CString folder = path.Left(static_cast<int>(::PathFindFileNameW(path) - static_cast<LPCWSTR>(path)));
+	CString name = ::PathFindFileNameW(path);
+	const CString ext = ::PathFindExtensionW(name);
+	name = name.Left(name.GetLength() - ext.GetLength());
+	name = name.Left(name.ReverseFind(L'_'));
+	name.Trim();
+	return folder + name + ext;
+}
+
+std::vector<size_t> CVideoLibrary::PartSiblings(size_t idx) const
+{
+	std::vector<size_t> out;
+	if (idx >= items.size())
+		return out;
+	CString key, k;
+	int num = 0;
+	PartGroupKey(items[idx].path, key, num);
+	for (size_t i = 0; i < items.size(); ++i)
+	{
+		if (i == idx)
+			continue;
+		PartGroupKey(items[i].path, k, num);
+		if (k == key)
+			out.push_back(i);
+	}
+	return out;
+}
+
+namespace
+{
+	// 분할 파일끼리 같이 쓰는 정보
+	void CopyPartInfo(VideoItem& dst, const VideoItem& src)
+	{
+		dst.code         = src.code;
+		dst.title        = src.title;
+		dst.rating       = src.rating;
+		dst.oCount       = src.oCount;
+		dst.release      = src.release;
+		dst.actors       = src.actors;
+		dst.actorAliases = src.actorAliases;
+		dst.studio       = src.studio;
+		dst.tags         = src.tags;
+	}
+	bool SamePartInfo(const VideoItem& a, const VideoItem& b)
+	{
+		return a.code == b.code && a.title == b.title && a.rating == b.rating && a.oCount == b.oCount &&
+			a.release == b.release && a.actors == b.actors && a.actorAliases == b.actorAliases &&
+			a.studio == b.studio && a.tags == b.tags;
+	}
+}
+
+int CVideoLibrary::SyncPartGroup(size_t idx)
+{
+	if (idx >= items.size())
+		return 0;
+	int changed = 0;
+	for (size_t i : PartSiblings(idx))
+	{
+		VideoItem& s = items[i];
+		if (SamePartInfo(s, items[idx]) && s.pending == items[idx].pending)
+			continue;
+		CopyPartInfo(s, items[idx]);
+		if (!items[idx].pending)
+			s.pending = false;   // 한 파일을 저장하면 묶음 전체가 정식 DB 로
+		++changed;
+	}
+	return changed;
+}
+
+int CVideoLibrary::UnifyPartGroups()
+{
+	// 묶음별로 모음 (파일이 2개 이상인 묶음만)
+	std::map<CString, std::vector<size_t>> groups;
+	CString key;
+	int num = 0;
+	for (size_t i = 0; i < items.size(); ++i)
+	{
+		PartGroupKey(items[i].path, key, num);
+		groups[key].push_back(i);
+	}
+	int changed = 0;
+	for (auto& g : groups)
+	{
+		std::vector<size_t>& list = g.second;
+		if (list.size() < 2)
+			continue;
+		// 기준: 정식 등록된 파일 우선, 그중 순번이 가장 앞선(이름 순) 파일
+		std::sort(list.begin(), list.end(), [this](size_t a, size_t b)
+		{
+			if (items[a].pending != items[b].pending)
+				return !items[a].pending;
+			return items[a].path.CompareNoCase(items[b].path) < 0;
+		});
+		VideoItem merged = items[list[0]];
+		// 기준 파일에 빈 칸이 있으면 다른 파일의 값으로 채움 (등록된 파일 먼저)
+		for (size_t k = 1; k < list.size(); ++k)
+		{
+			const VideoItem& o = items[list[k]];
+			if (o.pending && !merged.pending)
+				continue;   // 임시 파일의 자동 지정 값으로 등록된 정보를 채우지 않음
+			if (merged.code.IsEmpty())         merged.code = o.code;
+			if (merged.title.IsEmpty())        merged.title = o.title;
+			if (merged.rating == 0)            merged.rating = o.rating;
+			if (merged.oCount == 0)            merged.oCount = o.oCount;
+			if (merged.release.IsEmpty())      merged.release = o.release;
+			if (merged.actors.IsEmpty())     { merged.actors = o.actors; merged.actorAliases = o.actorAliases; }
+			if (merged.studio.IsEmpty())       merged.studio = o.studio;
+			if (merged.tags.IsEmpty())         merged.tags = o.tags;
+		}
+		for (size_t i : list)
+		{
+			VideoItem& v = items[i];
+			const bool registerIt = (v.pending && !merged.pending);
+			if (SamePartInfo(v, merged) && !registerIt)
+				continue;
+			CopyPartInfo(v, merged);
+			if (registerIt)
+				v.pending = false;
+			++changed;
+		}
+	}
+	return changed;
+}
+
 int CVideoLibrary::MergeScanned(const std::vector<VideoItem>& scanned)
 {
 	std::map<CString, size_t> index;
@@ -1383,6 +1570,8 @@ int CVideoLibrary::MergeScanned(const std::vector<VideoItem>& scanned)
 			items[it->second].modified = s.modified;
 		}
 	}
+	if (added > 0)
+		UnifyPartGroups();   // 새 분할 파일은 이미 등록된 같은 묶음의 정보를 같이 사용
 	return added;
 }
 
@@ -1696,7 +1885,17 @@ bool CVideoLibrary::NormalizeVideoActors(VideoItem& v) const
 			continue;
 		const int idx = FindActorByAnyName(n);
 		if (idx < 0)
+		{
+			// 이름 · 별칭과 그대로 같지는 않지만 한글 / 영어 / 일어 이름 중 하나가 같으면 같은 배우
+			//  (예: 폴더 이름 "나기 히카루" → 배우 "나기 히카루(Hikaru Nagi, 凪ひかる)") - 별칭이 아니므로 참여 별칭에는 넣지 않음
+			const int part = FindActorByNamePart(n);
+			if (part >= 0)
+			{
+				n = actors[part].name;
+				changed = true;
+			}
 			continue;
+		}
 		credited.push_back(n);
 		n = actors[idx].name;
 		changed = true;
@@ -1738,6 +1937,63 @@ bool CVideoLibrary::NormalizeAllVideoActors()
 	return changed;
 }
 
+CString CVideoLibrary::FindActorFolderImage(const CString& videoPath, const CString& actorName)
+{
+	// 영상의 상위 폴더 중 이름이 배우 이름과 같은 폴더(폴더\배우\영상\영상.mp4 의 "배우")를 찾음
+	static const wchar_t* const kExts[] = { L".jpg", L".jpeg", L".png", L".webp", L".bmp", L".gif", L".tif", L".tiff" };
+	CString dir = videoPath;
+	for (int depth = 0; depth < 8; ++depth)
+	{
+		const int slash = dir.ReverseFind(L'\\');
+		if (slash <= 2)
+			break;                      // 드라이브 루트까지 올라감
+		dir = dir.Left(slash);
+		CString name = ::PathFindFileNameW(dir);
+		RemoveListCommas(name);         // 폴더 구조 배우 이름과 같은 방식으로 정리
+		name.Trim();
+		if (name.CompareNoCase(actorName) != 0)
+			continue;
+
+		// 배우 폴더 바로 아래의 이미지 파일 (하위 폴더는 보지 않음)
+		std::vector<CString> images;
+		WIN32_FIND_DATAW fd = {};
+		HANDLE h = ::FindFirstFileW(dir + L"\\*", &fd);
+		if (h != INVALID_HANDLE_VALUE)
+		{
+			do
+			{
+				if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+					continue;
+				const LPCWSTR ext = ::PathFindExtensionW(fd.cFileName);
+				for (const wchar_t* e : kExts)
+				{
+					if (_wcsicmp(ext, e) == 0) { images.push_back(fd.cFileName); break; }
+				}
+			} while (::FindNextFileW(h, &fd));
+			::FindClose(h);
+		}
+		if (images.empty())
+			return CString();
+		// 우선순위: 배우(폴더) 이름 / folder / poster / profile / cover 와 같은 이름 → 없으면 이름 순 첫 번째
+		std::sort(images.begin(), images.end(), [](const CString& a, const CString& b) { return ::StrCmpLogicalW(a, b) < 0; });
+		const CString folderName = ::PathFindFileNameW(dir);
+		const CString preferred[] = { folderName, actorName, L"folder", L"poster", L"profile", L"cover", L"actor" };
+		for (const CString& p : preferred)
+		{
+			for (const CString& img : images)
+			{
+				CString stem = img;
+				::PathRemoveExtensionW(stem.GetBuffer());
+				stem.ReleaseBuffer();
+				if (stem.CompareNoCase(p) == 0)
+					return dir + L"\\" + img;
+			}
+		}
+		return dir + L"\\" + images.front();
+	}
+	return CString();
+}
+
 bool CVideoLibrary::SyncActorsFromVideos()
 {
 	bool added = false;
@@ -1748,17 +2004,267 @@ bool CVideoLibrary::SyncActorsFromVideos()
 		{
 			CString key = n;
 			key.MakeLower();
-			if (index.find(key) == index.end())   // 이름·별칭 어디에도 없을 때만 새 배우
+			if (index.find(key) == index.end() && FindActorByNamePart(n) < 0)   // 이름·별칭 어디에도 없고, 언어 단위 이름도 같은 배우가 없을 때만 새 배우
 			{
 				ActorInfo a;
 				a.name = n;
+				// 배우 폴더에 이미지 파일이 있으면 배우 사진으로 (Image\actors 에 암호화 사본)
+				const CString img = FindActorFolderImage(v.path, n);
+				if (!img.IsEmpty())
+					a.photo = StoreImageCopy(img, L"actors");
+				// 배우 폴더에 텍스트 파일(항목: 값)이 있으면 배우 정보로
+				const CString folder = FindActorFolder(v.path, n);
+				if (!folder.IsEmpty())
+				{
+					const CString txt = FindActorTextFile(folder, n);
+					if (!txt.IsEmpty())
+						ApplyActorTextInfo(a, txt);
+				}
 				actors.push_back(a);
 				index[key] = static_cast<int>(actors.size()) - 1;
 				added = true;
 			}
 		}
 	}
+	// 배우 이름과 언어 단위로 같은 별칭(예: "나기 히카루(凪ひかる)")은 뺌
+	if (CleanupActorAliases())
+		added = true;
+	// 언어 단위로 같은 이름인 영상의 배우 표기는 그 배우 이름으로 정리, 정보 없는 중복 배우는 합침
+	if (NormalizeAllVideoActors())
+		added = true;
+	if (MergeEmptyDuplicateActors() > 0)
+		added = true;
+	// 이미 등록된 배우 중 사진이 없는 배우도 배우 폴더의 이미지로 채움
+	if (FillMissingActorPhotos())
+		added = true;
 	return added;
+}
+
+bool CVideoLibrary::CleanupActorAliases()
+{
+	bool changed = false;
+	for (ActorInfo& a : actors)
+	{
+		std::vector<CString> kept, dropped;
+		for (const CString& al : SplitList(a.aliases))
+		{
+			bool same = SameNameByLang(al, a.name);
+			for (const CString& k : kept)
+				if (!same && SameNameByLang(al, k)) same = true;
+			if (same)
+				dropped.push_back(al);
+			else
+				kept.push_back(al);
+		}
+		if (dropped.empty())
+			continue;
+		a.aliases = JoinList(kept);
+		for (const CString& d : dropped)
+			if (a.lastAlias.CompareNoCase(d) == 0)
+				a.lastAlias.Empty();
+		// 영상의 참여 별칭에 빠진 별칭이 있으면 같이 뺌 (배우 이름으로 표시)
+		for (VideoItem& v : items)
+		{
+			std::vector<CString> credited = SplitList(v.actorAliases);
+			const size_t before = credited.size();
+			credited.erase(std::remove_if(credited.begin(), credited.end(), [&dropped](const CString& c)
+			{
+				for (const CString& d : dropped)
+					if (c.CompareNoCase(d) == 0) return true;
+				return false;
+			}), credited.end());
+			if (credited.size() != before)
+				v.actorAliases = JoinList(credited);
+		}
+		changed = true;
+	}
+	return changed;
+}
+
+// ---------------------------------------------------------------------------
+// 성별
+
+namespace
+{
+	const wchar_t* const kGenders[] = { L"", L"여성", L"남성", L"트랜스젠더 여성", L"트랜스젠더 남성", L"인터섹스", L"논바이너리" };
+}
+
+int CVideoLibrary::GenderCount()
+{
+	return static_cast<int>(_countof(kGenders));
+}
+
+CString CVideoLibrary::GenderAt(int i)
+{
+	return (i >= 0 && i < GenderCount()) ? CString(kGenders[i]) : CString();
+}
+
+CString CVideoLibrary::NormalizeGender(const CString& text)
+{
+	CString v = text;
+	v.Trim();
+	v.MakeLower();
+	if (v.IsEmpty())
+		return CString();
+	for (int i = 1; i < GenderCount(); ++i)   // 저장 값 그대로
+		if (v == CString(kGenders[i]))
+			return kGenders[i];
+	CString c = v;   // 공백 · 하이픈 · 밑줄 제거본
+	c.Remove(L' '); c.Remove(L'-'); c.Remove(L'_');
+	auto has = [&c](LPCWSTR s) { return c.Find(s) >= 0; };
+
+	// 논바이너리 / 인터섹스 먼저 (male · female 글자가 섞여 있어도)
+	if (has(L"nonbinary") || has(L"논바이너리") || has(L"넌바이너리") || has(L"enby") || has(L"ノンバイナリ") || has(L"genderqueer") || c == L"nb" || c == L"x")
+		return L"논바이너리";
+	if (has(L"intersex") || has(L"인터섹스") || has(L"インターセックス") || has(L"間性"))
+		return L"인터섹스";
+	// 트랜스젠더: 여성(MTF) / 남성(FTM)
+	const bool trans = has(L"trans") || has(L"트랜스") || has(L"トランス") || has(L"mtf") || has(L"ftm");
+	if (trans)
+	{
+		if (has(L"mtf") || has(L"female") || has(L"woman") || has(L"여") || has(L"女"))
+			return L"트랜스젠더 여성";
+		if (has(L"ftm") || has(L"male") || has(L"man") || has(L"남") || has(L"男"))
+			return L"트랜스젠더 남성";
+		return CString();   // 방향을 알 수 없음
+	}
+	if (has(L"여") || has(L"female") || has(L"woman") || c == L"f" || has(L"女"))
+		return L"여성";
+	if (has(L"남") || has(L"male") || c == L"man" || c == L"m" || has(L"男"))
+		return L"남성";
+	return CString();
+}
+
+bool CVideoLibrary::IsFemaleLike(const CString& g)
+{
+	return g == L"여성" || g == L"트랜스젠더 여성";
+}
+
+bool CVideoLibrary::IsMaleLike(const CString& g)
+{
+	return g == L"남성" || g == L"트랜스젠더 남성";
+}
+
+int CVideoLibrary::MergeEmptyDuplicateActors()
+{
+	// 예: 스캔으로 생긴 "나기 히카루"(사진 · 정보 없음) + 등록된 "나기 히카루(Hikaru Nagi, 凪ひかる)" → 앞의 배우를 뒤의 배우로 합침
+	//  정보가 하나라도 있는 배우는 다른 사람일 수 있으므로 합치지 않음
+	int merged = 0;
+	for (size_t i = 0; i < actors.size(); )
+	{
+		const ActorInfo& a = actors[i];
+		const bool empty = HasNoActorInfo(a) && a.photo.IsEmpty() && a.aliases.IsEmpty() && a.memo.IsEmpty() &&
+			a.gender.IsEmpty() && a.rating == 0 && !a.favorite;
+		const int target = empty ? FindActorByNamePart(a.name, static_cast<int>(i)) : -1;
+		if (target < 0)
+		{
+			++i;
+			continue;
+		}
+		const CString from = a.name, to = actors[target].name;
+		RenameActorInVideos(from, to);
+		actors.erase(actors.begin() + i);
+		++merged;
+	}
+	return merged;
+}
+
+bool CVideoLibrary::FillMissingActorPhotos()
+{
+	// 사진이 없는(또는 사진 파일이 없어진) 배우 → 그 배우가 나오는 영상들의 경로에서 배우 폴더 이미지 찾기
+	std::vector<int> need;
+	for (size_t i = 0; i < actors.size(); ++i)
+	{
+		const CString& p = actors[i].photo;
+		if (p.IsEmpty() || !::PathFileExistsW(p) || HasNoActorInfo(actors[i]))
+			need.push_back(static_cast<int>(i));   // 사진이 없거나 배우 정보가 비어 있음
+	}
+	if (need.empty())
+		return false;
+
+	// 배우별 출연 영상 경로 (이름·별칭으로 연결)
+	const std::map<CString, int> index = ActorNameIndex();
+	std::map<int, std::vector<CString>> videos;
+	for (const VideoItem& v : items)
+	{
+		for (const CString& n : SplitList(v.actors))
+		{
+			CString key = n;
+			key.MakeLower();
+			auto it = index.find(key);
+			if (it != index.end())
+				videos[it->second].push_back(v.path);
+		}
+	}
+
+	bool changed = false;
+	for (int idx : need)
+	{
+		auto vit = videos.find(idx);
+		if (vit == videos.end())
+			continue;
+		ActorInfo& a = actors[idx];
+		std::vector<CString> names = { a.name };   // 폴더 이름이 별칭일 수도 있음
+		for (const CString& al : SplitList(a.aliases))
+			names.push_back(al);
+		const bool needPhoto = a.photo.IsEmpty() || !::PathFileExistsW(a.photo);
+		if (HasNoActorInfo(a))
+		{
+			// 배우 정보가 비어 있으면 배우 폴더의 텍스트 파일에서 읽기
+			std::set<CString> triedFolders;
+			for (const CString& path : vit->second)
+			{
+				bool done = false;
+				for (const CString& nm : names)
+				{
+					CString folder = FindActorFolder(path, nm);
+					if (folder.IsEmpty())
+						continue;
+					CString fk = folder;
+					fk.MakeLower();
+					if (!triedFolders.insert(fk).second)
+						continue;
+					const CString txt = FindActorTextFile(folder, nm);
+					if (!txt.IsEmpty() && ApplyActorTextInfo(a, txt))
+					{
+						changed = true;
+						done = true;
+						break;
+					}
+				}
+				if (done)
+					break;
+			}
+		}
+		if (!needPhoto)
+			continue;
+		std::set<CString> triedDirs;               // 같은 영상 폴더는 한 번만
+		CString found;
+		for (const CString& path : vit->second)
+		{
+			CString dir = path.Left(static_cast<int>(::PathFindFileNameW(path) - static_cast<LPCWSTR>(path)));
+			dir.MakeLower();
+			if (!triedDirs.insert(dir).second)
+				continue;
+			for (const CString& nm : names)
+			{
+				found = FindActorFolderImage(path, nm);
+				if (!found.IsEmpty())
+					break;
+			}
+			if (!found.IsEmpty())
+				break;
+		}
+		if (found.IsEmpty())
+			continue;
+		const CString copy = StoreImageCopy(found, L"actors");   // Image\actors 에 암호화 사본
+		if (!copy.IsEmpty())
+		{
+			a.photo = copy;
+			changed = true;
+		}
+	}
+	return changed;
 }
 
 void CVideoLibrary::RenameActorInVideos(const CString& oldName, const CString& newName)
@@ -1957,4 +2463,1025 @@ std::map<CString, int> CVideoLibrary::CountNamed(int kind) const
 		}
 	}
 	return counts;
+}
+
+// ---------------------------------------------------------------------------
+// 배우 폴더의 텍스트 파일(항목: 값)에서 배우 정보 읽기
+
+CString CVideoLibrary::FindActorFolder(const CString& videoPath, const CString& actorName)
+{
+	CString dir = videoPath;
+	for (int depth = 0; depth < 8; ++depth)
+	{
+		const int slash = dir.ReverseFind(L'\\');
+		if (slash <= 2)
+			break;
+		dir = dir.Left(slash);
+		CString name = ::PathFindFileNameW(dir);
+		RemoveListCommas(name);
+		name.Trim();
+		if (name.CompareNoCase(actorName) == 0)
+			return dir;
+	}
+	return CString();
+}
+
+namespace
+{
+	const wchar_t kVideoTxtHeader[] = L"# RuliManager 영상 정보";
+	const wchar_t kActorTxtHeader[] = L"# RuliManager 배우 정보";
+
+	// 텍스트 파일 읽기: UTF-8(BOM 유무) / UTF-16 LE·BE(BOM) / 그 외는 시스템 코드 페이지(한국어 Windows 는 CP949)
+	bool ReadTextAuto(const CString& path, CString& out)
+	{
+		std::vector<BYTE> d;
+		if (!ReadWholeFile(path, d) || d.empty() || d.size() > 1024 * 1024)
+			return false;
+		if (d.size() >= 2 && d[0] == 0xFF && d[1] == 0xFE)
+		{
+			out = CString(reinterpret_cast<const wchar_t*>(d.data() + 2), static_cast<int>((d.size() - 2) / 2));
+			return true;
+		}
+		if (d.size() >= 2 && d[0] == 0xFE && d[1] == 0xFF)
+		{
+			std::wstring w;
+			for (size_t i = 2; i + 1 < d.size(); i += 2)
+				w.push_back(static_cast<wchar_t>((d[i] << 8) | d[i + 1]));
+			out = w.c_str();
+			return true;
+		}
+		size_t start = (d.size() >= 3 && d[0] == 0xEF && d[1] == 0xBB && d[2] == 0xBF) ? 3 : 0;
+		const char* p = reinterpret_cast<const char*>(d.data() + start);
+		const int n = static_cast<int>(d.size() - start);
+		UINT cp = CP_UTF8;
+		if (start == 0 && ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, p, n, nullptr, 0) == 0)
+			cp = CP_ACP;   // UTF-8 이 아니면 ANSI(CP949 등)
+		const int len = ::MultiByteToWideChar(cp, 0, p, n, nullptr, 0);
+		if (len <= 0)
+			return false;
+		std::wstring w(static_cast<size_t>(len), L'\0');
+		::MultiByteToWideChar(cp, 0, p, n, &w[0], len);
+		out = w.c_str();
+		return true;
+	}
+
+	// 날짜 → "YYYY-MM-DD" (1998-02-17 / 1998.2.17 / 1998/02/17 / 1998년 2월 17일 / 19980217 / 1998-02 → 1998-02-01)
+	CString ParseDateText(const CString& s)
+	{
+		std::vector<int> nums;
+		CString digits;
+		for (int i = 0; i <= s.GetLength(); ++i)
+		{
+			const wchar_t ch = (i < s.GetLength()) ? s[i] : L' ';
+			if (ch >= L'0' && ch <= L'9')
+				digits += ch;
+			else if (!digits.IsEmpty())
+			{
+				nums.push_back(_wtoi(digits));
+				if (digits.GetLength() == 8 && nums.size() == 1)
+				{
+					const int v = nums.back();
+					nums.back() = v / 10000;
+					nums.push_back(v / 100 % 100);
+					nums.push_back(v % 100);
+				}
+				digits.Empty();
+				if (nums.size() >= 3)
+					break;
+			}
+		}
+		if (nums.size() < 2 || nums[0] < 1900 || nums[0] > 2100 || nums[1] < 1 || nums[1] > 12)
+			return CString();
+		const int day = (nums.size() >= 3 && nums[2] >= 1 && nums[2] <= 31) ? nums[2] : 1;
+		CString r;
+		r.Format(L"%04d-%02d-%02d", nums[0], nums[1], day);
+		return r;
+	}
+
+	// 문자열 안의 첫 숫자 (없으면 0)
+	int FirstNumber(const CString& s, int from = 0)
+	{
+		int i = from;
+		while (i < s.GetLength() && !(s[i] >= L'0' && s[i] <= L'9'))
+			++i;
+		CString d;
+		while (i < s.GetLength() && s[i] >= L'0' && s[i] <= L'9')
+			d += s[i++];
+		return d.IsEmpty() ? 0 : _wtoi(d);
+	}
+
+	// 컵 문자 (A~Q) — "I컵", "I cup", "(I)" 등에서
+	CString ParseCup(const CString& s)
+	{
+		for (int i = 0; i < s.GetLength(); ++i)
+		{
+			wchar_t ch = s[i];
+			if (ch >= L'ａ' && ch <= L'ｚ') ch = static_cast<wchar_t>(ch - L'ａ' + L'a');
+			if (ch >= L'Ａ' && ch <= L'Ｚ') ch = static_cast<wchar_t>(ch - L'Ａ' + L'A');
+			const wchar_t up = static_cast<wchar_t>(towupper(ch));
+			if (up >= L'A' && up <= L'Q')
+			{
+				// 앞뒤가 다른 영문자가 아니어야 함 (예: "Bust" 의 B 제외)
+				const bool prevAlpha = i > 0 && iswalpha(s[i - 1]) && s[i - 1] < 0x80;
+				const bool nextAlpha = i + 1 < s.GetLength() && iswalpha(s[i + 1]) && s[i + 1] < 0x80
+					&& !(towlower(s[i + 1]) == L'c' && i + 3 < s.GetLength() && towlower(s[i + 2]) == L'u');   // "Icup"
+				if (!prevAlpha && !nextAlpha)
+					return CString(up);
+			}
+		}
+		return CString();
+	}
+
+	// 국적 이름 → 국적 목록의 이름 (일본 / Japan / 日本 / JP / 일본인 → 일본)
+	CString ParseCountry(CString s)
+	{
+		s.Trim();
+		if (s.IsEmpty())
+			return s;
+		if (CCountryCombo::FindCountry(s) >= 0)
+		{
+			int count = 0;
+			return CCountryCombo::Countries(count)[CCountryCombo::FindCountry(s)].name;
+		}
+		if (s.Right(1) == L"인" && CCountryCombo::FindCountry(s.Left(s.GetLength() - 1)) >= 0)
+			return ParseCountry(s.Left(s.GetLength() - 1));
+		static const struct { LPCWSTR key; LPCWSTR name; } kMap[] = {
+			{ L"japan", L"일본" }, { L"japanese", L"일본" }, { L"日本", L"일본" }, { L"한국", L"대한민국" },
+			{ L"korea", L"대한민국" }, { L"south korea", L"대한민국" }, { L"korean", L"대한민국" }, { L"韓国", L"대한민국" },
+			{ L"china", L"중국" }, { L"chinese", L"중국" }, { L"中国", L"중국" }, { L"taiwan", L"대만" }, { L"台湾", L"대만" },
+			{ L"hong kong", L"홍콩" }, { L"香港", L"홍콩" }, { L"usa", L"미국" }, { L"united states", L"미국" },
+			{ L"america", L"미국" }, { L"アメリカ", L"미국" }, { L"uk", L"영국" }, { L"united kingdom", L"영국" },
+			{ L"russia", L"러시아" }, { L"ロシア", L"러시아" }, { L"thailand", L"태국" }, { L"タイ", L"태국" },
+			{ L"philippines", L"필리핀" }, { L"vietnam", L"베트남" },
+		};
+		for (const auto& m : kMap)
+		{
+			if (s.CompareNoCase(m.key) == 0)
+				return m.name;
+		}
+		return s;   // 목록에 없는 국적은 그대로 (국기 없이 표시)
+	}
+
+	// 항목 이름 정리: 공백·기호 제거 + 소문자
+	CString NormKey(CString k)
+	{
+		CString r;
+		for (int i = 0; i < k.GetLength(); ++i)
+		{
+			const wchar_t ch = k[i];
+			if (ch == L' ' || ch == L'\t' || ch == L'　' || ch == L'-' || ch == L'_' || ch == L'.' || ch == L'*' || ch == L'#'
+				|| ch == L'[' || ch == L']' || ch == L'【' || ch == L'】' || ch == L'(' || ch == L')')
+				continue;
+			r += static_cast<wchar_t>(towlower(ch));
+		}
+		return r;
+	}
+
+	// 비교용: 공백 제거 + 소문자
+	CString CompactLower(const CString& s)
+	{
+		CString r;
+		for (int i = 0; i < s.GetLength(); ++i)
+		{
+			const wchar_t ch = s[i];
+			if (ch == L' ' || ch == L'\t' || ch == L'　')
+				continue;
+			r += static_cast<wchar_t>(towlower(ch));
+		}
+		return r;
+	}
+
+	// 다른 이름이 배우 이름과 같은지: 전체 이름, 괄호 앞 이름, 괄호 안의 각 이름(쉼표 구분) 중 하나와 같으면 true (공백·대소문자 무시)
+	//  예: 배우 "나기 히카루(Hikaru Nagi, 凪ひかる)" → "나기 히카루" / "Hikaru Nagi" / "凪ひかる" / "나기히카루" 는 같은 이름
+	bool IsSameAsActorName(const CString& alias, const CString& actorName)
+	{
+		// 언어 단위 비교: "나기 히카루(凪ひかる)" 는 배우 "나기 히카루(Hikaru Nagi, 凪ひかる)" 와 한글(또는 일어) 이름이 같으므로 같은 이름
+		if (CompactLower(alias).IsEmpty())
+			return true;
+		return CVideoLibrary::SameNameByLang(alias, actorName);
+	}
+
+	bool KeyIs(const CString& k, std::initializer_list<LPCWSTR> names)
+	{
+		for (LPCWSTR n : names)
+			if (k == n)
+				return true;
+		return false;
+	}
+}
+
+bool CVideoLibrary::ApplyActorTextInfo(ActorInfo& a, const CString& file)
+{
+	CString text;
+	if (!ReadTextAuto(file, text))
+		return false;
+	if (text.Find(kVideoTxtHeader) >= 0)
+		return false;   // 이 프로그램이 만든 영상 정보 파일은 배우 정보로 읽지 않음
+	text.Replace(L"\r\n", L"\n");
+	text.Replace(L'\r', L'\n');
+
+	bool changed = false;
+	auto setIfEmpty = [&changed](CString& field, const CString& value)
+	{
+		if (field.IsEmpty() && !value.IsEmpty())
+		{
+			field = value;
+			changed = true;
+		}
+	};
+
+	int pos = 0;
+	while (pos <= text.GetLength())
+	{
+		int nl = text.Find(L'\n', pos);
+		if (nl < 0) nl = text.GetLength();
+		CString line = text.Mid(pos, nl - pos);
+		pos = nl + 1;
+		line.Trim();
+		if (line.IsEmpty())
+			continue;
+		// "항목: 값" / "항목：값" / "항목=값" / "항목<탭>값"
+		int sep = -1;
+		const wchar_t seps[] = { L':', L'：', L'=', L'\t' };
+		for (wchar_t s : seps)
+		{
+			const int at = line.Find(s);
+			if (at > 0 && (sep < 0 || at < sep))
+				sep = at;
+		}
+		if (sep <= 0)
+			continue;
+		const CString key = NormKey(line.Left(sep));
+		CString val = line.Mid(sep + 1);
+		val.Trim();
+		if (val.IsEmpty() || val == L"-" || val.CompareNoCase(L"n/a") == 0 || val == L"不明" || val == L"없음")
+			continue;
+
+		if (KeyIs(key, { L"생년월일", L"생일", L"출생", L"출생일", L"birthday", L"birth", L"birthdate", L"born", L"dob", L"dateofbirth", L"生年月日", L"誕生日" }))
+			setIfEmpty(a.birth, ParseDateText(val));
+		else if (KeyIs(key, { L"키", L"신장", L"height", L"身長" }))
+		{
+			const int h = FirstNumber(val);
+			if (h >= 100 && h <= 250) { CString t; t.Format(L"%d", h); setIfEmpty(a.height, t); }
+		}
+		else if (KeyIs(key, { L"치수", L"쓰리사이즈", L"3사이즈", L"사이즈", L"신체사이즈", L"measurements", L"measurement", L"sizes", L"threesizes", L"bwh", L"スリーサイズ", L"サイズ" }))
+		{
+			// "B105 / W59 / H88", "105-59-88", "B105(I) W59 H88", "105I-59-88"
+			int b = 0, w = 0, hh = 0;
+			CString up = val;
+			up.MakeUpper();
+			const int pb = up.Find(L'B'), pw = up.Find(L'W'), ph = up.Find(L'H');
+			if (pb >= 0 && pw > pb && ph > pw)
+			{
+				b = FirstNumber(up, pb); w = FirstNumber(up, pw); hh = FirstNumber(up, ph);
+			}
+			else if (FirstNumber(up) > 0)
+			{
+				b = FirstNumber(up);
+				int i = up.Find(std::to_wstring(b).c_str()) + static_cast<int>(std::to_wstring(b).size());
+				w = FirstNumber(up, i);
+				i = up.Find(std::to_wstring(w).c_str(), i) + static_cast<int>(std::to_wstring(w).size());
+				hh = FirstNumber(up, i);
+			}
+			auto num = [](int v) { CString t; if (v >= 40 && v <= 200) t.Format(L"%d", v); return t; };
+			setIfEmpty(a.bust, num(b));
+			setIfEmpty(a.waist, num(w));
+			setIfEmpty(a.hip, num(hh));
+			// 치수 안의 컵 ("B105(I)" / "105I")
+			const int paren = val.Find(L'(');
+			if (paren >= 0)
+				setIfEmpty(a.cup, ParseCup(val.Mid(paren)));
+		}
+		else if (KeyIs(key, { L"가슴", L"바스트", L"bust", L"バスト" }))
+		{
+			CString t; const int v = FirstNumber(val); if (v >= 40 && v <= 200) t.Format(L"%d", v);
+			setIfEmpty(a.bust, t);
+			const int paren = val.Find(L'(');
+			if (paren >= 0) setIfEmpty(a.cup, ParseCup(val.Mid(paren)));
+		}
+		else if (KeyIs(key, { L"허리", L"웨이스트", L"waist", L"ウエスト" }))
+		{
+			CString t; const int v = FirstNumber(val); if (v >= 30 && v <= 150) t.Format(L"%d", v);
+			setIfEmpty(a.waist, t);
+		}
+		else if (KeyIs(key, { L"엉덩이", L"힙", L"hip", L"hips", L"ヒップ" }))
+		{
+			CString t; const int v = FirstNumber(val); if (v >= 40 && v <= 200) t.Format(L"%d", v);
+			setIfEmpty(a.hip, t);
+		}
+		else if (KeyIs(key, { L"컵", L"컵사이즈", L"cup", L"cupsize", L"カップ", L"ブラ" }))
+			setIfEmpty(a.cup, ParseCup(val));
+		else if (KeyIs(key, { L"국적", L"국가", L"출신", L"출신지", L"nationality", L"country", L"国籍", L"出身", L"出身地" }))
+			setIfEmpty(a.nationality, ParseCountry(val));
+		else if (KeyIs(key, { L"성별", L"gender", L"sex", L"性別" }))
+			setIfEmpty(a.gender, NormalizeGender(val));
+		else if (KeyIs(key, { L"데뷔", L"데뷔일", L"debut", L"careerstart", L"activefrom", L"デビュー", L"デビュー日" }))
+			setIfEmpty(a.debut, ParseDateText(val));
+		else if (KeyIs(key, { L"은퇴", L"은퇴일", L"retire", L"retired", L"careerend", L"引退", L"引退日" }))
+			setIfEmpty(a.retire, ParseDateText(val));
+		else if (KeyIs(key, { L"별칭", L"별명", L"다른이름", L"예명", L"aliases", L"alias", L"aka", L"別名", L"旧芸名" }))
+		{
+			CString v = val;
+			v.Replace(L'、', L',');
+			v.Replace(L'，', L',');
+			v.Replace(L'/', L',');
+			v.Replace(L'#', L',');    // "#이름1 #이름2" 처럼 # 로 구분된 다른 이름
+			v.Replace(L'＃', L',');   // 전각 ＃
+			std::vector<CString> list = SplitList(a.aliases);
+			std::vector<CString> found = SplitList(v);
+			std::reverse(found.begin(), found.end());   // 파일에 적힌 순서의 반대로 추가 (마지막 이름부터)
+			for (CString n : found)
+			{
+				n.Trim();
+				if (n.IsEmpty() || IsSameAsActorName(n, a.name))   // 배우 이름(괄호 앞 이름 · 괄호 안 이름 포함)과 같으면 추가 안 함
+					continue;
+				bool dup = false;
+				for (const CString& e : list)
+					if (CompactLower(e) == CompactLower(n) || SameNameByLang(e, n)) { dup = true; break; }   // 공백·대소문자만 다른 것, 언어 단위로 같은 이름도 중복
+				if (!dup)
+				{
+					list.push_back(n);
+					changed = true;
+				}
+			}
+			a.aliases = JoinList(list);
+		}
+		else if (KeyIs(key, { L"메모", L"설명", L"소개", L"memo", L"note", L"notes", L"details", L"bio", L"プロフィール" }))
+			setIfEmpty(a.memo, val);
+	}
+	return changed;
+}
+
+bool CVideoLibrary::HasNoActorInfo(const ActorInfo& a)
+{
+	return a.birth.IsEmpty() && a.height.IsEmpty() && a.nationality.IsEmpty() && a.debut.IsEmpty()
+		&& a.retire.IsEmpty() && a.bust.IsEmpty() && a.waist.IsEmpty() && a.hip.IsEmpty() && a.cup.IsEmpty();
+}
+
+CString CVideoLibrary::FindActorTextFile(const CString& dir, const CString& actorName)
+{
+	std::vector<CString> files;
+	WIN32_FIND_DATAW fd = {};
+	HANDLE h = ::FindFirstFileW(dir + L"\\*.txt", &fd);
+	if (h != INVALID_HANDLE_VALUE)
+	{
+		do
+		{
+			if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+				files.push_back(fd.cFileName);
+		} while (::FindNextFileW(h, &fd));
+		::FindClose(h);
+	}
+	if (files.empty())
+		return CString();
+	std::sort(files.begin(), files.end(), [](const CString& x, const CString& y) { return ::StrCmpLogicalW(x, y) < 0; });
+	const CString folderName = ::PathFindFileNameW(dir);
+	const CString preferred[] = { folderName, actorName, L"profile", L"info", L"actor", L"프로필", L"정보" };
+	for (const CString& p : preferred)
+	{
+		for (const CString& f : files)
+		{
+			CString stem = f;
+			::PathRemoveExtensionW(stem.GetBuffer());
+			stem.ReleaseBuffer();
+			if (stem.CompareNoCase(p) == 0)
+				return dir + L"\\" + f;
+		}
+	}
+	return dir + L"\\" + files.front();
+}
+
+// ---------------------------------------------------------------------------
+// 배우 / 영상 정보를 txt 로 내보내기 (같은 폴더, UTF-8, "항목: 값" — 배우 txt 는 다시 읽어 들일 수 있는 형식)
+
+namespace
+{
+	// 내용이 같으면 쓰지 않음 (수정 시각 유지). 반환: 1 = 씀, 0 = 같아서 건너뜀, -1 = 실패
+	int WriteTextIfChanged(const CString& path, const CString& text)
+	{
+		const CStringA utf8(CW2A(text, CP_UTF8));
+		std::vector<BYTE> data = { 0xEF, 0xBB, 0xBF };
+		data.insert(data.end(), reinterpret_cast<const BYTE*>(static_cast<LPCSTR>(utf8)),
+			reinterpret_cast<const BYTE*>(static_cast<LPCSTR>(utf8)) + utf8.GetLength());
+		std::vector<BYTE> old;
+		if (ReadWholeFile(path, old) && old == data)
+			return 0;
+		HANDLE h = ::CreateFileW(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+		if (h == INVALID_HANDLE_VALUE)
+			return -1;
+		DWORD written = 0;
+		const bool ok = ::WriteFile(h, data.data(), static_cast<DWORD>(data.size()), &written, nullptr) && written == data.size();
+		::CloseHandle(h);
+		return ok ? 1 : -1;
+	}
+
+	void AddLine(CString& t, LPCWSTR key, const CString& value)
+	{
+		if (value.IsEmpty())
+			return;
+		CString v = value;
+		v.Replace(L"\r\n", L" ");
+		v.Replace(L'\n', L' ');
+		t += key;
+		t += L": ";
+		t += v;
+		t += L"\r\n";
+	}
+}
+
+int CVideoLibrary::ExportVideoInfoTxt(int& unchanged, int& failed) const
+{
+	int written = 0;
+	unchanged = failed = 0;
+	for (const VideoItem& v : items)
+	{
+		if (v.pending || v.path.IsEmpty() || !::PathFileExistsW(v.path))
+			continue;   // 임시 항목 · 없는 파일은 제외
+		CString t = CString(kVideoTxtHeader) + L"\r\n";
+		AddLine(t, L"파일", v.FileName());
+		AddLine(t, L"품번", v.code);
+		AddLine(t, L"제목", v.title);
+		AddLine(t, L"발매일", v.release);
+		if (v.rating > 0) { CString r; r.Format(L"%d", v.rating); AddLine(t, L"별점", r); }
+		AddLine(t, L"배우", v.actors);
+		AddLine(t, L"참여 별칭", v.actorAliases);
+		AddLine(t, L"스튜디오", v.studio);
+		AddLine(t, L"태그", v.tags);
+		if (v.oCount > 0) { CString o; o.Format(L"%d", v.oCount); AddLine(t, L"물방울", o); }
+		// 영상과 같은 폴더, 같은 이름 (ABC-123.mp4 → ABC-123.txt)
+		CString path = v.path;
+		const int ext = static_cast<int>(::PathFindExtensionW(path) - static_cast<LPCWSTR>(path));
+		if (ext > 0) path = path.Left(ext);
+		const int r = WriteTextIfChanged(path + L".txt", t);
+		if (r > 0) ++written; else if (r == 0) ++unchanged; else ++failed;
+	}
+	return written;
+}
+
+int CVideoLibrary::ExportActorInfoTxt(int& unchanged, int& noFolder, int& failed) const
+{
+	int written = 0;
+	unchanged = noFolder = failed = 0;
+	// 배우별 출연 영상 경로
+	const std::map<CString, int> index = ActorNameIndex();
+	std::map<int, std::vector<CString>> videos;
+	for (const VideoItem& v : items)
+	{
+		for (const CString& n : SplitList(v.actors))
+		{
+			CString key = n;
+			key.MakeLower();
+			auto it = index.find(key);
+			if (it != index.end())
+				videos[it->second].push_back(v.path);
+		}
+	}
+	for (size_t i = 0; i < actors.size(); ++i)
+	{
+		const ActorInfo& a = actors[i];
+		// 배우 폴더 찾기 (배우 이름 또는 별칭과 같은 상위 폴더)
+		CString folder;
+		auto vit = videos.find(static_cast<int>(i));
+		if (vit != videos.end())
+		{
+			std::vector<CString> names = { a.name };
+			for (const CString& al : SplitList(a.aliases))
+				names.push_back(al);
+			for (const CString& path : vit->second)
+			{
+				for (const CString& nm : names)
+				{
+					folder = FindActorFolder(path, nm);
+					if (!folder.IsEmpty())
+						break;
+				}
+				if (!folder.IsEmpty())
+					break;
+			}
+		}
+		if (folder.IsEmpty())
+		{
+			++noFolder;
+			continue;
+		}
+
+		CString t = CString(kActorTxtHeader) + L"\r\n";
+		AddLine(t, L"이름", a.name);
+		{
+			// 다른 이름: 읽어 들일 때 순서를 뒤집으므로 거꾸로 써 둠 (다시 읽으면 지금 순서)
+			std::vector<CString> al = SplitList(a.aliases);
+			CString s;
+			for (auto it = al.rbegin(); it != al.rend(); ++it)
+			{
+				if (!s.IsEmpty()) s += L" ";
+				s += L"#" + *it;
+			}
+			AddLine(t, L"다른이름", s);
+		}
+		AddLine(t, L"성별", a.gender);
+		AddLine(t, L"생년월일", a.birth);
+		AddLine(t, L"국적", a.nationality);
+		if (!a.height.IsEmpty()) AddLine(t, L"키", a.height + L"cm");
+		if (!a.bust.IsEmpty() || !a.waist.IsEmpty() || !a.hip.IsEmpty())
+		{
+			CString m;
+			m.Format(L"B%s / W%s / H%s", static_cast<LPCWSTR>(a.bust), static_cast<LPCWSTR>(a.waist), static_cast<LPCWSTR>(a.hip));
+			AddLine(t, L"치수", m);
+		}
+		AddLine(t, L"컵", a.cup);
+		AddLine(t, L"데뷔", a.debut);
+		AddLine(t, L"은퇴", a.retire);
+		if (a.rating > 0) { CString r; r.Format(L"%d", a.rating); AddLine(t, L"별점", r); }
+		if (a.favorite) AddLine(t, L"즐겨찾기", L"예");
+		AddLine(t, L"메모", a.memo);   // 한 줄로
+
+		const CString path = folder + L"\\" + ::PathFindFileNameW(folder) + L".txt";   // 배우 폴더 이름.txt
+		const int r = WriteTextIfChanged(path, t);
+		if (r > 0) ++written; else if (r == 0) ++unchanged; else ++failed;
+	}
+	return written;
+}
+
+// ---------------------------------------------------------------------------
+// 영상 폴더의 텍스트 파일(항목: 값)에서 영상 정보 읽기
+
+CString CVideoLibrary::FindVideoTextFile(const CString& videoPath)
+{
+	if (videoPath.IsEmpty())
+		return CString();
+	const CString dir = videoPath.Left(static_cast<int>(::PathFindFileNameW(videoPath) - static_cast<LPCWSTR>(videoPath)));
+	CString stem = ::PathFindFileNameW(videoPath);
+	::PathRemoveExtensionW(stem.GetBuffer());
+	stem.ReleaseBuffer();
+
+	// 0) 상위 폴더(영상 폴더) 이름 기준: D:\영상\ABC-123\xxx.mp4 → D:\영상\ABC-123\ABC-123.txt
+	//    같은 이름이 없으면 폴더 이름의 '_' 왼쪽과 txt 이름의 '_' 왼쪽이 같은 txt (이름 순 첫 번째). 배우 정보 파일은 제외
+	{
+		CString folderName = dir;
+		folderName.TrimRight(L"\\/");
+		folderName = ::PathFindFileNameW(folderName);
+		folderName.Trim();
+		if (!folderName.IsEmpty() && folderName.Find(L':') < 0)   // 드라이브 루트(D:) 제외
+		{
+			auto notActorTxt = [](const CString& f)
+			{
+				CString text;
+				return !ReadTextAuto(f, text) || text.Find(kActorTxtHeader) < 0;
+			};
+			if (::PathFileExistsW(dir + folderName + L".txt") && notActorTxt(dir + folderName + L".txt"))
+				return dir + folderName + L".txt";
+			auto leftKey = [](const CString& s) { const int us = s.Find(L'_'); CString k = (us >= 0) ? s.Left(us) : s; k.Trim(); return k; };
+			const CString fkey = leftKey(folderName);
+			std::vector<CString> txts;
+			WIN32_FIND_DATAW fd0 = {};
+			HANDLE h0 = ::FindFirstFileW(dir + L"*.txt", &fd0);
+			if (h0 != INVALID_HANDLE_VALUE)
+			{
+				do
+				{
+					if (!(fd0.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+						txts.push_back(fd0.cFileName);
+				} while (::FindNextFileW(h0, &fd0));
+				::FindClose(h0);
+			}
+			std::sort(txts.begin(), txts.end(), [](const CString& x, const CString& y) { return ::StrCmpLogicalW(x, y) < 0; });
+			for (const CString& f : txts)
+			{
+				CString t = f;
+				::PathRemoveExtensionW(t.GetBuffer());
+				t.ReleaseBuffer();
+				if (!fkey.IsEmpty() && leftKey(t).CompareNoCase(fkey) == 0 && notActorTxt(dir + f))
+					return dir + f;
+			}
+		}
+	}
+
+	// 1) 같은 이름 (ABC-123.mp4 → ABC-123.txt), 2) 확장자 포함 (ABC-123.mp4.txt)
+	if (::PathFileExistsW(dir + stem + L".txt"))
+		return dir + stem + L".txt";
+	if (::PathFileExistsW(videoPath + L".txt"))
+		return videoPath + L".txt";
+
+	// 3) '_' 왼쪽이 같은 이름 (ABC-123_1080p.mp4 ↔ ABC-123.txt / ABC-123_info.txt)
+	auto keyOf = [](const CString& s) { const int us = s.Find(L'_'); CString k = (us >= 0) ? s.Left(us) : s; k.Trim(); return k; };
+	const CString key = keyOf(stem);
+	std::vector<CString> all;
+	WIN32_FIND_DATAW fd = {};
+	HANDLE h = ::FindFirstFileW(dir + L"*.txt", &fd);
+	if (h != INVALID_HANDLE_VALUE)
+	{
+		do
+		{
+			if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+				all.push_back(fd.cFileName);
+		} while (::FindNextFileW(h, &fd));
+		::FindClose(h);
+	}
+	std::sort(all.begin(), all.end(), [](const CString& a, const CString& b) { return ::StrCmpLogicalW(a, b) < 0; });
+	for (const CString& f : all)
+	{
+		CString s = f;
+		::PathRemoveExtensionW(s.GetBuffer());
+		s.ReleaseBuffer();
+		if (!key.IsEmpty() && keyOf(s).CompareNoCase(key) == 0)
+			return dir + f;
+	}
+
+	// 4) 영상 폴더에 영상이 하나뿐이고 txt 도 하나뿐이면 그 파일 (배우 정보 파일은 제외)
+	if (all.size() == 1)
+	{
+		int videos = 0;
+		h = ::FindFirstFileW(dir + L"*", &fd);
+		if (h != INVALID_HANDLE_VALUE)
+		{
+			do
+			{
+				if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && IsVideoFile(fd.cFileName))
+					++videos;
+			} while (::FindNextFileW(h, &fd) && videos < 2);
+			::FindClose(h);
+		}
+		if (videos == 1)
+		{
+			CString text;
+			if (ReadTextAuto(dir + all[0], text) && text.Find(kActorTxtHeader) < 0)
+				return dir + all[0];
+		}
+	}
+	return CString();
+}
+
+namespace
+{
+	// 이름 조각의 언어: 한글 / 영어(라틴) / 일어(가나 · 한자) / 섞임
+	enum NameLang { LANG_KO = 0, LANG_EN = 1, LANG_JA = 2, LANG_MIX = 3 };
+
+	int DetectNameLang(const CString& s)
+	{
+		bool ko = false, en = false, ja = false;
+		for (int i = 0; i < s.GetLength(); ++i)
+		{
+			const wchar_t c = s[i];
+			if ((c >= 0xAC00 && c <= 0xD7A3) || (c >= 0x1100 && c <= 0x11FF) || (c >= 0x3130 && c <= 0x318F))
+				ko = true;
+			else if ((c >= 0x3040 && c <= 0x30FF) || (c >= 0x31F0 && c <= 0x31FF) || (c >= 0xFF66 && c <= 0xFF9F) ||
+			         (c >= 0x4E00 && c <= 0x9FFF) || (c >= 0x3400 && c <= 0x4DBF) || (c >= 0xF900 && c <= 0xFAFF))
+				ja = true;
+			else if ((c >= L'A' && c <= L'Z') || (c >= L'a' && c <= L'z') || (c >= 0x00C0 && c <= 0x024F) ||
+			         (c >= 0xFF21 && c <= 0xFF3A) || (c >= 0xFF41 && c <= 0xFF5A))
+				en = true;
+		}
+		const int kinds = (ko ? 1 : 0) + (en ? 1 : 0) + (ja ? 1 : 0);
+		if (kinds != 1)
+			return LANG_MIX;
+		return ko ? LANG_KO : (en ? LANG_EN : LANG_JA);
+	}
+
+	// 비교 키: 영어는 단어 순서 무시(Hikaru Nagi = Nagi Hikaru, 점 · 하이픈도 공백 취급), 나머지는 공백 제거 + 소문자
+	CString NameKey(const CString& s, int lang)
+	{
+		if (lang != LANG_EN)
+			return CompactLower(s);
+		CString t = s;
+		t.MakeLower();
+		const wchar_t seps[] = { L'.', L'-', L'\x00B7', L'\x30FB', L'_', L'\x3000' };
+		for (wchar_t c : seps)
+			t.Replace(c, L' ');
+		std::vector<CString> words;
+		int start = 0;
+		for (;;)
+		{
+			CString w = t.Tokenize(L" ", start);
+			if (start < 0)
+				break;
+			w.Trim();
+			if (!w.IsEmpty())
+				words.push_back(w);
+		}
+		std::sort(words.begin(), words.end());
+		CString k;
+		for (const CString& w : words)
+			k += w;
+		return k;
+	}
+
+	struct NamePart { CString key; int lang; };
+
+	// 이름의 비교용 조각들: 전체, 괄호 앞 이름, 괄호 안의 각 이름 (언어별 키)
+	//  예: "나기 히카루(Hikaru Nagi, 凪ひかる)" / "나기 히카루, (Hikaru Nagi, 凪ひかる)"
+	//      → { 전체(섞임), "나기히카루"(한글), "hikarunagi"(영어, 단어 정렬), "凪ひかる"(일어) }
+	std::vector<NamePart> NameParts(const CString& name)
+	{
+		std::vector<NamePart> parts;
+		auto add = [&parts](CString s)
+		{
+			s.Trim(L" \t,，、;；");
+			const int lang = DetectNameLang(s);
+			const CString k = NameKey(s, lang);
+			if (k.IsEmpty())
+				return;
+			for (const NamePart& p : parts)
+				if (p.key == k && p.lang == lang) return;
+			parts.push_back({ k, lang });
+		};
+		add(name);
+		int po = name.Find(L'(');
+		const int poW = name.Find(L'（');
+		if (po < 0 || (poW >= 0 && poW < po)) po = poW;
+		if (po < 0)
+			return parts;
+		add(name.Left(po));   // "한글이름, (" 처럼 괄호 앞 쉼표가 있어도 떼고 비교
+		int pc = name.ReverseFind(L')');
+		const int pcW = name.ReverseFind(L'）');
+		if (pcW > pc) pc = pcW;
+		if (pc < po) pc = name.GetLength();
+		CString inner = name.Mid(po + 1, pc - po - 1);
+		inner.Replace(L'，', L',');
+		inner.Replace(L'、', L',');
+		inner.Replace(L'/', L',');
+		int start = 0;
+		for (;;)
+		{
+			const int comma = inner.Find(L',', start);
+			add((comma < 0) ? inner.Mid(start) : inner.Mid(start, comma - start));
+			if (comma < 0)
+				break;
+			start = comma + 1;
+		}
+		return parts;
+	}
+}
+
+int CVideoLibrary::FindActorByNamePart(const CString& name, int exclude) const
+{
+	// 출연자 이름의 한글 / 영어 / 일어 조각 중 하나라도 배우 이름(또는 별칭)의 같은 언어 조각과 같으면 그 배우
+	//  - 같은 언어끼리만 비교, 한 언어가 같으면 다른 언어 이름은 비교하지 않고 동일인으로 봄
+	//  - 언어 우선순위: 한글 → 일어 → 영어 → 전체 (여러 배우가 걸리면 먼저 맞은 언어의 배우)
+	const std::vector<NamePart> mine = NameParts(name);
+	if (mine.empty())
+		return -1;
+	std::vector<std::vector<NamePart>> cands(actors.size());
+	for (size_t i = 0; i < actors.size(); ++i)
+	{
+		cands[i] = NameParts(actors[i].name);
+		for (const CString& al : SplitList(actors[i].aliases))
+			for (const NamePart& p : NameParts(al))
+				cands[i].push_back(p);
+	}
+	const int order[] = { LANG_KO, LANG_JA, LANG_EN, LANG_MIX };
+	for (int lang : order)
+	{
+		for (const NamePart& m : mine)
+		{
+			if (m.lang != lang)
+				continue;
+			for (size_t i = 0; i < actors.size(); ++i)
+				if (static_cast<int>(i) != exclude)
+				for (const NamePart& c : cands[i])
+					if (c.lang == lang && c.key == m.key)
+						return static_cast<int>(i);
+		}
+	}
+	return -1;
+}
+
+bool CVideoLibrary::SameNameByLang(const CString& a, const CString& b)
+{
+	const std::vector<NamePart> pa = NameParts(a), pb = NameParts(b);
+	for (const NamePart& x : pa)
+		for (const NamePart& y : pb)
+			if (x.lang == y.lang && x.key == y.key)
+				return true;
+	return false;
+}
+
+bool CVideoLibrary::ApplyVideoTextInfo(VideoItem& v, const CString& file) const
+{
+	CString text;
+	if (!ReadTextAuto(file, text) || text.Find(kActorTxtHeader) >= 0)
+		return false;   // 배우 정보 파일은 영상 정보로 읽지 않음
+	text.Replace(L"\r\n", L"\n");
+	text.Replace(L'\r', L'\n');
+
+	bool changed = false;
+	auto setIfEmpty = [&changed](CString& field, const CString& value)
+	{
+		if (field.IsEmpty() && !value.IsEmpty())
+		{
+			field = value;
+			changed = true;
+		}
+	};
+	// 목록 값: 쉼표 · 、 · / · # · | 로 나눔 (괄호 안 쉼표는 이름의 일부)
+	auto toList = [](CString s) -> CString
+	{
+		s.Replace(L'、', L',');
+		s.Replace(L'，', L',');
+		s.Replace(L'/', L',');
+		s.Replace(L'|', L',');
+		s.Replace(L'#', L',');
+		s.Replace(L'＃', L',');
+		return JoinList(SplitList(s));
+	};
+
+	// 배우 목록: "한글이름, (English Name, なまえ)" 처럼 괄호 앞에 쉼표가 있어도 한 사람으로 (괄호로 시작하는 항목은 앞 이름에 붙임)
+	auto toActorList = [&toList](const CString& s) -> CString
+	{
+		std::vector<CString> out;
+		for (const CString& e : SplitList(toList(s)))
+		{
+			const bool paren = !e.IsEmpty() && (e[0] == L'(' || e[0] == L'（');
+			if (paren && !out.empty() && out.back().FindOneOf(L"(（") < 0)
+				out.back() += e;
+			else
+				out.push_back(e);
+		}
+		return JoinList(out);
+	};
+
+	bool actorsSet = false;
+	int pos = 0;
+	while (pos <= text.GetLength())
+	{
+		int nl = text.Find(L'\n', pos);
+		if (nl < 0) nl = text.GetLength();
+		CString line = text.Mid(pos, nl - pos);
+		pos = nl + 1;
+		line.Trim();
+		if (line.IsEmpty() || (line[0] == L'#' && line.Find(L':') < 0))   // 머리말 줄(# ...)
+			continue;
+		int sep = -1;
+		const wchar_t seps[] = { L':', L'：', L'=', L'\t' };
+		for (wchar_t s : seps)
+		{
+			const int at = line.Find(s);
+			if (at > 0 && (sep < 0 || at < sep))
+				sep = at;
+		}
+		if (sep <= 0)
+			continue;
+		const CString key = NormKey(line.Left(sep));
+		CString val = line.Mid(sep + 1);
+		val.Trim();
+
+		// 메모: 영상 메모 기능은 삭제 - 읽지 않고 건너뜀 (값이 비어 있으면 다음 줄부터 끝까지가 메모이므로 끝까지 건너뜀)
+		if (KeyIs(key, { L"메모", L"설명", L"줄거리", L"소개", L"memo", L"note", L"notes", L"plot", L"description", L"story", L"内容", L"あらすじ", L"作品紹介" }))
+		{
+			if (val.IsEmpty() && pos <= text.GetLength())
+			{
+				val = text.Mid(pos);
+				val.Trim();
+				pos = text.GetLength() + 1;
+			}
+			continue;
+		}
+		if (val.IsEmpty() || val == L"-" || val.CompareNoCase(L"n/a") == 0)
+			continue;
+
+		if (KeyIs(key, { L"품번", L"코드", L"작품번호", L"code", L"id", L"dvdid", L"num", L"品番", L"品番号" }))
+			setIfEmpty(v.code, val);
+		else if (KeyIs(key, { L"제목", L"타이틀", L"title", L"タイトル", L"作品名" }))
+			setIfEmpty(v.title, val);
+		else if (KeyIs(key, { L"발매일", L"출시일", L"발매", L"release", L"releasedate", L"date", L"発売日", L"配信開始日", L"公開日" }))
+			setIfEmpty(v.release, ParseDateText(val));
+		else if (KeyIs(key, { L"별점", L"평점", L"rating", L"評価" }))
+		{
+			int r = FirstNumber(val);
+			if (val.Find(L'★') >= 0) { r = 0; for (int i = 0; i < val.GetLength(); ++i) if (val[i] == L'★') ++r; }
+			if (v.rating == 0 && r >= 1 && r <= 5) { v.rating = r; changed = true; }
+		}
+		else if (KeyIs(key, { L"배우", L"출연", L"출연자", L"출연배우", L"여배우", L"actor", L"actors", L"actress", L"cast", L"出演者", L"出演", L"女優" }))
+		{
+			if (v.actors.IsEmpty())
+			{
+				v.actors = toActorList(val);
+				actorsSet = !v.actors.IsEmpty();
+				changed = changed || actorsSet;
+			}
+		}
+		else if (KeyIs(key, { L"참여별칭", L"별칭" }))
+			setIfEmpty(v.actorAliases, toActorList(val));
+		else if (KeyIs(key, { L"스튜디오", L"제작사", L"메이커", L"레이블", L"studio", L"maker", L"label", L"publisher", L"メーカー", L"レーベル", L"スタジオ" }))
+		{
+			CString s = val;
+			const int comma = FindListComma(s, 0);
+			if (comma > 0) s = s.Left(comma);   // 스튜디오는 하나
+			s.Trim();
+			setIfEmpty(v.studio, s);
+		}
+		else if (KeyIs(key, { L"태그", L"장르", L"키워드", L"tag", L"tags", L"genre", L"genres", L"keywords", L"ジャンル", L"タグ" }))
+			setIfEmpty(v.tags, toList(val));
+		else if (KeyIs(key, { L"물방울", L"ocount", L"o" }))
+		{
+			const int o = FirstNumber(val);
+			if (v.oCount == 0 && o > 0) { v.oCount = o; changed = true; }
+		}
+	}
+	if (actorsSet)
+	{
+		// 출연자 이름이 등록 배우의 한글 / 영어 / 일어 이름 조각과 같으면 그 배우로 연결
+		//  (이름 · 별칭과 그대로 같은 경우는 아래 NormalizeVideoActors 가 배우 이름 + 참여 별칭으로 정리)
+		std::vector<CString> list = SplitList(v.actors), out;
+		for (const CString& n : list)
+		{
+			CString name = n;
+			if (FindActorByAnyName(n) < 0)
+			{
+				const int idx = FindActorByNamePart(n);
+				if (idx >= 0)
+					name = actors[idx].name;
+			}
+			bool dup = false;
+			for (const CString& o : out)
+				if (o.CompareNoCase(name) == 0) { dup = true; break; }
+			if (!dup)
+				out.push_back(name);
+		}
+		v.actors = JoinList(out);
+		NormalizeVideoActors(v);   // 별칭으로 적힌 배우 → 배우 이름 + 참여 별칭
+	}
+
+	// 스튜디오 · 태그: 목록에 이미 있는 이름이면 목록의 표기(대소문자)로 맞춤.
+	// 목록에 없는 이름은 그대로 두고, 스캔 뒤 SyncNamedFromVideos() 가 스튜디오 / 태그 목록에 새로 추가함
+	if (!v.studio.IsEmpty())
+	{
+		const int n = FindNamed(LIST_STUDIO, v.studio);
+		if (n >= 0)
+			v.studio = studios[n].name;
+	}
+	if (!v.tags.IsEmpty())
+	{
+		std::vector<CString> list = SplitList(v.tags), out;
+		for (CString& t : list)
+		{
+			const int n = FindNamed(LIST_TAG, t);
+			const CString name = (n >= 0) ? tagInfos[n].name : t;
+			bool dup = false;
+			for (const CString& o : out)
+				if (o.CompareNoCase(name) == 0) { dup = true; break; }
+			if (!dup)
+				out.push_back(name);
+		}
+		v.tags = JoinList(out);
+	}
+	return changed;
+}
+
+CString CVideoLibrary::ExtractCode(const CString& name)
+{
+	// 영문 2~6자 + (- 또는 _ 또는 없음) + 숫자 2~5자  →  "ABC-123" (대문자)
+	//  - [2024.12.10] 같은 대괄호 날짜 · 해상도(1080p) 는 숫자 앞에 영문이 없어 걸리지 않음
+	const int n = name.GetLength();
+	for (int i = 0; i < n; ++i)
+	{
+		auto isAlpha = [](wchar_t ch) { return (ch >= L'A' && ch <= L'Z') || (ch >= L'a' && ch <= L'z'); };
+		auto isDigit = [](wchar_t ch) { return ch >= L'0' && ch <= L'9'; };
+		if (!isAlpha(name[i]) || (i > 0 && (isAlpha(name[i - 1]) || isDigit(name[i - 1]))))
+			continue;   // 단어 시작에서만
+		int j = i;
+		while (j < n && isAlpha(name[j])) ++j;
+		const int letters = j - i;
+		if (letters < 2 || letters > 6)
+			continue;
+		int k = j;
+		if (k < n && (name[k] == L'-' || name[k] == L'_' || name[k] == L' '))
+			++k;
+		int m = k;
+		while (m < n && isDigit(name[m])) ++m;
+		const int digits = m - k;
+		if (digits < 2 || digits > 5 || (m < n && isAlpha(name[m]) && !(m + 1 >= n || !isAlpha(name[m + 1]))))
+			continue;   // 숫자 뒤에 영문 단어가 이어지면(예: 1080p 이외의 긴 단어) 제외
+		CString prefix = name.Mid(i, letters);
+		prefix.MakeUpper();
+		if (prefix == L"MP" || prefix == L"HD" || prefix == L"FHD" || prefix == L"UHD" || prefix == L"CD" || prefix == L"PART")
+			continue;   // 품번이 아닌 흔한 표기
+		return prefix + L"-" + name.Mid(k, digits);
+	}
+	return CString();
+}
+
+int CVideoLibrary::FillMissingCodes()
+{
+	int filled = 0;
+	for (VideoItem& v : items)
+	{
+		if (!v.code.IsEmpty())
+			continue;
+		CString stem = v.FileName();
+		::PathRemoveExtensionW(stem.GetBuffer());
+		stem.ReleaseBuffer();
+		CString code = ExtractCode(stem);
+		if (code.IsEmpty())
+		{
+			CString folder = v.path.Left(static_cast<int>(::PathFindFileNameW(v.path) - static_cast<LPCWSTR>(v.path)));
+			folder.TrimRight(L"\\");
+			code = ExtractCode(::PathFindFileNameW(folder));
+		}
+		if (!code.IsEmpty())
+		{
+			v.code = code;
+			++filled;
+		}
+	}
+	return filled;
 }

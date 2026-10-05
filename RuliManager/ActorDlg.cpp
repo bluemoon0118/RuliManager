@@ -178,9 +178,8 @@ BOOL CActorDlg::OnInitDialog()
 	}
 
 	m_editSearch.SetCueBanner(L"이름 · 별칭 검색");
-	m_comboGender.AddString(L"");        // 미지정
-	m_comboGender.AddString(L"여성");
-	m_comboGender.AddString(L"남성");
+	for (int i = 0; i < CVideoLibrary::GenderCount(); ++i)   // 0 = 미지정, 여성 / 남성 / 트랜스젠더 여성 / 트랜스젠더 남성 / 인터섹스 / 논바이너리
+		m_comboGender.AddString(CVideoLibrary::GenderAt(i));
 	m_comboCup.AddString(L"");          // 미지정
 	for (wchar_t c = L'A'; c <= L'Q'; ++c)
 		m_comboCup.AddString(CString(c));
@@ -307,7 +306,12 @@ void CActorDlg::ShowActor(int idx)
 		else
 			m_dateBirth.SetTime(static_cast<LPSYSTEMTIME>(nullptr));
 		m_comboNationality.SetCountry(a.nationality);
-		m_comboGender.SetCurSel(a.gender == L"여성" ? 1 : a.gender == L"남성" ? 2 : 0);
+		{
+			int gsel = 0;
+			for (int i = 1; i < CVideoLibrary::GenderCount(); ++i)
+				if (a.gender == CVideoLibrary::GenderAt(i)) { gsel = i; break; }
+			m_comboGender.SetCurSel(gsel);
+		}
 		m_editHeight.SetWindowText(a.height);
 		m_editBust.SetWindowText(a.bust);
 		m_editWaist.SetWindowText(a.waist);
@@ -468,10 +472,19 @@ bool CActorDlg::Commit()
 		m_lib.RenameActorInVideos(a.name, name);   // 동영상의 배우 이름도 대표 이름으로 변경
 	a.name = name;
 	{
+		// 별칭: 대표 이름(또는 앞의 별칭)과 언어 단위로 같은 이름은 넣지 않음
+		//  예: 대표 이름 "나기 히카루(Hikaru Nagi, 凪ひかる)" → "나기 히카루(凪ひかる)" 는 같은 이름이므로 무시
 		std::vector<CString> others;
 		for (const CString& s : names)
-			if (s.CompareNoCase(name) != 0)
+		{
+			if (s.CompareNoCase(name) == 0 || CVideoLibrary::SameNameByLang(s, name))
+				continue;
+			bool dup = false;
+			for (const CString& o : others)
+				if (CVideoLibrary::SameNameByLang(s, o)) { dup = true; break; }
+			if (!dup)
 				others.push_back(s);
+		}
 		a.aliases = CVideoLibrary::JoinList(others);
 	}
 	// 영상에서 마지막으로 고른 별칭: 별칭 목록에 없으면 해제
@@ -501,7 +514,7 @@ bool CActorDlg::Commit()
 	a.nationality = m_comboNationality.GetCountry();
 
 	const int g = m_comboGender.GetCurSel();
-	a.gender = (g == 1) ? L"여성" : (g == 2) ? L"남성" : L"";
+	a.gender = CVideoLibrary::GenderAt(g);   // 0(미지정) / 범위 밖 → ""
 
 	m_editHeight.GetWindowText(a.height);
 	a.height.Trim();

@@ -1,5 +1,6 @@
 ﻿#include "pch.h"
 #include "SuggestEdit.h"
+#include "TextDraw.h"   // 글꼴 대체 (凪 등 일본어 한자)
 #include "VideoLibrary.h"   // 목록 구분 쉼표 (괄호 안 쉼표 제외)
 
 #ifdef _DEBUG
@@ -82,12 +83,12 @@ void CSuggestList::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		if (!hint.IsEmpty())
 		{
 			dc.SetTextColor(selected ? m_text : m_hint);
-			dc.DrawText(hint, tr, DT_RIGHT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS);
-			const CSize hs = dc.GetTextExtent(hint);
-			tr.right = (std::max)(tr.left, tr.right - hs.cx - 12);
+			TextFB::Draw(&dc, hint, tr, DT_RIGHT, true);
+			const int hw = TextFB::Width(&dc, hint);
+			tr.right = (std::max)(tr.left, tr.right - hw - 12);
 		}
 		dc.SetTextColor(m_text);
-		dc.DrawText(text, tr, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS);
+		TextFB::Draw(&dc, text, tr, DT_LEFT, true);   // 글꼴 대체 (凪 등 일본어 한자도 표시)
 	}
 	dc.Detach();
 }

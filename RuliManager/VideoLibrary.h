@@ -6,6 +6,7 @@
 struct VideoItem
 {
 	CString   path;          // 전체 경로
+	CString   code;          // 품번 (예: SONE-479, 비어 있으면 파일 이름에서 자동으로 찾음)
 	CString   title;         // 제목 (파일 이름과 별개, 비어 있으면 파일 이름 사용)
 	ULONGLONG size = 0;      // 바이트
 	ULONGLONG modified = 0;  // FILETIME (UTC) 64비트 값
@@ -28,7 +29,7 @@ struct ActorInfo
 	CString name;      // 이름 (중복 불가)
 	CString lastAlias; // 영상 배우 칩에서 마지막으로 고른 별칭 (새로 배우를 넣을 때 초기값)
 	CString aliases;   // 별칭 (여러 개, 쉼표 구분) - 동영상의 배우 칸에 별칭으로 적혀 있어도 이 배우로 연결
-	CString gender;    // 성별 "여성" / "남성" (비어 있으면 미지정)
+	CString gender;    // 성별 "여성" / "남성" / "트랜스젠더 남성" / "트랜스젠더 여성" / "인터섹스" / "논바이너리" (비어 있으면 미지정)
 	CString birth;     // 생년월일 "YYYY-MM-DD"
 	CString nationality; // 국적
 	CString height;    // 키 (cm, 숫자)
@@ -92,6 +93,16 @@ public:
 	int  FindActor(const CString& name) const;                 // 이름(대소문자 무시)으로 찾기
 	// 동영상의 배우 표기(이름 또는 별칭)로 배우 찾기: 이름이 우선, 없으면 별칭
 	int  FindActorByAnyName(const CString& name) const;
+	int  FindActorByNamePart(const CString& name, int exclude = -1) const;
+	int  MergeEmptyDuplicateActors();
+	static bool SameNameByLang(const CString& a, const CString& b);
+	// 성별 목록 (저장 값, 순서 = 배우 관리 창 콤보 순서, 0번 = 미지정 "")
+	static int     GenderCount();
+	static CString GenderAt(int i);
+	static CString NormalizeGender(const CString& text);   // "Female" / "Transgender Female" / "MTF" / "女性" … → 저장 값 (모르면 빈 문자열)
+	static bool    IsFemaleLike(const CString& g);         // 여성 · 트랜스젠더 여성 (여성 실루엣 기본 이미지)
+	static bool    IsMaleLike(const CString& g);           // 남성 · 트랜스젠더 남성 (남성 실루엣 기본 이미지)   // 두 이름의 한글 / 영어 / 일어 조각 중 같은 언어끼리 하나라도 같으면 true
+	bool CleanupActorAliases();          // 배우 이름(또는 앞의 별칭)과 언어 단위로 같은 별칭은 뺌 (영상의 참여 별칭도 정리, 변경 시 true)   // 정보가 하나도 없는 배우가 다른 배우와 언어 단위 이름이 같으면 그 배우로 합침 (반환: 합친 수)   // 이름의 한글 / 영어 / 일어 조각(괄호 앞 · 괄호 안) 단위로 같은 배우 (없으면 -1)
 	// 이름/별칭(소문자) → 배우 인덱스 (반복 조회용, 이름이 별칭보다 우선)
 	std::map<CString, int> ActorNameIndex() const;
 	// 동영상의 배우 표기 → 연결된 배우 이름(소문자). 목록에 없으면 표기 그대로(소문자)
@@ -100,6 +111,7 @@ public:
 	// 배우 칸에 없는 배우의 참여 별칭은 정리 (변경되면 true)
 	bool NormalizeVideoActors(VideoItem& v) const;
 	bool NormalizeAllVideoActors();
+	bool FillMissingActorPhotos();                               // 사진 없는 배우를 배우 폴더의 이미지로 채움 (변경 시 true)
 	bool SyncActorsFromVideos();                                 // 동영상에만 있는 배우 이름을 배우 목록에 추가
 	void RenameActorInVideos(const CString& oldName, const CString& newName);
 	int  RemoveActorFromVideos(const CString& name);            // 반환: 영향 받은 동영상 수
@@ -154,6 +166,25 @@ public:
 	static CString GetImageStoreDir(LPCWSTR sub = nullptr);
 	static bool    IsInImageStore(const CString& path);
 	// 이미지를 보관소로 복사하고 복사본 경로를 반환 (이미 보관소 안이면 그대로, 실패하면 빈 문자열)
+	// 영상 경로의 상위 폴더 중 배우 이름과 같은 폴더에서 이미지 파일 찾기 (없으면 빈 문자열)
+	static CString FindActorFolderImage(const CString& videoPath, const CString& actorName);
+	static CString FindActorFolder(const CString& videoPath, const CString& actorName);   // 배우 이름과 같은 상위 폴더 (없으면 빈 문자열)
+	static CString FindActorTextFile(const CString& dir, const CString& actorName);       // 배우 폴더의 텍스트 파일 (*.txt)
+	static bool    ApplyActorTextInfo(ActorInfo& a, const CString& file);                // 텍스트(항목: 값)에서 비어 있는 배우 정보 채우기
+	static bool    HasNoActorInfo(const ActorInfo& a);
+	// 정보 txt 내보내기 (같은 폴더, 덮어쓰기 · 내용이 같으면 건너뜀). 반환: 새로 쓴 파일 수
+	static CString ExtractCode(const CString& name);
+	// 분할 파일 (ABC-123_1.mp4, ABC-123_2.mp4 …): 같은 폴더 + 마지막 '_' 왼쪽 이름이 같으면 한 묶음, 정보(품번 · 제목 · 별점 · 물방울 · 발매일 · 배우 · 스튜디오 · 태그)를 같이 사용
+	static bool PartGroupKey(const CString& path, CString& key, int& num);   // 묶음 키(소문자) + 순번 ("_" 오른쪽 숫자, 없으면 0 → false)
+	static CString PartGroupPath(const CString& path);                      // 순번을 뗀 대표 경로 (D:\a\ABC-123_2.mp4 → D:\a\ABC-123.mp4)
+	std::vector<size_t> PartSiblings(size_t idx) const;                      // 같은 묶음의 다른 영상 (자기 자신 제외)
+	int  SyncPartGroup(size_t idx);   // idx 의 정보를 같은 묶음 영상에 복사 (임시 항목도 등록됨). 반환: 바꾼 수
+	int  UnifyPartGroups();           // 묶음마다 비어 있는 정보를 다른 파일의 정보로 채움 (등록된 파일이 있으면 임시 파일도 등록). 반환: 바꾼 수
+	int  FillMissingCodes();   // 품번이 빈 영상은 파일/폴더 이름에서 찾아 채움 (반환: 채운 수)                          // 이름에서 품번 찾기 (ABC-123 / ABC123 → ABC-123, 없으면 빈 문자열)
+	static CString FindVideoTextFile(const CString& videoPath);                 // 영상 폴더의 정보 txt (같은 이름 → '_' 왼쪽 같은 이름 → 영상·txt 가 하나씩이면 그것)
+	bool ApplyVideoTextInfo(VideoItem& v, const CString& file) const;           // 텍스트(항목: 값)에서 비어 있는 영상 정보 채우기
+	int ExportVideoInfoTxt(int& unchanged, int& failed) const;                  // 영상 폴더\영상이름.txt (저장된 영상)
+	int ExportActorInfoTxt(int& unchanged, int& noFolder, int& failed) const;   // 배우 폴더\배우폴더이름.txt                                    // 생년월일·키·국적·치수 등이 모두 비어 있음
 	static CString StoreImageCopy(const CString& src, LPCWSTR sub, bool force = false);   // force: 보관소 안의 파일도 새 암호화 사본으로
 	bool MigrateImagesToStore();      // 보관소 밖 이미지(기존 데이터)를 복사본으로 교체 (변경 시 true)
 	// Image 폴더의 평문 이미지를 암호화 사본(.vmimg)으로 바꾸고 연결도 바꿈 (평문 경로는 plainFiles 에, 저장 후 지울 것)
