@@ -203,6 +203,7 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_WM_GETMINMAXINFO()
 	ON_WM_CLOSE()
 	ON_WM_CTLCOLOR()
+	ON_WM_DRAWITEM()
 	ON_WM_CONTEXTMENU()
 
 	ON_BN_CLICKED(IDC_BTN_ADDFOLDER, &CRuliManagerDlg::OnBnClickedAddFolder)
@@ -554,8 +555,17 @@ BOOL CRuliManagerDlg::OnInitDialog()
 		{
 			const CString cur = m_studioChips.Tags().empty() ? CString() : m_studioChips.Tags()[0];
 			for (const NamedInfo& n : m_lib.studios)
-				if (n.name.CompareNoCase(cur) != 0)   // 지금 스튜디오는 후보에서 뺌
-					out.push_back({ n.name, n.name });
+			{
+				if (n.name.CompareNoCase(cur) == 0)   // 지금 스튜디오는 후보에서 뺌
+					continue;
+				// 서브이름이 있으면 오른쪽에 회색으로, 서브이름으로 입력해도 찾아짐 (고르면 스튜디오 이름)
+				const std::vector<CString> subs = CVideoLibrary::SplitLines(n.subName);   // 서브이름 여러 개 (줄바꿈 구분)
+				CString subShown;
+				for (const CString& sub : subs) { if (!subShown.IsEmpty()) subShown += L" / "; subShown += sub; }
+				out.push_back({ subShown.IsEmpty() ? n.name : (n.name + L"\t" + subShown), n.name });
+				for (const CString& sub : subs)
+					out.push_back({ sub + L"\t" + n.name + L"의 서브이름", n.name });
+			}
 		}, false);
 		m_studioChips.m_onChanged = [this]()
 		{
@@ -1222,6 +1232,12 @@ void CRuliManagerDlg::ApplyFilter()
 		if (!terms.empty())
 		{
 			CString hay = v.FileName() + L"\n" + v.code + L"\n" + v.title + L"\n" + v.release + L"\n" + v.actors + L"\n" + v.actorAliases + L"\n" + v.studio + L"\n" + v.tags;   // 영상 메모 기능 삭제
+			if (!v.studio.IsEmpty())
+			{
+				const int sn = m_lib.FindNamed(LIST_STUDIO, v.studio);   // 스튜디오 서브이름으로도 검색
+				if (sn >= 0 && !m_lib.studios[sn].subName.IsEmpty())
+					hay += L"\n" + m_lib.studios[sn].subName;
+			}
 			if (!aliasMap.empty() && !v.actors.IsEmpty())
 			{
 				for (const CString& n : CVideoLibrary::SplitList(v.actors))
@@ -2065,6 +2081,7 @@ void CRuliManagerDlg::OnNmDblclkList(NMHDR* pNMHDR, LRESULT* pResult)
 
 void CRuliManagerDlg::ShowDetails(int idx)
 {
+	SetNameRich(false);   // 스튜디오 상세의 직접 그리기 해제 (일반 글자로)
 	m_pendingImage.Empty();   // 다른 영상으로 바뀌면 저장 안 한 새 이미지는 버림 (CommitDetails 가 먼저 저장함)
 	m_loadingDetails = true;
 	m_curItem = (idx >= 0 && idx < static_cast<int>(m_lib.items.size())) ? idx : -1;
@@ -2959,6 +2976,7 @@ void CRuliManagerDlg::SelectActorRow(int row)
 void CRuliManagerDlg::ShowActorInfo(int actorIdx)
 {
 	// 오른쪽 패널: 배우 사진과 정보 (동영상 편집 칸은 비활성)
+	SetNameRich(false);
 	CommitDetails();
 	ShowDetails(-1);
 	const bool validActor = (actorIdx >= 0 && actorIdx < static_cast<int>(m_lib.actors.size()));
@@ -3099,14 +3117,23 @@ void CRuliManagerDlg::ShowNamedInfo(int row)
 		return;
 	}
 
-	m_staticName.SetWindowText(kindName + L": " + r.value);
 	CString info = L"영상 " + count + L"편";
 	const int idx = m_lib.FindNamed(NamedKind(), r.value);
 	CString image;
+	CString title = kindName + L": " + r.value;
+	CString subName;
 	if (idx >= 0)
 	{
 		const NamedInfo& n = m_lib.NamedList(NamedKind())[idx];
 		image = n.image;
+		if (NamedKind() == LIST_STUDIO)
+		{
+			for (const CString& sub : CVideoLibrary::SplitLines(n.subName))   // 표시: "에스원 / S1"
+			{
+				if (!subName.IsEmpty()) subName += L" / ";
+				subName += sub;
+			}
+		}
 		if (NamedKind() == LIST_STUDIO && !n.memo.IsEmpty())   // 태그는 메모 없음
 		{
 			CString memo = n.memo;
@@ -3114,6 +3141,15 @@ void CRuliManagerDlg::ShowNamedInfo(int row)
 			memo.Replace(L'\n', L' ');
 			info += L" · " + memo;
 		}
+	}
+	m_staticName.SetWindowText(title + (subName.IsEmpty() ? CString() : L"  (" + subName + L")"));
+	if (m_mode == MODE_STUDIO)
+	{
+		// 스튜디오: 이름은 굵게, 서브이름은 회색  예) 스튜디오: S1 NO.1 STYLE  (에스원, S1)
+		m_nameRichPrefix = kindName + L": ";
+		m_nameRichName = r.value;
+		m_nameRichSub = subName;
+		SetNameRich(true);
 	}
 	m_staticImage.SetWindowText(info);
 
@@ -3821,7 +3857,7 @@ void CRuliManagerDlg::DrawStudioCard(CDC* dc, int row, const CRect& rc, bool sel
 	const int right = rc.right - m_cardPad * 2;
 	int y = rc.top + m_cardPad * 2 + (m_scardW - m_cardPad * 2) * 9 / 16 - m_cardPad + m_cardPad;
 
-	// 이름 (굵게, 한 줄)
+	// 이름 (굵게, 한 줄) - 서브이름은 카드에 표시하지 않음
 	dc->SetTextColor(kTextColor);
 	CRect nr(x, y, right, y + m_cardLineB);
 	TextFB::Draw(dc, name, nr, DT_LEFT, true);
@@ -5574,6 +5610,64 @@ void CRuliManagerDlg::UpdateModeButtons()
 		if (m_modeButtons[i].GetSafeHwnd())
 			m_modeButtons[i].SetChecked(i == m_mode);
 	}
+}
+
+void CRuliManagerDlg::SetNameRich(bool on)
+{
+	if (!m_staticName.GetSafeHwnd())
+		return;
+	if (on == m_nameRich)
+	{
+		if (on)
+			m_staticName.Invalidate();
+		return;
+	}
+	m_nameRich = on;
+	// 직접 그리기(SS_OWNERDRAW) ↔ 일반 왼쪽 정렬 글자(SS_LEFT)
+	m_staticName.ModifyStyle(SS_TYPEMASK, on ? SS_OWNERDRAW : SS_LEFT);
+	m_staticName.Invalidate();
+}
+
+void CRuliManagerDlg::OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDis)
+{
+	if (nIDCtl == IDC_STATIC_NAME && m_nameRich && lpDis)
+	{
+		CDC* dc = CDC::FromHandle(lpDis->hDC);
+		const CRect rc = lpDis->rcItem;
+		dc->FillSolidRect(rc, kBackColor);
+		dc->SetBkMode(TRANSPARENT);
+		CFont* base = m_staticName.GetFont();
+		if (!m_nameBoldFont.GetSafeHandle() && base)
+		{
+			LOGFONT lf = {};
+			base->GetLogFont(&lf);
+			lf.lfWeight = FW_BOLD;
+			m_nameBoldFont.CreateFontIndirect(&lf);
+		}
+		CFont* old = dc->SelectObject(base);
+		int x = rc.left;
+		// "스튜디오: " (보통)
+		dc->SetTextColor(kTextColor);
+		const int pw = TextFB::Width(dc, m_nameRichPrefix);
+		TextFB::Draw(dc, m_nameRichPrefix, CRect(x, rc.top, rc.right, rc.bottom), DT_LEFT, true);
+		x += pw;
+		// 이름 (굵게)
+		if (m_nameBoldFont.GetSafeHandle())
+			dc->SelectObject(&m_nameBoldFont);
+		const int nw = TextFB::Width(dc, m_nameRichName);
+		TextFB::Draw(dc, m_nameRichName, CRect(x, rc.top, rc.right, rc.bottom), DT_LEFT, true);
+		x += nw;
+		// "  (서브이름)" (회색, 남는 폭만큼)
+		if (!m_nameRichSub.IsEmpty() && x < rc.right - 8)
+		{
+			dc->SelectObject(base);
+			dc->SetTextColor(RGB(0x8A, 0x9B, 0xA8));
+			TextFB::Draw(dc, L"  (" + m_nameRichSub + L")", CRect(x, rc.top, rc.right, rc.bottom), DT_LEFT, true);
+		}
+		dc->SelectObject(old);
+		return;
+	}
+	CDialogEx::OnDrawItem(nIDCtl, lpDis);
 }
 
 HBRUSH CRuliManagerDlg::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)

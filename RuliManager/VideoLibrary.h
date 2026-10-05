@@ -52,6 +52,7 @@ struct NamedInfo
 	CString name;    // 이름 (중복 불가)
 	CString memo;    // 메모
 	CString image;   // 이미지(로고 등) 파일 경로
+	CString subName; // 서브이름 (스튜디오만, 여러 개 줄바꿈 \n 구분 - 쉼표는 이름의 일부, 보조 표기 예: S1 NO.1 STYLE → 에스원 / S1) - 이 이름으로 적혀 있어도 같은 스튜디오
 	bool    favorite = false;   // 즐겨찾기 (태그 카드 오른쪽 위 하트)
 };
 
@@ -96,6 +97,7 @@ public:
 	int  FindActorByAnyName(const CString& name) const;
 	int  FindActorByNamePart(const CString& name, int exclude = -1) const;
 	int  MergeEmptyDuplicateActors();
+	int  FindStudioLoose(const CString& name) const;   // 스튜디오 이름 · 서브이름으로 찾기 (그대로 → 공백 · 대소문자 · 기호 무시 순, 없으면 -1)
 	static bool SameNameByLang(const CString& a, const CString& b);
 	// 성별 목록 (저장 값, 순서 = 배우 관리 창 콤보 순서, 0번 = 미지정 "")
 	static int     GenderCount();
@@ -178,7 +180,9 @@ public:
 	static CString ActorInfoText(const ActorInfo& a);                                    // 배우 정보 → "항목: 값" 글자 ([정보 txt 생성]과 같은 형식)
 	static void    ClearActorTextFields(ActorInfo& a);
 	static std::vector<CString> SplitUrls(const CString& text);   // URL 목록 (줄바꿈 · 공백 · | 구분, 중복 제거)
-	static CString JoinUrls(const std::vector<CString>& urls);   // 줄바꿈(\n)으로 이어 붙임                                   // 텍스트로 읽는 항목만 비움 (직접 입력 창 = 입력한 내용으로 교체)
+	static CString JoinUrls(const std::vector<CString>& urls);
+	static std::vector<CString> SplitLines(const CString& text);   // 줄마다 하나 (앞뒤 공백 · 빈 줄 · 중복 제거, 쉼표는 그대로) - 스튜디오 서브이름
+	static CString JoinLines(const std::vector<CString>& lines);   // 줄바꿈(\n)으로 이어 붙임   // 줄바꿈(\n)으로 이어 붙임                                   // 텍스트로 읽는 항목만 비움 (직접 입력 창 = 입력한 내용으로 교체)
 	static bool    HasNoActorInfo(const ActorInfo& a);
 	// 정보 txt 내보내기 (같은 폴더, 덮어쓰기 · 내용이 같으면 건너뜀). 반환: 새로 쓴 파일 수
 	static CString ExtractCode(const CString& name);

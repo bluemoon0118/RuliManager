@@ -30,6 +30,7 @@ protected:
 	CStatic        m_staticCount;
 	CStatic        m_staticImagePath;
 	CEdit          m_editMemo;
+	CEdit          m_editSub;          // 서브이름 (스튜디오만)
 
 	std::vector<int>       m_rows;    // 목록 행 → 이름 목록 인덱스
 	std::map<CString, int> m_counts;  // 이름(소문자) → 영상 수

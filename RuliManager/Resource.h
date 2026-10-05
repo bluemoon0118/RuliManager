@@ -173,6 +173,8 @@
 #define IDC_TI_TEXT                 1211
 #define IDC_TI_GUIDE                1212
 #define IDC_ACT_URLS                1213
+#define IDC_NL_SUB_LBL              1214
+#define IDC_NL_SUB                  1215
 #define IDC_ACT_GENDER              1159
 
 // 배우 선택 창
@@ -187,7 +189,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE    140
 #define _APS_NEXT_COMMAND_VALUE     32817
-#define _APS_NEXT_CONTROL_VALUE     1214
+#define _APS_NEXT_CONTROL_VALUE     1216
 #define _APS_NEXT_SYMED_VALUE       101
 #endif
 #endif

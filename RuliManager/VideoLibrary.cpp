@@ -1046,6 +1046,12 @@ bool CVideoLibrary::Load()
 			if (fields.size() >= 3 && kind == LIST_STUDIO) n.memo = Unescape(fields[2]);   // 태그는 메모 없음
 			if (fields.size() >= 4 && kind == LIST_STUDIO) n.image = FromStoredPath(Unescape(fields[3]));   // 태그는 이미지 없음
 			if (fields.size() >= 5) n.favorite = (fields[4] == L"1");
+			if (fields.size() >= 6 && kind == LIST_STUDIO)   // 서브이름 (스튜디오만, 줄바꿈 구분)
+			{
+				n.subName = Unescape(fields[5]);
+				if (n.subName.Find(L'\n') < 0 && n.subName.Find(L',') >= 0)
+					n.subName = JoinLines(SplitList(n.subName));   // 예전 형식(쉼표 구분) → 줄바꿈 구분
+			}
 			if (!n.name.IsEmpty() && FindNamed(kind, n.name) < 0)
 				NamedList(kind).push_back(n);
 		}
@@ -1177,7 +1183,7 @@ bool CVideoLibrary::Save() const
 		{
 			text += (kind == LIST_STUDIO ? L"S\t" : L"T\t");
 			text += Escape(n.name) + L"\t" + (kind == LIST_STUDIO ? Escape(n.memo) : CString()) + L"\t" + (kind == LIST_STUDIO ? Escape(ToStoredPath(n.image)) : CString()) +
-				L"\t" + (n.favorite ? L"1" : L"") + L"\n";
+				L"\t" + (n.favorite ? L"1" : L"") + L"\t" + (kind == LIST_STUDIO ? Escape(n.subName) : CString()) + L"\n";   // 6번째 칸: 서브이름
 		}
 	}
 	CString pendingText = L"#VideoManager pending v1 (스캔으로 찾은 새 파일 - 정보를 저장하면 library.tsv 로 옮겨짐)\n";
@@ -1384,7 +1390,10 @@ void CVideoLibrary::ApplyFolderStructure(VideoItem& v) const
 		NormalizeVideoActors(v);   // 폴더 이름이 배우의 별칭이면 배우 이름 + 참여 별칭으로
 	}
 	if (!studio.IsEmpty() && v.studio.IsEmpty())
-		v.studio = studio;
+	{
+		const int n = FindStudioLoose(studio);   // 폴더 이름이 서브이름이어도 그 스튜디오로
+		v.studio = (n >= 0) ? studios[n].name : studio;
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -2406,12 +2415,38 @@ int CVideoLibrary::FindNamed(int kind, const CString& name) const
 		if (list[i].name.CompareNoCase(name) == 0)
 			return static_cast<int>(i);
 	}
+	// 스튜디오는 서브이름(보조 표기)으로도 찾음
+	if (kind == LIST_STUDIO && !name.IsEmpty())
+	{
+		for (size_t i = 0; i < list.size(); ++i)
+		{
+			if (list[i].subName.IsEmpty())
+				continue;
+			for (const CString& sub : SplitLines(list[i].subName))   // 서브이름 여러 개 (줄바꿈 구분)
+				if (sub.CompareNoCase(name) == 0)
+					return static_cast<int>(i);
+		}
+	}
 	return -1;
 }
 
 bool CVideoLibrary::SyncNamedFromVideos()
 {
 	bool added = false;
+	// 영상의 스튜디오가 서브이름으로 적혀 있으면 스튜디오 이름으로 바꿈 (같은 스튜디오로 묶이도록)
+	for (VideoItem& v : items)
+	{
+		CString s = v.studio;
+		s.Trim();
+		if (s.IsEmpty())
+			continue;
+		const int n = FindStudioLoose(s);   // 서브이름 · 공백/대소문자 차이도 같은 스튜디오
+		if (n >= 0 && studios[n].name != v.studio)
+		{
+			v.studio = studios[n].name;
+			added = true;
+		}
+	}
 	for (const VideoItem& v : items)
 	{
 		for (int kind = LIST_STUDIO; kind <= LIST_TAG; ++kind)
@@ -2900,6 +2935,40 @@ std::vector<CString> CVideoLibrary::SplitUrls(const CString& text)
 			out.push_back(u);
 	}
 	return out;
+}
+
+std::vector<CString> CVideoLibrary::SplitLines(const CString& text)
+{
+	std::vector<CString> out;
+	CString t = text;
+	t.Replace(L"\r", L"\n");
+	int start = 0;
+	for (;;)
+	{
+		CString line = t.Tokenize(L"\n", start);
+		if (start < 0)
+			break;
+		line.Trim();
+		if (line.IsEmpty())
+			continue;
+		bool dup = false;
+		for (const CString& e : out)
+			if (e.CompareNoCase(line) == 0) { dup = true; break; }
+		if (!dup)
+			out.push_back(line);
+	}
+	return out;
+}
+
+CString CVideoLibrary::JoinLines(const std::vector<CString>& lines)
+{
+	CString r;
+	for (const CString& l : lines)
+	{
+		if (!r.IsEmpty()) r += L"\n";
+		r += l;
+	}
+	return r;
 }
 
 CString CVideoLibrary::JoinUrls(const std::vector<CString>& urls)
@@ -3406,6 +3475,36 @@ int CVideoLibrary::FindActorByNamePart(const CString& name, int exclude) const
 	return -1;
 }
 
+int CVideoLibrary::FindStudioLoose(const CString& name) const
+{
+	CString nm = name;
+	nm.Trim();
+	if (nm.IsEmpty())
+		return -1;
+	const int exact = FindNamed(LIST_STUDIO, nm);   // 이름 → 서브이름 (대소문자 무시)
+	if (exact >= 0)
+		return exact;
+	// 공백 · 하이픈 · 점 · 밑줄 · 대소문자 차이 무시  예) "S1 NO.1 STYLE" = "s1no1style"
+	auto loose = [](const CString& s)
+	{
+		CString k = CompactLower(s);
+		k.Remove(L'-'); k.Remove(L'.'); k.Remove(L'_'); k.Remove(L'\x30FB'); k.Remove(L'\x00B7');
+		return k;
+	};
+	const CString key = loose(nm);
+	if (key.IsEmpty())
+		return -1;
+	for (size_t i = 0; i < studios.size(); ++i)
+	{
+		if (loose(studios[i].name) == key)
+			return static_cast<int>(i);
+		for (const CString& sub : SplitLines(studios[i].subName))
+			if (loose(sub) == key)
+				return static_cast<int>(i);
+	}
+	return -1;
+}
+
 bool CVideoLibrary::SameNameByLang(const CString& a, const CString& b)
 {
 	const std::vector<NamePart> pa = NameParts(a), pb = NameParts(b);
@@ -3531,14 +3630,37 @@ bool CVideoLibrary::ApplyVideoText(VideoItem& v, CString text) const
 			setIfEmpty(v.actorAliases, toActorList(val));
 		else if (KeyIs(key, { L"스튜디오", L"제작사", L"메이커", L"레이블", L"studio", L"maker", L"label", L"publisher", L"メーカー", L"レーベル", L"スタジオ" }))
 		{
+			// 스튜디오는 하나: 값 전체가 등록 스튜디오(이름 · 서브이름)면 그대로, 아니면 쉼표 · / 로 나눈 조각 중 등록된 것,
+			// 그것도 없으면 첫 조각 (쉼표가 들어간 스튜디오 이름도 지원)
 			CString s = val;
-			const int comma = FindListComma(s, 0);
-			if (comma > 0) s = s.Left(comma);   // 스튜디오는 하나
 			s.Trim();
+			if (FindStudioLoose(s) < 0)
+			{
+				CString t = s;
+				t.Replace(L'、', L',');
+				t.Replace(L'，', L',');
+				t.Replace(L'/', L',');
+				t.Replace(L'|', L',');
+				std::vector<CString> parts = SplitList(t);
+				CString pick = parts.empty() ? s : parts[0];
+				for (const CString& p : parts)
+					if (FindStudioLoose(p) >= 0) { pick = p; break; }
+				s = pick;
+				s.Trim();
+			}
 			setIfEmpty(v.studio, s);
 		}
 		else if (KeyIs(key, { L"태그", L"장르", L"키워드", L"tag", L"tags", L"genre", L"genres", L"keywords", L"ジャンル", L"タグ" }))
-			setIfEmpty(v.tags, toList(val));
+		{
+			// 태그는 "/" 를 구분자로 쓰지 않음 (예: "OL/사무원" 같은 태그 이름 그대로) - 쉼표 · 、 · ， · | · # 로만 나눔
+			CString t = val;
+			t.Replace(L'、', L',');
+			t.Replace(L'，', L',');
+			t.Replace(L'|', L',');
+			t.Replace(L'#', L',');
+			t.Replace(L'＃', L',');
+			setIfEmpty(v.tags, JoinList(SplitList(t)));
+		}
 		else if (KeyIs(key, { L"물방울", L"ocount", L"o" }))
 		{
 			const int o = FirstNumber(val);
@@ -3573,7 +3695,7 @@ bool CVideoLibrary::ApplyVideoText(VideoItem& v, CString text) const
 	// 목록에 없는 이름은 그대로 두고, 스캔 뒤 SyncNamedFromVideos() 가 스튜디오 / 태그 목록에 새로 추가함
 	if (!v.studio.IsEmpty())
 	{
-		const int n = FindNamed(LIST_STUDIO, v.studio);
+		const int n = FindStudioLoose(v.studio);   // 스튜디오 이름 · 서브이름 (공백 · 대소문자 차이도)
 		if (n >= 0)
 			v.studio = studios[n].name;
 	}

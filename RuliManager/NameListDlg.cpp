@@ -49,6 +49,7 @@ void CNameListDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_NL_COUNT, m_staticCount);
 	DDX_Control(pDX, IDC_NL_IMAGE_PATH, m_staticImagePath);
 	DDX_Control(pDX, IDC_NL_MEMO, m_editMemo);
+	DDX_Control(pDX, IDC_NL_SUB, m_editSub);
 }
 
 BEGIN_MESSAGE_MAP(CNameListDlg, CDialogEx)
@@ -56,6 +57,7 @@ BEGIN_MESSAGE_MAP(CNameListDlg, CDialogEx)
 	ON_EN_CHANGE(IDC_NL_SEARCH, &CNameListDlg::OnEnChangeSearch)
 	ON_EN_CHANGE(IDC_NL_NAME, &CNameListDlg::OnFieldChanged)
 	ON_EN_CHANGE(IDC_NL_MEMO, &CNameListDlg::OnFieldChanged)
+	ON_EN_CHANGE(IDC_NL_SUB, &CNameListDlg::OnFieldChanged)
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_NL_LIST, &CNameListDlg::OnLvnItemChanged)
 	ON_BN_CLICKED(IDC_NL_NEW, &CNameListDlg::OnBnClickedNew)
 	ON_BN_CLICKED(IDC_NL_DELETE, &CNameListDlg::OnBnClickedDelete)
@@ -96,6 +98,22 @@ BOOL CNameListDlg::OnInitDialog()
 		GetDlgItem(IDC_NL_IMAGE)->GetWindowRect(&imageRc);
 		GetDlgItem(IDC_NL_NAME_LBL)->GetWindowRect(&nameLblRc);
 		const int dy = nameLblRc.top - imageRc.top - 2;   // 올릴 거리 (픽셀)
+
+		// 태그는 서브이름도 없음: 서브이름 줄을 숨기고 영상 수를 그 자리로
+		{
+			CRect subLbl, subEdit, cntLbl, cnt;
+			GetDlgItem(IDC_NL_SUB_LBL)->GetWindowRect(&subLbl);  ScreenToClient(&subLbl);
+			GetDlgItem(IDC_NL_SUB)->GetWindowRect(&subEdit);     ScreenToClient(&subEdit);
+			GetDlgItem(IDC_NL_COUNT_LBL)->GetWindowRect(&cntLbl); ScreenToClient(&cntLbl);
+			GetDlgItem(IDC_NL_COUNT)->GetWindowRect(&cnt);       ScreenToClient(&cnt);
+			const int up = cntLbl.top - subLbl.top;
+			cntLbl.OffsetRect(0, -up);
+			cnt.OffsetRect(0, -up);
+			GetDlgItem(IDC_NL_COUNT_LBL)->MoveWindow(&cntLbl);
+			GetDlgItem(IDC_NL_COUNT)->MoveWindow(&cnt);
+			GetDlgItem(IDC_NL_SUB_LBL)->ShowWindow(SW_HIDE);
+			m_editSub.ShowWindow(SW_HIDE);
+		}
 
 		const UINT moveIds[] = { IDC_NL_NAME_LBL, IDC_NL_NAME, IDC_NL_COUNT_LBL, IDC_NL_COUNT };
 		for (UINT id : moveIds)
@@ -172,6 +190,12 @@ void CNameListDlg::ShowItem(int idx)
 	{
 		const NamedInfo& n = Items()[m_cur];
 		m_editName.SetWindowText(n.name);
+		{
+			CString subs = n.subName;
+			subs.Replace(L"\r\n", L"\n");
+			subs.Replace(L"\n", L"\r\n");   // 여러 줄 에디트: 한 줄에 하나
+			m_editSub.SetWindowText(subs);
+		}
 		CString memo = n.memo;
 		memo.Replace(L"\r\n", L"\n");
 		memo.Replace(L"\n", L"\r\n");
@@ -184,12 +208,14 @@ void CNameListDlg::ShowItem(int idx)
 	else
 	{
 		m_editName.SetWindowText(L"");
+		m_editSub.SetWindowText(L"");
 		m_editMemo.SetWindowText(L"");
 		m_staticCount.SetWindowText(L"");
 		SetImage(CString());
 	}
 
 	m_editName.EnableWindow(enable);
+	m_editSub.EnableWindow(enable);
 	m_editMemo.EnableWindow(enable);
 	GetDlgItem(IDC_NL_DELETE)->EnableWindow(enable);
 	GetDlgItem(IDC_NL_IMG_BROWSE)->EnableWindow(enable);
@@ -269,9 +295,22 @@ bool CNameListDlg::Commit()
 	}
 	n.name = name;
 	if (m_kind == LIST_STUDIO)
+	{
 		m_editMemo.GetWindowText(n.memo);   // 태그는 메모 없음
+		// 서브이름: 한 줄에 하나 (쉼표는 이름의 일부) - 이름과 같은 것 · 빈 줄 · 중복은 뺌
+		CString subs;
+		m_editSub.GetWindowText(subs);
+		std::vector<CString> list;
+		for (const CString& sub : CVideoLibrary::SplitLines(subs))
+			if (sub.CompareNoCase(n.name) != 0)
+				list.push_back(sub);
+		n.subName = CVideoLibrary::JoinLines(list);
+	}
 	else
+	{
 		n.memo.Empty();
+		n.subName.Empty();
+	}
 	n.image = m_imagePath;
 
 	m_dirty = false;

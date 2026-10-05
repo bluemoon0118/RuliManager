@@ -307,6 +307,12 @@ protected:
 	void SaveWindowPlacement();      // 창 위치/크기/최대화 상태 저장 (다음 실행 때 복원)
 	void RestoreWindowPlacement();
 	afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
+	afx_msg void OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDis);
+	// 스튜디오 상세 이름 줄: "스튜디오: " + 이름(굵게) + "  (서브이름)"(회색) - 이름 칸을 그동안만 직접 그림
+	bool    m_nameRich = false;
+	CString m_nameRichPrefix, m_nameRichName, m_nameRichSub;
+	CFont   m_nameBoldFont;
+	void    SetNameRich(bool on);
 	void ApplyColors();
 	afx_msg void OnContextMenu(CWnd* pWnd, CPoint point);
 
