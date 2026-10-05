@@ -2,7 +2,10 @@
 
 // 이미지 파일을 CImage 로 불러옵니다.
 // WIC(Windows Imaging Component)를 먼저 사용하므로 WebP 등도 지원하고, 실패하면 GDI+로 다시 시도합니다.
+// Image 폴더의 암호화된 이미지(.vmimg, DbCrypt 형식)도 메모리에서 복호화해서 읽음
 bool LoadImageFile(CImage& image, const CString& path);
+// 이미지 파일 내용을 메모리 스트림으로 (암호화된 파일은 복호화한 내용), 실패하면 nullptr. 호출한 쪽에서 Release
+IStream* OpenImageFileStream(const CString& path);
 
 // 이미지를 비율 유지하여 중앙에 표시하는 정적 컨트롤
 class CImagePreview : public CStatic

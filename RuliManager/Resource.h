@@ -75,6 +75,7 @@
 #define IDC_COMBO_SORT              1052
 #define IDC_BTN_SORTDIR             1053
 #define IDC_BTN_OPENDB              1054
+#define IDC_BTN_APPLYDB             1205
 
 // 스튜디오 / 태그 관리 창
 #define IDC_NL_SEARCH               1140
@@ -174,7 +175,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE    139
 #define _APS_NEXT_COMMAND_VALUE     32814
-#define _APS_NEXT_CONTROL_VALUE     1205
+#define _APS_NEXT_CONTROL_VALUE     1206
 #define _APS_NEXT_SYMED_VALUE       101
 #endif
 #endif

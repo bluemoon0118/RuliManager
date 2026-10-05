@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include <functional>
+
 // 동영상 한 개의 정보
 struct VideoItem
 {
@@ -67,7 +69,11 @@ public:
 	bool Load();
 	bool Save() const;               // DB 파일은 AES 로 암호화해서 저장 (DbCrypt.h)
 	bool LoadedPlainText() const { return m_loadedPlainText; }   // 예전 평문 DB 를 읽었음 → 바로 저장하면 암호화됨
-	bool DbBroken() const { return m_dbBroken; }                 // 암호화된 DB 를 풀지 못함 (저장 안 함)
+	bool DbBroken() const { return m_dbBroken; }
+	// 작업 DB: 실행 중에는 library.work.vmdb 에 저장하고 [DB 반영] / 종료 때 library.vmdb 로 반영
+	bool HasUnappliedChanges() const { return m_workDirty; }   // 작업 DB 에 반영 안 한 변경이 있음
+	bool ApplyWorkDb();                                         // 작업 DB → library.vmdb (원자적 교체)
+	std::function<void()> m_onSaved;                            // 작업 DB 에 저장할 때마다 (버튼 상태 갱신용)                 // 암호화된 DB 를 풀지 못함 (저장 안 함)
 
 	// 폴더를 등록하고 하위 폴더까지 스캔합니다. 새로 추가된 개수를 반환.
 	int  AddFolder(const CString& folder);
@@ -126,10 +132,15 @@ public:
 	static CString GetAppDataDir();        // %APPDATA%\VideoManager (예전 DB 위치, 없으면 만듦)
 	// DB 는 두 파일: library.vmdb = 정보(library.tsv) + 임시 목록(pending.tsv), images.vmdb = 이미지 복사본 전부 (각각 AES 암호화)
 	//  - 실행 중 이미지는 캐시 폴더(%LOCALAPPDATA%\VideoManager\cache\images)에 풀어서 사용, 종료 시 지움
+	static CString GetWorkDbPath();        // <실행 파일 폴더>\library.work.vmdb (실행 중 작업 DB)
+	static bool    HasLeftoverWorkDb();    // 이전 실행에서 반영하지 않고 남은 작업 DB 가 있음 (원본과 내용이 다를 때만)
+	static void    DiscardWorkDb();        // 남은 작업 DB 버리기
+	static bool    ApplyLeftoverWorkDb();  // 남은 작업 DB 를 원본에 반영
 	static CString GetDataFilePath();      // <실행 파일 폴더>\library.vmdb (정보 + 임시 목록)
-	static CString GetImagesDbPath();      // <실행 파일 폴더>\images.vmdb (이미지 복사본 묶음)
+	static CString GetImagesDbPath();      // <실행 파일 폴더>\images.vmdb (예전 이미지 DB, 처음 실행 때 Image 폴더로 풀고 .bak)
+	static CString GetImageRoot();         // <실행 파일 폴더>\Image (배우 사진 · 스튜디오 이미지 보관, actors / studios — 태그는 이미지 없음)
 	static CString GetBackupDir();         // <DB 폴더>\backup (없으면 만듦)
-	// 프로그램 시작 시 DB 백업: library.vmdb / images.vmdb 를 backup 폴더에 날짜·시각 이름으로 복사
+	// 프로그램 시작 시 DB 백업: library.vmdb 를 backup 폴더에 날짜·시각 이름으로 복사
 	//  - 가장 최근 백업과 내용이 같으면 그 파일은 건너뜀, 파일마다 최근 keep 개만 남김
 	//  - 반환: 새로 만든 백업 파일 수
 	static int     BackupDbFiles(int keep = 10);
@@ -139,12 +150,15 @@ public:
 	static void    ClearImageCache();      // 캐시 이미지 지우기 (종료 시)
 	int  PendingCount() const;
 
-	// 등록 이미지 보관소: %APPDATA%\VideoManager\images\<sub> (배우 사진 · 스튜디오/태그 이미지 복사본)
+	// 등록 이미지 보관소: <실행 폴더>\Image\<sub> (배우 사진 · 스튜디오 이미지의 암호화 사본 .vmimg)
 	static CString GetImageStoreDir(LPCWSTR sub = nullptr);
 	static bool    IsInImageStore(const CString& path);
 	// 이미지를 보관소로 복사하고 복사본 경로를 반환 (이미 보관소 안이면 그대로, 실패하면 빈 문자열)
-	static CString StoreImageCopy(const CString& src, LPCWSTR sub);
+	static CString StoreImageCopy(const CString& src, LPCWSTR sub, bool force = false);   // force: 보관소 안의 파일도 새 암호화 사본으로
 	bool MigrateImagesToStore();      // 보관소 밖 이미지(기존 데이터)를 복사본으로 교체 (변경 시 true)
+	// Image 폴더의 평문 이미지를 암호화 사본(.vmimg)으로 바꾸고 연결도 바꿈 (평문 경로는 plainFiles 에, 저장 후 지울 것)
+	bool EncryptImageStore(std::vector<CString>& plainFiles);
+	static bool IsEncryptedFile(const CString& path);   // DbCrypt 형식으로 암호화된 파일인지
 	int  CleanupImageStore() const;   // 어디에도 연결되지 않은 복사본을 휴지통으로 (반환: 정리한 수)
 	static bool    IsVideoFile(LPCWSTR path);
 	static CString MakeKey(const CString& path);
@@ -153,6 +167,7 @@ public:
 private:
 	bool m_loadedPlainText = false;
 	bool m_dbBroken = false;
+	mutable bool m_workDirty = false;
 	// 이미지가 바뀌지 않았으면 저장할 때 images.vmdb 를 다시 쓰지 않음
 	mutable CString           m_imgSig;
 	mutable bool              m_legacyToMove = false;   // 예전 파일을 옮겨 왔음 → 첫 저장 후 .bak 으로

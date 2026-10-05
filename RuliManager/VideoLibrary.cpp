@@ -155,6 +155,79 @@ int CVideoLibrary::PendingCount() const
 	return n;
 }
 
+CString CVideoLibrary::GetWorkDbPath()
+{
+	return GetDataDir() + L"\\library.work.vmdb";
+}
+
+namespace
+{
+	bool SameFileContent(const CString& a, const CString& b);   // 아래에서 정의
+
+	// src 를 dst 로 원자적으로 교체 (임시 파일에 복사한 뒤 바꿔치기)
+	bool ReplaceWithCopy(const CString& src, const CString& dst)
+	{
+		const CString tmp = dst + L".tmp";
+		if (!::CopyFileW(src, tmp, FALSE))
+			return false;
+		if (!::MoveFileExW(tmp, dst, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+		{
+			::DeleteFileW(tmp);
+			return false;
+		}
+		return true;
+	}
+}
+
+bool CVideoLibrary::HasLeftoverWorkDb()
+{
+	const CString work = GetWorkDbPath();
+	if (::GetFileAttributesW(work) == INVALID_FILE_ATTRIBUTES)
+		return false;
+	if (::GetFileAttributesW(GetDataFilePath()) != INVALID_FILE_ATTRIBUTES && SameFileContent(work, GetDataFilePath()))
+	{
+		::DeleteFileW(work);   // 원본과 같으면 반영할 것이 없음
+		return false;
+	}
+	return true;
+}
+
+void CVideoLibrary::DiscardWorkDb()
+{
+	::DeleteFileW(GetWorkDbPath());
+}
+
+bool CVideoLibrary::ApplyLeftoverWorkDb()
+{
+	const CString work = GetWorkDbPath();
+	if (::GetFileAttributesW(work) == INVALID_FILE_ATTRIBUTES)
+		return false;
+	if (!ReplaceWithCopy(work, GetDataFilePath()))
+		return false;
+	::DeleteFileW(work);
+	return true;
+}
+
+bool CVideoLibrary::ApplyWorkDb()
+{
+	if (m_dbBroken)
+		return false;   // DB 를 읽지 못한 실행에서는 원본을 건드리지 않음
+	if (!m_workDirty)
+		return true;    // 실행 후 저장한 적 없음 = 반영할 것 없음
+	const CString work = GetWorkDbPath();
+	if (::GetFileAttributesW(work) == INVALID_FILE_ATTRIBUTES)
+	{
+		m_workDirty = false;
+		return true;    // 저장한 적 없음 = 반영할 것 없음
+	}
+	if (!ReplaceWithCopy(work, GetDataFilePath()))
+		return false;
+	m_workDirty = false;
+	if (m_onSaved)
+		m_onSaved();
+	return true;
+}
+
 CString CVideoLibrary::GetDataFilePath()
 {
 	return GetDataDir() + L"\\library.vmdb";
@@ -207,10 +280,10 @@ CString CVideoLibrary::GetAppDataDir()
 
 namespace
 {
-	// 저장 파일에는 이미지 보관소 안의 이미지를 상대 경로("images\\actors\\...")로 기록 → DB 파일과 함께 이동
+	// 저장 파일에는 Image 폴더 안의 이미지를 상대 경로("actors\\...")로 기록 → 실행 폴더째 옮겨도 그대로
 	CString ToStoredPath(const CString& path)
 	{
-		const CString dir = CVideoLibrary::GetCacheDir();
+		const CString dir = CVideoLibrary::GetImageRoot();
 		if (!path.IsEmpty() && CVideoLibrary::IsUnder(path, dir))
 			return path.Mid(dir.GetLength() + 1);
 		return path;
@@ -219,14 +292,27 @@ namespace
 	CString FromStoredPath(const CString& path)
 	{
 		if (!path.IsEmpty() && ::PathIsRelativeW(path))
-			return CVideoLibrary::GetCacheDir() + L"\\" + path;
+		{
+			// 예전 이미지 DB 시절의 "images\\actors\\..." 도 Image 폴더 기준으로
+			CString rel = path;
+			if (rel.GetLength() > 7 && _wcsnicmp(rel, L"images\\", 7) == 0)
+				rel = rel.Mid(7);
+			return CVideoLibrary::GetImageRoot() + L"\\" + rel;
+		}
 		return path;
 	}
 }
 
+CString CVideoLibrary::GetImageRoot()
+{
+	const CString dir = GetDataDir() + L"\\Image";
+	::CreateDirectoryW(dir, nullptr);
+	return dir;
+}
+
 CString CVideoLibrary::GetImageStoreDir(LPCWSTR sub)
 {
-	CString dir = GetCacheDir() + L"\\images";
+	CString dir = GetImageRoot();
 	::CreateDirectoryW(dir, nullptr);
 	if (sub && *sub)
 	{
@@ -239,21 +325,43 @@ CString CVideoLibrary::GetImageStoreDir(LPCWSTR sub)
 
 bool CVideoLibrary::IsInImageStore(const CString& path)
 {
-	return !path.IsEmpty() && IsUnder(path, GetCacheDir() + L"\\images");
+	return !path.IsEmpty() && IsUnder(path, GetImageRoot());
 }
 
-CString CVideoLibrary::StoreImageCopy(const CString& src, LPCWSTR sub)
+namespace
+{
+	bool ReadWholeFile(const CString& path, std::vector<BYTE>& data);   // 아래에서 정의
+}
+
+CString CVideoLibrary::StoreImageCopy(const CString& src, LPCWSTR sub, bool force)
 {
 	if (src.IsEmpty())
 		return CString();
-	if (IsInImageStore(src))
+	if (!force && IsInImageStore(src))
 		return src;                  // 이미 보관소에 있는 복사본
 	if (!::PathFileExistsW(src))
 		return CString();
 
+	// 원본을 읽어서 암호화한 사본(이름.확장자.vmimg)으로 저장
+	std::vector<BYTE> data, enc;
+	if (!ReadWholeFile(src, data) || data.empty())
+		return CString();
+	if (DbCrypt::IsEncrypted(data.data(), data.size()))
+		enc.swap(data);                         // 이미 암호화된 파일
+	else if (!DbCrypt::Encrypt(data.data(), data.size(), enc))
+		return CString();
+	::SecureZeroMemory(data.data(), data.size());
+
 	const CString dir = GetImageStoreDir(sub);
 	CString stem = ::PathFindFileNameW(src);
 	CString ext = ::PathFindExtensionW(src);
+	if (ext.CompareNoCase(L".vmimg") == 0)
+	{
+		// 암호화 사본을 다시 등록: 안쪽 확장자 사용
+		::PathRemoveExtensionW(stem.GetBuffer());
+		stem.ReleaseBuffer();
+		ext = ::PathFindExtensionW(stem);
+	}
 	::PathRemoveExtensionW(stem.GetBuffer());
 	stem.ReleaseBuffer();
 	if (stem.GetLength() > 40)
@@ -269,11 +377,17 @@ CString CVideoLibrary::StoreImageCopy(const CString& src, LPCWSTR sub)
 			st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
 		if (n > 0)
 			name.AppendFormat(L"-%d", n);
-		const CString dst = dir + L"\\" + name + L"_" + stem + ext;
-		if (::CopyFileW(src, dst, TRUE))       // 같은 이름이 있으면 실패 → 다음 번호
+		const CString dst = dir + L"\\" + name + L"_" + stem + ext + L".vmimg";
+		HANDLE h = ::CreateFileW(dst, GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);   // 같은 이름이 있으면 실패 → 다음 번호
+		if (h != INVALID_HANDLE_VALUE)
 		{
-			::SetFileAttributesW(dst, FILE_ATTRIBUTE_NORMAL);   // 읽기 전용 속성은 떼어냄
-			return dst;
+			DWORD written = 0;
+			const bool ok = ::WriteFile(h, enc.data(), static_cast<DWORD>(enc.size()), &written, nullptr) && written == enc.size();
+			::CloseHandle(h);
+			if (ok)
+				return dst;
+			::DeleteFileW(dst);
+			return CString();
 		}
 		const DWORD err = ::GetLastError();
 		if (err != ERROR_FILE_EXISTS && err != ERROR_ALREADY_EXISTS)
@@ -300,8 +414,40 @@ bool CVideoLibrary::MigrateImagesToStore()
 		fix(a.photo, L"actors");
 	for (NamedInfo& n : studios)
 		fix(n.image, L"studios");
-	for (NamedInfo& n : tagInfos)
-		fix(n.image, L"tags");
+	// 태그는 이미지 없음
+	return changed;
+}
+
+bool CVideoLibrary::IsEncryptedFile(const CString& path)
+{
+	BYTE head[16] = {};
+	DWORD read = 0;
+	HANDLE h = ::CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+	if (h == INVALID_HANDLE_VALUE)
+		return false;
+	const BOOL ok = ::ReadFile(h, head, sizeof(head), &read, nullptr);
+	::CloseHandle(h);
+	return ok && DbCrypt::IsEncrypted(head, read);
+}
+
+bool CVideoLibrary::EncryptImageStore(std::vector<CString>& plainFiles)
+{
+	bool changed = false;
+	auto fix = [&](CString& path, LPCWSTR sub)
+	{
+		if (path.IsEmpty() || !IsInImageStore(path) || !::PathFileExistsW(path) || IsEncryptedFile(path))
+			return;
+		const CString enc = StoreImageCopy(path, sub, true);   // 보관소 안 평문 → 암호화 사본 (.vmimg)
+		if (enc.IsEmpty())
+			return;
+		plainFiles.push_back(path);   // 평문은 저장이 끝난 뒤 지움
+		path = enc;
+		changed = true;
+	};
+	for (ActorInfo& a : actors)
+		fix(a.photo, L"actors");
+	for (NamedInfo& n : studios)
+		fix(n.image, L"studios");
 	return changed;
 }
 
@@ -317,7 +463,7 @@ int CVideoLibrary::CleanupImageStore() const
 	// 보관소 하위 폴더의 파일 중 연결되지 않은 것 모으기
 	std::vector<CString> unused;
 	const CString root = GetImageStoreDir();
-	const LPCWSTR subs[] = { L"actors", L"studios", L"tags" };
+	const LPCWSTR subs[] = { L"actors", L"studios" };   // 태그는 이미지 없음
 	for (LPCWSTR sub : subs)
 	{
 		const CString dir = root + L"\\" + sub;
@@ -461,8 +607,8 @@ namespace
 	// 캐시의 이미지 파일 목록 (images\<sub>\파일)
 	void ListCacheImages(std::vector<CString>& files, std::vector<WIN32_FIND_DATAW>* infos)
 	{
-		const CString root = CVideoLibrary::GetCacheDir() + L"\\images";
-		const LPCWSTR subs[] = { L"actors", L"studios", L"tags" };
+		const CString root = CVideoLibrary::GetImageRoot();
+		const LPCWSTR subs[] = { L"actors", L"studios" };   // 태그는 이미지 없음
 		for (LPCWSTR sub : subs)
 		{
 			const CString dir = root + L"\\" + sub;
@@ -486,7 +632,7 @@ namespace
 	{
 		if (rel.Find(L"..") >= 0 || rel.Find(L':') >= 0 || rel.Left(1) == L"\\")
 			return false;
-		const LPCWSTR subs[] = { L"images\\actors\\", L"images\\studios\\", L"images\\tags\\" };
+		const LPCWSTR subs[] = { L"images\\actors\\", L"images\\studios\\" };   // 예전 태그 이미지는 풀지 않음
 		for (LPCWSTR s : subs)
 		{
 			const int n = static_cast<int>(wcslen(s));
@@ -569,7 +715,7 @@ namespace
 	const char kImgMagic[] = "VMDB-IMGS1";
 	const size_t kImgMagicLen = sizeof(kImgMagic) - 1;
 
-	// 암호화된 이미지 묶음을 풀어서 캐시 폴더에 파일로 씀
+	// 예전 이미지 DB(암호화된 이미지 묶음)를 풀어서 실행 폴더의 Image 폴더에 파일로 씀 (이미 있는 파일은 그대로)
 	bool UnpackImages(const std::vector<BYTE>& sec)
 	{
 		if (sec.empty())
@@ -578,14 +724,17 @@ namespace
 		std::vector<Entry> imgs;
 		if (!DbCrypt::Decrypt(sec.data(), sec.size(), plain) || !ParseEntries(plain, imgs))
 			return false;
-		const CString root = CVideoLibrary::GetCacheDir();
+		const CString root = CVideoLibrary::GetImageRoot();
 		for (const Entry& e : imgs)
 		{
 			const CString rel = CString(CA2W(e.name, CP_UTF8));
 			if (!SafeImageName(rel))
 				continue;
+			const CString dst = root + L"\\" + rel.Mid(7);   // "images\\" 를 뗀 actors\\... 경로
+			if (::PathFileExistsW(dst))
+				continue;
 			CFile f;
-			if (f.Open(root + L"\\" + rel, CFile::modeCreate | CFile::modeWrite))
+			if (f.Open(dst, CFile::modeCreate | CFile::modeWrite))
 			{
 				f.Write(plain.data() + e.offset, static_cast<UINT>(e.length));
 				f.Close();
@@ -663,8 +812,7 @@ int CVideoLibrary::BackupDbFiles(int keep)
 
 	int made = 0;
 	const struct { CString src; LPCWSTR prefix; } files[] = {
-		{ GetDataFilePath(), L"library" },
-		{ GetImagesDbPath(), L"images" },
+		{ GetDataFilePath(), L"library" },   // 이미지는 Image 폴더에 파일로 있으므로 정보 DB 만
 	};
 	CString dir;
 	for (const auto& f : files)
@@ -697,7 +845,7 @@ bool CVideoLibrary::ReadPackedDb(CString& text, CString& pending)
 {
 	// library.vmdb: "VMDB-PACK1" + [정보 묶음] + [이미지 묶음 - 예전 한 파일 형식일 때만, 지금은 길이 0]
 	std::vector<BYTE> raw;
-	if (!ReadWholeFile(GetDataFilePath(), raw) || raw.size() < kPackMagicLen + 16 ||
+	if (!ReadWholeFile(GetWorkDbPath(), raw) || raw.size() < kPackMagicLen + 16 ||
 		memcmp(raw.data(), kPackMagic, kPackMagicLen) != 0)
 	{
 		g_decryptFailed = true;
@@ -734,13 +882,10 @@ bool CVideoLibrary::ReadPackedDb(CString& text, CString& pending)
 			pending = CString(CA2W(body, CP_UTF8));
 	}
 
-	// 이미지: 캐시를 비우고 images.vmdb (없으면 예전 한 파일 형식의 이미지 묶음) 에서 풀어 놓음
-	ClearImageCache();
+	// 이미지: 이제 실행 폴더의 Image 폴더에 파일로 보관 (이미지 DB 없음)
+	//  - 예전 images.vmdb (또는 예전 한 파일 형식의 이미지 묶음) 가 있으면 Image 폴더로 풀고 images.vmdb 는 .bak 으로
 	GetImageStoreDir(L"actors");
 	GetImageStoreDir(L"studios");
-	GetImageStoreDir(L"tags");
-	bool imagesOk = true;
-	bool fromNewFile = false;
 	std::vector<BYTE> imgRaw;
 	if (ReadWholeFile(GetImagesDbPath(), imgRaw) && imgRaw.size() >= kImgMagicLen + 8 &&
 		memcmp(imgRaw.data(), kImgMagic, kImgMagicLen) == 0)
@@ -750,26 +895,12 @@ bool CVideoLibrary::ReadPackedDb(CString& text, CString& pending)
 		if (len <= imgRaw.size() - kImgMagicLen - 8)
 		{
 			const std::vector<BYTE> sec(imgRaw.begin() + kImgMagicLen + 8, imgRaw.begin() + kImgMagicLen + 8 + static_cast<size_t>(len));
-			imagesOk = UnpackImages(sec);
-			fromNewFile = true;
+			if (UnpackImages(sec))
+				::MoveFileExW(GetImagesDbPath(), GetImagesDbPath() + L".bak", MOVEFILE_REPLACE_EXISTING);
 		}
-		else
-			imagesOk = false;
 	}
-	else if (::GetFileAttributesW(GetImagesDbPath()) != INVALID_FILE_ATTRIBUTES)
-		imagesOk = false;   // images.vmdb 가 있는데 형식이 다름 (손상)
-	if (!fromNewFile && imagesOk && !secImgOld.empty())
-	{
-		imagesOk = UnpackImages(secImgOld);
-		g_readPlainDb = true;   // 예전 한 파일 형식 → 바로 저장해서 library.vmdb / images.vmdb 로 나눔
-	}
-	if (!imagesOk)
-	{
-		g_decryptFailed = true;   // 이미지가 손상 → 저장하지 않음 (덮어쓰기 방지)
-		return false;
-	}
-	// 풀어 놓은 그대로면 다음 저장 때 images.vmdb 를 다시 쓰지 않음 (예전 형식에서 옮긴 경우는 새로 써야 함)
-	m_imgSig = fromNewFile ? ImageSignature(nullptr) : CString();
+	if (!secImgOld.empty() && UnpackImages(secImgOld))
+		g_readPlainDb = true;   // 예전 한 파일 형식 → 바로 저장해서 이미지 묶음 자리를 비움
 	return true;
 }
 
@@ -804,28 +935,7 @@ bool CVideoLibrary::WritePackedDb(const CString& text, const CString& pending) c
 		return ::MoveFileExW(tmp, path, MOVEFILE_REPLACE_EXISTING) != FALSE;
 	};
 
-	// 1) 이미지가 바뀌었으면(또는 images.vmdb 가 없으면) images.vmdb 를 먼저 씀
-	std::vector<CString> files;
-	const CString sig = ImageSignature(&files);
-	if (sig != m_imgSig || ::GetFileAttributesW(GetImagesDbPath()) == INVALID_FILE_ATTRIBUTES)
-	{
-		std::vector<BYTE> imgPlain;
-		const CString root = GetCacheDir();
-		for (const CString& rel : files)
-		{
-			std::vector<BYTE> data;
-			if (ReadWholeFile(root + L"\\" + rel, data))
-				PutEntry(imgPlain, CStringA(CW2A(rel, CP_UTF8)), data.data(), data.size());
-		}
-		std::vector<BYTE> blob;
-		if (!imgPlain.empty() && !DbCrypt::Encrypt(imgPlain.data(), imgPlain.size(), blob))
-			return false;
-		if (!writeFile(GetImagesDbPath(), kImgMagic, kImgMagicLen, blob, nullptr))
-			return false;
-		m_imgSig = sig;
-	}
-
-	// 2) 정보 묶음 → library.vmdb (이미지 묶음 자리는 길이 0)
+	// 정보 묶음 → library.vmdb (이미지 묶음 자리는 길이 0, 이미지는 Image 폴더에 파일로)
 	std::vector<BYTE> plain;
 	{
 		const CStringA a(CW2A(text, CP_UTF8));
@@ -839,8 +949,11 @@ bool CVideoLibrary::WritePackedDb(const CString& text, const CString& pending) c
 	if (!okText)
 		return false;
 	const std::vector<BYTE> noImages;
-	if (!writeFile(GetDataFilePath(), kPackMagic, kPackMagicLen, secText, &noImages))
+	if (!writeFile(GetWorkDbPath(), kPackMagic, kPackMagicLen, secText, &noImages))   // 실행 중에는 작업 DB 에만 저장
 		return false;
+	m_workDirty = true;
+	if (m_onSaved)
+		m_onSaved();
 
 	// 예전 파일(library.tsv / pending.tsv / images 폴더)은 처음 한 번 옮긴 뒤 .bak 으로 남겨 둠
 	if (m_legacyToMove)
@@ -867,7 +980,6 @@ bool CVideoLibrary::Load()
 	g_readPlainDb = false;
 	g_decryptFailed = false;
 	m_legacyToMove = false;
-	m_imgSig.Empty();
 	bool haveLibrary = false;
 	bool havePending = false;
 	{
@@ -881,7 +993,11 @@ bool CVideoLibrary::Load()
 				::MoveFileExW(oldDb, oldDb + L".bak", MOVEFILE_REPLACE_EXISTING);
 		}
 	}
+	// 원본 DB 를 작업 DB(library.work.vmdb)로 복사해서 사용 — 실행 중 저장은 작업 DB 에만, [DB 반영] / 종료 때 원본에 반영
 	if (::GetFileAttributesW(GetDataFilePath()) != INVALID_FILE_ATTRIBUTES)
+		::CopyFileW(GetDataFilePath(), GetWorkDbPath(), FALSE);
+	m_workDirty = false;
+	if (::GetFileAttributesW(GetWorkDbPath()) != INVALID_FILE_ATTRIBUTES)
 	{
 		// 하나로 묶은 DB (정보 + 임시 목록 + 이미지)
 		haveLibrary = ReadPackedDb(text, pendingText);
@@ -895,7 +1011,7 @@ bool CVideoLibrary::Load()
 		ClearImageCache();
 		const CString oldImages = GetAppDataDir() + L"\\images";
 		if (::GetFileAttributesW(oldImages) != INVALID_FILE_ATTRIBUTES)
-			CopyTree(oldImages, GetCacheDir() + L"\\images");
+			CopyTree(oldImages, GetImageRoot());
 		if (haveLibrary || havePending)
 			m_legacyToMove = true;
 		g_readPlainDb = g_readPlainDb || m_legacyToMove;   // 바로 저장해서 묶도록
@@ -925,7 +1041,7 @@ bool CVideoLibrary::Load()
 			NamedInfo n;
 			n.name = Unescape(fields[1]);
 			if (fields.size() >= 3 && kind == LIST_STUDIO) n.memo = Unescape(fields[2]);   // 태그는 메모 없음
-			if (fields.size() >= 4) n.image = FromStoredPath(Unescape(fields[3]));
+			if (fields.size() >= 4 && kind == LIST_STUDIO) n.image = FromStoredPath(Unescape(fields[3]));   // 태그는 이미지 없음
 			if (fields.size() >= 5) n.favorite = (fields[4] == L"1");
 			if (!n.name.IsEmpty() && FindNamed(kind, n.name) < 0)
 				NamedList(kind).push_back(n);
@@ -1052,7 +1168,7 @@ bool CVideoLibrary::Save() const
 		for (const NamedInfo& n : NamedList(kind))
 		{
 			text += (kind == LIST_STUDIO ? L"S\t" : L"T\t");
-			text += Escape(n.name) + L"\t" + (kind == LIST_STUDIO ? Escape(n.memo) : CString()) + L"\t" + Escape(ToStoredPath(n.image)) +
+			text += Escape(n.name) + L"\t" + (kind == LIST_STUDIO ? Escape(n.memo) : CString()) + L"\t" + (kind == LIST_STUDIO ? Escape(ToStoredPath(n.image)) : CString()) +
 				L"\t" + (n.favorite ? L"1" : L"") + L"\n";
 		}
 	}

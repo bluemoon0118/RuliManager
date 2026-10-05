@@ -225,6 +225,7 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BTN_DELETE, &CRuliManagerDlg::OnBnClickedDelete)
 	ON_BN_CLICKED(IDC_BTN_EXPLORER, &CRuliManagerDlg::OnBnClickedExplorer)
 	ON_BN_CLICKED(IDC_BTN_OPENDB, &CRuliManagerDlg::OnBnClickedOpenDb)
+	ON_BN_CLICKED(IDC_BTN_APPLYDB, &CRuliManagerDlg::OnBnClickedApplyDb)
 	ON_BN_CLICKED(IDC_BTN_OPENDEFAULT, &CRuliManagerDlg::OnBnClickedOpenDefault)
 
 	ON_EN_CHANGE(IDC_EDIT_SEARCH, &CRuliManagerDlg::OnEnChangeSearch)
@@ -514,6 +515,22 @@ BOOL CRuliManagerDlg::OnInitDialog()
 	// 시작할 때마다 기존 DB 백업 (DB 폴더\backup, 최근 10개, 바뀐 것이 없으면 건너뜀)
 	CVideoLibrary::BackupDbFiles(10);
 
+	// 이전 실행이 비정상 종료되어 반영하지 못한 작업 DB 가 남아 있으면 물어봄
+	if (CVideoLibrary::HasLeftoverWorkDb())
+	{
+		const int r = AfxMessageBox(L"이전 실행에서 DB 에 반영하지 못한 변경 내용(library.work.vmdb)이 남아 있습니다.\n\n"
+			L"[예] 남은 변경 내용을 DB 에 반영하고 시작\n[아니요] 남은 변경 내용을 버리고 기존 DB 로 시작",
+			MB_YESNO | MB_ICONQUESTION);
+		if (r == IDYES)
+		{
+			if (!CVideoLibrary::ApplyLeftoverWorkDb())
+				AfxMessageBox(L"남은 변경 내용을 반영하지 못했습니다. 기존 DB 로 시작합니다.", MB_ICONWARNING);
+		}
+		else
+			CVideoLibrary::DiscardWorkDb();
+	}
+	m_lib.m_onSaved = [this]() { UpdateApplyDbButton(); };
+
 	// 라이브러리 불러오기
 	const bool haveLibrary = m_lib.Load();
 	{
@@ -523,14 +540,24 @@ BOOL CRuliManagerDlg::OnInitDialog()
 		const bool a = m_lib.SyncActorsFromVideos() || va;
 		const bool n = m_lib.SyncNamedFromVideos();
 		// 예전에 원본 경로로 등록한 이미지를 DB 폴더(images)의 복사본으로 교체
-		const bool img = m_lib.MigrateImagesToStore();
+		bool img = m_lib.MigrateImagesToStore();
+		// Image 폴더의 평문 이미지 → 암호화(.vmimg)로 바꿈 (DB 를 정상적으로 읽었을 때만, 평문은 저장 후 삭제)
+		std::vector<CString> plainImages;
+		if (haveLibrary && !m_lib.DbBroken())
+			img = m_lib.EncryptImageStore(plainImages) || img;
 		// 경로가 바뀐(옮기거나 이름을 바꾼) 영상 파일을 기존 정보에 다시 연결
 		{
 			CWaitCursor wait;
 			m_startupRelinked = m_lib.RelinkOnStartup();
 		}
 		if (a || n || img || m_startupRelinked > 0 || m_lib.LoadedPlainText())   // 예전 평문 DB 는 바로 암호화해서 다시 저장
-			m_lib.Save();
+		{
+			if (m_lib.Save())
+			{
+				for (const CString& f : plainImages)
+					::DeleteFileW(f);   // 암호화 사본으로 바뀐 평문 이미지 삭제 (휴지통 거치지 않음)
+			}
+		}
 		if (m_lib.DbBroken())
 			AfxMessageBox(L"DB 파일을 복호화하지 못했습니다 (손상되었거나 다른 프로그램 버전의 키).\n"
 				L"기존 DB 를 보호하기 위해 이번 실행에서는 DB 를 저장하지 않습니다.", MB_ICONERROR);
@@ -538,6 +565,7 @@ BOOL CRuliManagerDlg::OnInitDialog()
 		if (haveLibrary)
 			m_lib.CleanupImageStore();
 	}
+	UpdateApplyDbButton();   // 시작 때 정리하며 저장했으면 활성
 	RebuildCategories();
 
 	// 목록 / 격자 표시 복원
@@ -633,7 +661,7 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 	const int by = cy - m - btnH;
 	x = m;
 	MoveCtrl(IDC_BTN_OPENDEFAULT, x, by, DX(76), btnH);  x += DX(76) + gap;
-	const UINT bottomIds[] = { IDC_BTN_DELETE, IDC_BTN_EXPLORER, IDC_BTN_OPENDB };
+	const UINT bottomIds[] = { IDC_BTN_DELETE, IDC_BTN_EXPLORER, IDC_BTN_OPENDB, IDC_BTN_APPLYDB };
 	const int bw = DX(62);
 	for (UINT id : bottomIds)
 	{
@@ -3618,8 +3646,20 @@ Gdiplus::Bitmap* CRuliManagerDlg::GetStudioLogo(const CString& path)
 	std::unique_ptr<Gdiplus::Bitmap> bmp;
 	if (::PathFileExistsW(path))
 	{
-		// PNG 등은 투명도까지 그대로 읽음
-		bmp.reset(Gdiplus::Bitmap::FromFile(path));
+		// PNG 등은 투명도까지 그대로 읽음 (암호화된 이미지는 메모리에서 복호화한 스트림으로)
+		if (IStream* s = OpenImageFileStream(path))
+		{
+			std::unique_ptr<Gdiplus::Bitmap> tmp(Gdiplus::Bitmap::FromStream(s));
+			if (tmp && tmp->GetLastStatus() == Gdiplus::Ok && tmp->GetWidth() > 0 && tmp->GetHeight() > 0)
+			{
+				// 스트림과 분리된 복사본 (스트림을 바로 놓아도 되게)
+				bmp = std::make_unique<Gdiplus::Bitmap>(static_cast<INT>(tmp->GetWidth()), static_cast<INT>(tmp->GetHeight()), PixelFormat32bppPARGB);
+				Gdiplus::Graphics g(bmp.get());
+				g.DrawImage(tmp.get(), 0, 0, static_cast<INT>(tmp->GetWidth()), static_cast<INT>(tmp->GetHeight()));
+			}
+			tmp.reset();
+			s->Release();
+		}
 		if (bmp && bmp->GetLastStatus() != Gdiplus::Ok)
 			bmp.reset();
 		if (!bmp)
@@ -4972,7 +5012,8 @@ void CRuliManagerDlg::ApplyColors()
 	const UINT buttons[] = {
 		IDC_BTN_ADDFOLDER, IDC_BTN_REMOVEFOLDER, IDC_BTN_REFRESH, IDC_BTN_ACTORS,
 		IDC_BTN_ACTOR_BACK, IDC_BTN_SAVE, IDC_BTN_PICKACTORS, IDC_BTN_PICKVALIASES, IDC_BTN_PICKSTUDIO, IDC_BTN_PICKTAGS,
-		IDC_BTN_OPENDEFAULT, IDC_BTN_DELETE, IDC_BTN_EXPLORER, IDC_BTN_SORTDIR, IDC_BTN_OPENDB, IDC_BTN_CHANGEIMAGE, IDC_BTN_SEARCHIMAGE
+		IDC_BTN_OPENDEFAULT, IDC_BTN_DELETE, IDC_BTN_EXPLORER, IDC_BTN_SORTDIR, IDC_BTN_OPENDB, IDC_BTN_CHANGEIMAGE, IDC_BTN_SEARCHIMAGE,
+		IDC_BTN_APPLYDB
 	};
 	for (size_t i = 0; i < _countof(buttons) && i < _countof(m_darkButtons); ++i)
 	{
@@ -4980,7 +5021,7 @@ void CRuliManagerDlg::ApplyColors()
 		{
 			// 삭제/제거 버튼은 빨간색
 			const bool danger = (buttons[i] == IDC_BTN_DELETE || buttons[i] == IDC_BTN_REMOVEFOLDER);
-			const bool isSave = (buttons[i] == IDC_BTN_SAVE);   // 저장 버튼은 초록색
+			const bool isSave = (buttons[i] == IDC_BTN_SAVE || buttons[i] == IDC_BTN_APPLYDB);   // 저장 · DB 반영 버튼은 초록색
 			m_darkButtons[i].SetColors(danger ? kDangerColor : (isSave ? kSaveColor : kButtonColor), RGB(255, 255, 255), kBackColor);
 		}
 	}
@@ -5103,9 +5144,19 @@ void CRuliManagerDlg::OnClose()
 {
 	CommitDetails();
 	m_lib.Save();
+	// 종료할 때 작업 DB 를 원본(library.vmdb)에 반영하고 작업 DB 삭제
+	if (!m_lib.DbBroken())
+	{
+		if (m_lib.ApplyWorkDb())
+			CVideoLibrary::DiscardWorkDb();
+		else if (AfxMessageBox(L"DB 에 반영하지 못했습니다 (파일이 사용 중이거나 쓰기 권한 없음).\n"
+			L"그래도 종료할까요? (변경 내용은 library.work.vmdb 에 남아 있어 다음 실행 때 반영할 수 있습니다)",
+			MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES)
+			return;
+	}
 	SaveWindowPlacement();
 	m_preview.Clear();
-	CVideoLibrary::ClearImageCache();   // DB 파일에서 풀어 둔 이미지 지움 (DB 파일 안에 보관됨)
+	CVideoLibrary::ClearImageCache();   // 예전 버전이 %LOCALAPPDATA% 캐시에 풀어 둔 이미지 정리 (이미지는 이제 실행 폴더의 Image 폴더)
 	EndDialog(IDCANCEL);
 }
 
@@ -5399,4 +5450,29 @@ void CRuliManagerDlg::OpenActorFromStrip(int i)
 		}
 	}
 	m_actorGrid.SetFocus();
+}
+
+// ---------------------------------------------------------------------------
+// 작업 DB 반영
+
+void CRuliManagerDlg::UpdateApplyDbButton()
+{
+	if (CWnd* w = GetDlgItem(IDC_BTN_APPLYDB))
+		w->EnableWindow(m_lib.HasUnappliedChanges() && !m_lib.DbBroken());
+}
+
+void CRuliManagerDlg::OnBnClickedApplyDb()
+{
+	CommitDetails();   // 편집 중인 상세 정보도 먼저 저장
+	if (!m_lib.HasUnappliedChanges())
+	{
+		UpdateApplyDbButton();
+		return;
+	}
+	CWaitCursor wait;
+	if (m_lib.ApplyWorkDb())
+		SetDlgItemText(IDC_STATIC_STATUS, L"DB 에 반영했습니다.");
+	else
+		AfxMessageBox(L"DB 에 반영하지 못했습니다 (파일이 사용 중이거나 쓰기 권한 없음).", MB_ICONWARNING);
+	UpdateApplyDbButton();
 }

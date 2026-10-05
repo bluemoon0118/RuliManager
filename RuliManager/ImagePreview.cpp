@@ -2,19 +2,51 @@
 #include "ImagePreview.h"
 
 #include <wincodec.h>
+#include <shlwapi.h>
+#include "DbCrypt.h"
 #pragma comment(lib, "windowscodecs.lib")
 
 namespace
 {
-	bool LoadWithWic(CImage& image, const CString& path)
+	// 파일 전체 읽기
+	bool ReadAll(const CString& path, std::vector<BYTE>& out)
+	{
+		out.clear();
+		HANDLE h = ::CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+		if (h == INVALID_HANDLE_VALUE)
+			return false;
+		LARGE_INTEGER size = {};
+		bool ok = ::GetFileSizeEx(h, &size) && size.QuadPart > 0 && size.QuadPart < 512LL * 1024 * 1024;
+		if (ok)
+		{
+			out.resize(static_cast<size_t>(size.QuadPart));
+			DWORD read = 0;
+			ok = ::ReadFile(h, out.data(), static_cast<DWORD>(out.size()), &read, nullptr) && read == out.size();
+		}
+		::CloseHandle(h);
+		return ok;
+	}
+
+	// 암호화된 이미지 파일이면 복호화한 내용을 plain 에 넣고 true
+	bool ReadEncryptedImage(const CString& path, std::vector<BYTE>& plain)
+	{
+		std::vector<BYTE> raw;
+		if (!ReadAll(path, raw) || !DbCrypt::IsEncrypted(raw.data(), raw.size()))
+			return false;
+		return DbCrypt::Decrypt(raw.data(), raw.size(), plain) && !plain.empty();
+	}
+
+	bool LoadWithWic(CImage& image, const CString& path, IStream* stream)
 	{
 		CComPtr<IWICImagingFactory> factory;
 		if (FAILED(::CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory))))
 			return false;
 
 		CComPtr<IWICBitmapDecoder> decoder;
-		if (FAILED(factory->CreateDecoderFromFilename(path, nullptr, GENERIC_READ,
-			WICDecodeMetadataCacheOnDemand, &decoder)))
+		const HRESULT hr = stream
+			? factory->CreateDecoderFromStream(stream, nullptr, WICDecodeMetadataCacheOnLoad, &decoder)
+			: factory->CreateDecoderFromFilename(path, nullptr, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &decoder);
+		if (FAILED(hr))
 			return false;   // 코덱 없음 (예: WebP 확장 미설치) 또는 손상된 파일
 
 		CComPtr<IWICBitmapFrameDecode> frame;
@@ -53,12 +85,47 @@ bool LoadImageFile(CImage& image, const CString& path)
 {
 	if (path.IsEmpty())
 		return false;
-	if (LoadWithWic(image, path))
+
+	// 암호화된 이미지(Image 폴더의 .vmimg): 메모리에서 복호화해서 읽음 (평문 파일을 만들지 않음)
+	std::vector<BYTE> plain;
+	if (ReadEncryptedImage(path, plain))
+	{
+		bool ok = false;
+		if (IStream* s = ::SHCreateMemStream(plain.data(), static_cast<UINT>(plain.size())))
+		{
+			ok = LoadWithWic(image, path, s);
+			if (!ok)
+			{
+				LARGE_INTEGER zero = {};
+				s->Seek(zero, STREAM_SEEK_SET, nullptr);
+				if (!image.IsNull())
+					image.Destroy();
+				ok = SUCCEEDED(image.Load(s));   // GDI+
+			}
+			s->Release();
+		}
+		::SecureZeroMemory(plain.data(), plain.size());
+		return ok;
+	}
+
+	if (LoadWithWic(image, path, nullptr))
 		return true;
 
 	if (!image.IsNull())
 		image.Destroy();
 	return SUCCEEDED(image.Load(path));   // GDI+ (JPG/PNG/BMP/GIF/TIFF)
+}
+
+IStream* OpenImageFileStream(const CString& path)
+{
+	if (path.IsEmpty())
+		return nullptr;
+	std::vector<BYTE> data;
+	if (!ReadEncryptedImage(path, data) && !ReadAll(path, data))
+		return nullptr;
+	IStream* s = ::SHCreateMemStream(data.data(), static_cast<UINT>(data.size()));
+	::SecureZeroMemory(data.data(), data.size());
+	return s;
 }
 
 BEGIN_MESSAGE_MAP(CImagePreview, CStatic)

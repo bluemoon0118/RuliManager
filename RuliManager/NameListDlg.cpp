@@ -419,8 +419,10 @@ void CNameListDlg::OnBnClickedImageBrowse()
 	if (dlg.DoModal() != IDOK)
 		return;
 
-	// 원본 대신 DB 폴더(images\studios 또는 tags)에 복사본을 만들어 그것을 등록
-	const CString copy = CVideoLibrary::StoreImageCopy(dlg.GetPathName(), m_kind == LIST_STUDIO ? L"studios" : L"tags");
+	// 원본 대신 실행 폴더의 Image\studios 에 복사본을 만들어 그것을 등록 (태그는 이미지 없음)
+	if (m_kind != LIST_STUDIO)
+		return;
+	const CString copy = CVideoLibrary::StoreImageCopy(dlg.GetPathName(), L"studios");
 	if (copy.IsEmpty())
 	{
 		AfxMessageBox(L"이미지를 DB 폴더로 복사하지 못했습니다.", MB_ICONWARNING);

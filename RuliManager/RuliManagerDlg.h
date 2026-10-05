@@ -42,7 +42,7 @@ protected:
 	static const COLORREF kButtonColor = RGB(0x13, 0x7C, 0xBD); // #137CBD (버튼 배경)
 	static const COLORREF kSaveColor = RGB(0x0F, 0x99, 0x60);   // #0F9960 (저장 버튼 배경)
 	static const COLORREF kDangerColor = RGB(0xDB, 0x37, 0x37); // #DB3737 (삭제/제거 버튼 배경)
-	CDarkButton m_darkButtons[17];
+	CDarkButton m_darkButtons[18];
 	CDarkButton m_btnSettings;      // 오른쪽 위 톱니바퀴 (설정 창)
 	CDarkButton m_modeButtons[4];   // 영상 / 배우 / 스튜디오 / 태그 토글 버튼
 	void UpdateModeButtons();
@@ -68,6 +68,8 @@ protected:
 	void DrawStripCard(CDC* dc, int i, const CRect& rc, bool hot);   // 카드 띠의 배우 카드 하나
 	void OpenActorFromStrip(int i);                                  // 더블클릭: 배우 탭에서 그 배우 선택
 	CRect StripHeartRect(const CRect& card);                          // 카드 띠 카드의 즐겨찾기 하트 자리
+	afx_msg void OnBnClickedApplyDb();   // [DB 반영]: 작업 DB → library.vmdb
+	void UpdateApplyDbButton();          // 반영 안 한 변경이 있을 때만 [DB 반영] 활성
 	void UpdateActorPanel(const ActorInfo* a, int count);   // 배우 상세 패널 내용 (높이가 바뀌면 다시 배치)
 	int             m_actorInfoIdx = -1;   // 오른쪽 패널에 표시 중인 배우
 	CDarkCombo m_comboSort;        // 영상 정렬 기준 (격자에는 열 머리글이 없음)
