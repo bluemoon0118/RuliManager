@@ -3,6 +3,7 @@
 #include "RuliManagerDlg.h"
 #include "ActorDlg.h"
 #include "TextInfoDlg.h"
+#include <cmath>
 #include "SettingsDlg.h"
 #include "ImageSearchDlg.h"
 #include "NameListDlg.h"
@@ -318,6 +319,25 @@ BOOL CRuliManagerDlg::OnInitDialog()
 		m_actorGrid.Invalidate(FALSE);   // 카드의 별점 리본
 	};
 	m_actorPanel.m_onFavorite = [this]() { ToggleActorFavorite(m_actorInfoIdx); };
+	m_actorPanel.m_onDebutDblClick = [this]()
+	{
+		// 데뷔작 품번 상자 더블클릭 → 그 배우의 출연작 화면으로 들어가서 데뷔작 선택
+		if (!IsActorGridMode() || m_actorInfoIdx < 0 || m_actorInfoIdx >= static_cast<int>(m_lib.actors.size()))
+			return;
+		const ActorInfo a = m_lib.actors[m_actorInfoIdx];
+		const int item = m_lib.FindVideoOnDate(a.name, a.debut);
+		if (item < 0 || m_actorSel < 0)
+			return;
+		DrillIntoActor(m_actorSel);
+		for (size_t row = 0; row < m_view.size(); ++row)
+		{
+			if (m_view[row] == item)
+			{
+				GridSetSel(static_cast<int>(row));
+				break;
+			}
+		}
+	};
 	// 영상 상세 정보: 태그 아래 출연 배우 카드
 	// 영상 상세 정보: [이미지 변경] 버튼 위 fps / 해상도
 	m_mediaInfo.Create(this, IDC_MEDIA_INFO);
@@ -581,6 +601,8 @@ BOOL CRuliManagerDlg::OnInitDialog()
 		m_studioChips.m_onHeightChanged = m_tagChips.m_onHeightChanged;
 		GetDlgItem(IDC_EDIT_STUDIO)->ShowWindow(SW_HIDE);
 		GetDlgItem(IDC_BTN_PICKSTUDIO)->ShowWindow(SW_HIDE);
+
+		ApplyDetailFonts();   // 영상 상세 글자 컨트롤: 기본 글꼴 + 1pt
 		// [별칭] 줄은 배우 칩에 합침 (값은 숨긴 별칭 칸에 보관)
 		GetDlgItem(IDC_STATIC_VALIASES_LBL)->ShowWindow(SW_HIDE);
 		GetDlgItem(IDC_EDIT_VALIASES)->ShowWindow(SW_HIDE);
@@ -815,7 +837,21 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 	// 상세 정보(편집 칸)는 영상 탭에서만 표시, 다른 탭은 이미지 + 이름/정보 두 줄만
 	const bool showDetail = ShowVideoDetail();   // 영상 탭 + 배우 출연작 화면
 	// 태그 칩이 여러 줄이면 그만큼 상세 영역을 늘림 (이미지가 줄어듦)
-	const int lblW0 = DX(34);   // 라벨 폭 ("스튜디오" 가 잘리지 않게)
+	const int lblW0 = DX(37);   // 라벨 폭 ("스튜디오" 가 잘리지 않게, 상세 글꼴 +1pt)
+	// 상세 글꼴(+1pt)에 맞춘 줄 높이 / 라벨 높이
+	const int dRowH = (std::max)(rowH, m_detailTmH + 8);          // 품번 · 발매일 등 한 줄 칸
+	const int lblH = (std::max)(DY(9), m_detailTmH + 2);          // 라벨 높이
+	const int nameStep = (std::max)(DY(11), lblH + 2);            // 파일 이름 줄
+	const int imgStep = (std::max)(DY(16), lblH + 6);             // 이미지 줄 ([이미지 검색/변경])
+	const int lblOff = (dRowH - lblH) / 2;                        // 한 줄 칸 옆 라벨 세로 위치
+	const int chipLblOff = (std::max)(0, (m_detailTmH + 14 - lblH) / 2);   // 칩 첫 줄 옆 라벨 세로 위치
+	// 줄 사이 세로 여백: 예전 DY(4) 에서 4pt 줄임 (2pt + 2pt, 최소 1픽셀)
+	int vGap = DY(4);
+	{
+		CClientDC gdc(this);
+		const int pt2 = static_cast<int>(std::lround(4.0 * (std::max)(1, gdc.GetDeviceCaps(LOGPIXELSY)) / 72.0));
+		vGap = (std::max)(1, DY(4) - pt2);
+	}
 	const int chipsH = (showDetail && m_tagChips.GetSafeHwnd())
 		? (std::max)(rowH, m_tagChips.CalcHeight(rw - lblW0)) : rowH;
 	const int actorChipsH = (showDetail && m_actorChips.GetSafeHwnd())
@@ -834,15 +870,15 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 		tdc.SelectObject(old);
 		titleH = (std::max)(rowH, static_cast<int>(tm.tmHeight) * 4 + 8);
 	}
-	const int detailH = showDetail ? DY(116) + (titleH - rowH) + (studioChipsH - rowH) + chipsH + actorChipsH + (stripH > 0 ? stripH + gap : 0)   // 파일 / 이미지 / 품번 / 제목 / 별점 / 발매일 / 배우 / 스튜디오 / 태그 (메모 칸 삭제 → 이미지가 커짐)
+	const int detailH = showDetail ? DY(116) + (nameStep - DY(11)) + (imgStep - DY(16)) + 3 * (dRowH - rowH) - 7 * (DY(4) - vGap) + (titleH - rowH) + (studioChipsH - rowH) + chipsH + actorChipsH + (stripH > 0 ? stripH + gap : 0)   // 파일 / 이미지 / 품번 / 제목 / 별점 / 발매일 / 배우 / 스튜디오 / 태그 (메모 칸 삭제 → 이미지가 커짐)
 		: ((IsActorGridMode() && m_actorPanel.GetSafeHwnd()) ? m_actorPanel.CalcHeight(rw) : DY(26));   // 배우 격자: [별점] 줄 추가   // [별칭] 줄은 배우 칩에 합침
 	const int previewBottom = (std::max)(top + DY(60), bottom - detailH - gap);
 	MoveCtrl(IDC_PREVIEW, rx, top, rw, previewBottom - top);
 
-	const int lblW = DX(34);   // 라벨 폭 ("스튜디오" 가 잘리지 않게, lblW0 과 같게)
+	const int lblW = lblW0;    // 라벨 폭 ("스튜디오" 가 잘리지 않게, lblW0 과 같게)
 	const int infoX = showDetail ? lblW : 0;   // 다른 탭은 [파일] 글자 없이 왼쪽부터
 	int dy = previewBottom + gap;
-	MoveCtrl(IDC_STATIC_NAME_LBL, rx, dy + DY(2), lblW, DY(9));
+	MoveCtrl(IDC_STATIC_NAME_LBL, rx, dy + DY(2), lblW, showDetail ? lblH : DY(9));
 	if (showDetail)
 	{
 		// 영상: 파일 이름 줄 오른쪽(= [이미지 검색][이미지 변경] 버튼 위)에 fps / 해상도
@@ -851,20 +887,20 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 		const int needW = m_mediaInfo.GetSafeHwnd() ? m_mediaInfo.NeededWidth() : 0;
 		const int infoW = (std::min)(needW, cbw * 2 + DX(3));
 		const int nameGap = (infoW > 0) ? DX(6) : 0;
-		MoveCtrl(IDC_STATIC_NAME, rx + infoX, dy + DY(2), rw - infoX - infoW - nameGap, DY(9));
+		MoveCtrl(IDC_STATIC_NAME, rx + infoX, dy + DY(2), rw - infoX - infoW - nameGap, lblH);
 		MoveCtrl(IDC_MEDIA_INFO, rx + rw - infoW, dy, infoW, DY(11));
 	}
 	else
 		MoveCtrl(IDC_STATIC_NAME, rx + infoX, dy + DY(2), rw - infoX, DY(9));
-	dy += DY(11);
+	dy += showDetail ? nameStep : DY(11);
 	if (showDetail)
 	{
 		// 영상: 이미지 줄 오른쪽에 [이미지 변경...]
 		const int cbw = DX(54);
-		MoveCtrl(IDC_STATIC_IMAGE, rx + infoX, dy + DY(2), rw - infoX - cbw * 2 - DX(7), DY(9));
+		MoveCtrl(IDC_STATIC_IMAGE, rx + infoX, dy + DY(2), rw - infoX - cbw * 2 - DX(7), lblH);
 		MoveCtrl(IDC_BTN_SEARCHIMAGE, rx + rw - cbw * 2 - DX(3), dy, cbw, DY(13));
 		MoveCtrl(IDC_BTN_CHANGEIMAGE, rx + rw - cbw, dy, cbw, DY(13));
-		dy += DY(16);
+		dy += imgStep;
 	}
 	else
 	{
@@ -883,44 +919,76 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 		return;
 	}
 
-	MoveCtrl(IDC_STATIC_CODE_LBL, rx, dy + DY(3), lblW, DY(9));     // 품번 (제목 위)
-	MoveCtrl(IDC_EDIT_CODE, rx + lblW, dy, rw - lblW, rowH);
-	dy += DY(17);
+	MoveCtrl(IDC_STATIC_CODE_LBL, rx, dy + lblOff, lblW, lblH);     // 품번 (제목 위)
+	MoveCtrl(IDC_EDIT_CODE, rx + lblW, dy, rw - lblW, dRowH);
+	dy += dRowH + vGap;
 
-	MoveCtrl(IDC_STATIC_TITLE_LBL, rx, dy + DY(3), lblW, DY(9));
+	MoveCtrl(IDC_STATIC_TITLE_LBL, rx, dy + lblOff, lblW, lblH);
 	MoveCtrl(IDC_EDIT_TITLE, rx + lblW, dy, rw - lblW, titleH);   // 여러 줄 (4줄)
-	dy += titleH + DY(4);
+	dy += titleH + vGap;
 
-	MoveCtrl(IDC_STATIC_RATING_LBL, rx, dy + DY(3), lblW, DY(9));
-	MoveCtrl(IDC_COMBO_RATING, rx + lblW, dy, DX(80), rowH);
-	MoveCtrl(IDC_DROP_COUNTER, rx + lblW + DX(86), dy, DX(40), rowH);   // 별점 오른쪽 물방울 카운트
-	MoveCtrl(IDC_BTN_SAVE, rx + rw - DX(50), dy, DX(50), btnH);
-	dy += DY(17);
+	MoveCtrl(IDC_STATIC_RATING_LBL, rx, dy + lblOff, lblW, lblH);
+	MoveCtrl(IDC_COMBO_RATING, rx + lblW, dy + (dRowH - rowH) / 2, DX(80), rowH);
+	MoveCtrl(IDC_DROP_COUNTER, rx + lblW + DX(86), dy + (dRowH - rowH) / 2, DX(40), rowH);   // 별점 오른쪽 물방울 카운트
+	MoveCtrl(IDC_BTN_SAVE, rx + rw - DX(50), dy + (dRowH - btnH) / 2, DX(50), btnH);
+	dy += dRowH + vGap;
 
-	MoveCtrl(IDC_STATIC_RELEASE_LBL, rx, dy + DY(3), lblW, DY(9));
-	MoveCtrl(IDC_DATE_RELEASE, rx + lblW, dy, DX(80), rowH);
-	dy += DY(17);
+	MoveCtrl(IDC_STATIC_RELEASE_LBL, rx, dy + lblOff, lblW, lblH);
+	MoveCtrl(IDC_DATE_RELEASE, rx + lblW, dy, DX(86), dRowH);
+	dy += dRowH + vGap;
 
-	MoveCtrl(IDC_STATIC_ACTORS_LBL, rx, dy + DY(3), lblW, DY(9));
+	MoveCtrl(IDC_STATIC_ACTORS_LBL, rx, dy + chipLblOff, lblW, lblH);
 	MoveCtrl(IDC_EDIT_ACTORS, rx + lblW, dy, rw - lblW - DX(40), rowH);   // 숨김 (값 보관용)
 	MoveCtrl(IDC_ACTOR_CHIPS, rx + lblW, dy, rw - lblW, actorChipsH);
-	dy += actorChipsH + DY(4);
+	dy += actorChipsH + vGap;
 
 
-	MoveCtrl(IDC_STATIC_STUDIO_LBL, rx, dy + DY(3), lblW, DY(9));
+	MoveCtrl(IDC_STATIC_STUDIO_LBL, rx, dy + chipLblOff, lblW, lblH);
 	MoveCtrl(IDC_EDIT_STUDIO, rx + lblW, dy, rw - lblW - DX(40), rowH);   // 숨김 (값 보관용)
 	MoveCtrl(IDC_STUDIO_CHIPS, rx + lblW, dy, rw - lblW, studioChipsH);   // 배우 선택과 같은 칩 입력
-	dy += studioChipsH + DY(4);
+	dy += studioChipsH + vGap;
 
-	MoveCtrl(IDC_STATIC_TAGS_LBL, rx, dy + DY(3), lblW, DY(9));
+	MoveCtrl(IDC_STATIC_TAGS_LBL, rx, dy + chipLblOff, lblW, lblH);
 	MoveCtrl(IDC_EDIT_TAGS, rx + lblW, dy, rw - lblW - DX(40), rowH);   // 숨김 (값 보관용)
 	MoveCtrl(IDC_TAG_CHIPS, rx + lblW, dy, rw - lblW, chipsH);
-	dy += chipsH + DY(4);
+	dy += chipsH + vGap;
 
 	if (stripH > 0)
 		MoveCtrl(IDC_ACTOR_STRIP, rx, (std::max)(dy, bottom - stripH), rw, stripH);   // 태그 아래 출연 배우 카드 띠 (전체 폭)
 
 	RedrawWindow(nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
+}
+
+void CRuliManagerDlg::ApplyDetailFonts()
+{
+	// 영상 상세보기의 글자 컨트롤(라벨 · 파일 이름 · 이미지 줄 · 품번 · 제목 · 발매일 · 배우 / 스튜디오 / 태그 칩)을 1pt 크게
+	if (!m_detailFont.GetSafeHandle())
+	{
+		LOGFONT lf = {};
+		GetFont()->GetLogFont(&lf);
+		CClientDC sdc(this);
+		const int dpi = (std::max)(1, sdc.GetDeviceCaps(LOGPIXELSY));
+		const double pt = std::abs(lf.lfHeight) * 72.0 / dpi;
+		lf.lfHeight = -static_cast<LONG>(std::lround((pt + 1.0) * dpi / 72.0));
+		m_detailFont.CreateFontIndirect(&lf);
+		CFont* old = sdc.SelectObject(&m_detailFont);
+		TEXTMETRIC tm = {};
+		sdc.GetTextMetrics(&tm);
+		sdc.SelectObject(old);
+		m_detailTmH = tm.tmHeight;
+	}
+	const UINT ids[] = {
+		IDC_STATIC_NAME_LBL, IDC_STATIC_NAME, IDC_STATIC_IMAGE,
+		IDC_STATIC_CODE_LBL, IDC_EDIT_CODE, IDC_STATIC_TITLE_LBL, IDC_EDIT_TITLE,
+		IDC_STATIC_RATING_LBL, IDC_STATIC_RELEASE_LBL, IDC_DATE_RELEASE,
+		IDC_STATIC_ACTORS_LBL, IDC_STATIC_STUDIO_LBL, IDC_STATIC_TAGS_LBL };
+	for (UINT id : ids)
+		if (CWnd* w = GetDlgItem(id))
+			w->SetFont(&m_detailFont, FALSE);
+	CTagChipCtrl* chips[] = { &m_actorChips, &m_studioChips, &m_tagChips };
+	for (CTagChipCtrl* c : chips)
+		if (c->GetSafeHwnd())
+			c->SetFont(&m_detailFont, FALSE);
 }
 
 void CRuliManagerDlg::SetupSuggestions()
@@ -3152,7 +3220,9 @@ void CRuliManagerDlg::UpdateActorPanel(const ActorInfo* a, int count)
 	if (!m_actorPanel.GetSafeHwnd())
 		return;
 	const int before = m_actorPanel.CalcHeight(0);   // 0 = 패널의 지금 폭 기준
-	m_actorPanel.SetActor(a, count);
+	// 데뷔일과 같은 날 발매된 출연작이 있으면 그 품번을 데뷔일 오른쪽에
+	const CString debutCode = a ? m_lib.FindCodeOnDate(a->name, a->debut) : CString();
+	m_actorPanel.SetActor(a, count, debutCode);
 	// 줄 수가 바뀌어 필요한 높이가 달라지면 미리보기/패널 배치 다시
 	if (m_layoutReady && m_actorPanel.CalcHeight(0) != before)
 	{
@@ -3561,7 +3631,7 @@ void CRuliManagerDlg::OnActorTextInfo()
 	const ActorInfo& cur = m_lib.actors[idx];
 	CTextInfoDlg dlg(L"텍스트로 정보 입력 - " + cur.name,
 		L"배우 폴더 txt 와 같은 \"항목: 값\" 형식입니다 (스캔 때 읽는 규칙과 같음). 입력한 내용으로 바뀌고, 지운 항목은 비워집니다.\r\n"
-		L"항목: 다른이름(# 구분) · 성별 · 생년월일 · 국적 · 키 · 치수 · 가슴/허리/엉덩이 · 컵 · 데뷔 · 은퇴  (이름 · 별점 · 즐겨찾기 · 메모는 바뀌지 않음)",
+		L"항목: 다른이름(# 구분) · 성별 · 생년월일 · 국적 · 키 · 치수 · 가슴/허리/엉덩이 · 컵 · 데뷔 · 은퇴 · URL(한 줄에 하나, 여러 줄)  (이름 · 별점 · 즐겨찾기 · 메모는 바뀌지 않음)",
 		CVideoLibrary::ActorInfoText(cur), this);
 	if (dlg.DoModal() != IDOK)
 		return;

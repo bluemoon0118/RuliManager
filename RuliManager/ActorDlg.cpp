@@ -86,6 +86,7 @@ void CActorDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_ACT_COUNT, m_staticCount);
 	DDX_Control(pDX, IDC_ACT_PHOTO_PATH, m_staticPhotoPath);
 	DDX_Control(pDX, IDC_ACT_MEMO, m_editMemo);
+	DDX_Control(pDX, IDC_ACT_URLS, m_editUrls);
 }
 
 BEGIN_MESSAGE_MAP(CActorDlg, CDialogEx)
@@ -95,6 +96,7 @@ BEGIN_MESSAGE_MAP(CActorDlg, CDialogEx)
 	ON_CBN_SELCHANGE(IDC_ACT_ALIASES, &CActorDlg::OnCbnSelchangeAliases)
 	ON_CBN_SELCHANGE(IDC_ACT_GENDER, &CActorDlg::OnFieldChanged)
 	ON_EN_CHANGE(IDC_ACT_MEMO, &CActorDlg::OnFieldChanged)
+	ON_EN_CHANGE(IDC_ACT_URLS, &CActorDlg::OnFieldChanged)
 	ON_NOTIFY(DTN_DATETIMECHANGE, IDC_ACT_BIRTH, &CActorDlg::OnDtnBirthChanged)
 	ON_NOTIFY(DTN_DATETIMECHANGE, IDC_ACT_DEBUT, &CActorDlg::OnDtnDebutChanged)
 	ON_NOTIFY(DTN_DATETIMECHANGE, IDC_ACT_RETIRE, &CActorDlg::OnDtnDebutChanged)   // 같은 처리 (변경 표시)
@@ -333,6 +335,11 @@ void CActorDlg::ShowActor(int idx)
 		memo.Replace(L"\r\n", L"\n");
 		memo.Replace(L"\n", L"\r\n");
 		m_editMemo.SetWindowText(memo);
+		{
+			CString urls = CVideoLibrary::JoinUrls(CVideoLibrary::SplitUrls(a.urls));
+			urls.Replace(L"\n", L"\r\n");   // 한 줄에 하나
+			m_editUrls.SetWindowText(urls);
+		}
 		CString c;
 		c.Format(L"%d편", m_lib.CountVideosWithActor(a.name));
 		m_staticCount.SetWindowText(c);
@@ -353,6 +360,7 @@ void CActorDlg::ShowActor(int idx)
 		m_dateRetire.SetTime(static_cast<LPSYSTEMTIME>(nullptr));
 		m_starRating.SetRating(0);
 		m_editMemo.SetWindowText(L"");
+		m_editUrls.SetWindowText(L"");
 		m_staticCount.SetWindowText(L"");
 		SetPhoto(CString());
 	}
@@ -370,6 +378,7 @@ void CActorDlg::ShowActor(int idx)
 	m_dateRetire.EnableWindow(enable);
 	m_starRating.EnableWindow(enable);
 	m_editMemo.EnableWindow(enable);
+	m_editUrls.EnableWindow(enable);
 	UpdateAgeText();
 	GetDlgItem(IDC_ACT_DELETE)->EnableWindow(enable);
 	GetDlgItem(IDC_ACT_PHOTO_BROWSE)->EnableWindow(enable);
@@ -544,6 +553,11 @@ bool CActorDlg::Commit()
 	a.rating = m_starRating.GetRating();
 
 	m_editMemo.GetWindowText(a.memo);
+	{
+		CString urls;
+		m_editUrls.GetWindowText(urls);
+		a.urls = CVideoLibrary::JoinUrls(CVideoLibrary::SplitUrls(urls));   // 공백 · 빈 줄 · 중복 정리
+	}
 	a.photo = m_photoPath;
 
 	m_dirty = false;

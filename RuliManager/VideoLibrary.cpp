@@ -1079,6 +1079,8 @@ bool CVideoLibrary::Load()
 				a.hip   = Unescape(fields[17]);
 				a.cup   = Unescape(fields[18]);
 			}
+			if (fields.size() >= 20)   // 링크 URL (줄바꿈 구분)
+				a.urls = Unescape(fields[19]);
 			if (!a.name.IsEmpty() && FindActor(a.name) < 0)
 				actors.push_back(a);
 		}
@@ -1166,7 +1168,8 @@ bool CVideoLibrary::Save() const
 			L"\t" + Escape(a.height) + L"\t" + Escape(a.debut) +
 			L"\t\t" + Escape(a.gender) + L"\t" + Escape(a.lastAlias) + L"\t" + Escape(a.retire) +
 			L"\t" + RatingField(a.rating) + L"\t" + (a.favorite ? L"1" : L"") +
-			L"\t" + Escape(a.bust) + L"\t" + Escape(a.waist) + L"\t" + Escape(a.hip) + L"\t" + Escape(a.cup) + L"\n";   // 10번째 칸(예전 활동명)은 비워 두고 11번째에 성별
+			L"\t" + Escape(a.bust) + L"\t" + Escape(a.waist) + L"\t" + Escape(a.hip) + L"\t" + Escape(a.cup) +
+			L"\t" + Escape(a.urls) + L"\n";   // 20번째 칸: 링크 URL   // 10번째 칸(예전 활동명)은 비워 두고 11번째에 성별
 	}
 	for (int kind = LIST_STUDIO; kind <= LIST_TAG; ++kind)
 	{
@@ -2320,6 +2323,40 @@ int CVideoLibrary::CountVideosWithActor(const CString& name) const
 	return count;
 }
 
+CString CVideoLibrary::FindCodeOnDate(const CString& actorName, const CString& date) const
+{
+	const int idx = FindVideoOnDate(actorName, date);
+	return (idx >= 0) ? items[idx].code : CString();
+}
+
+int CVideoLibrary::FindVideoOnDate(const CString& actorName, const CString& date) const
+{
+	if (actorName.IsEmpty() || date.IsEmpty())
+		return -1;
+	const std::map<CString, int> index = ActorNameIndex();
+	CString target = actorName;
+	target.MakeLower();
+	int best = -1;
+	for (size_t i = 0; i < items.size(); ++i)
+	{
+		const VideoItem& v = items[i];
+		if (v.code.IsEmpty() || v.release.CompareNoCase(date) != 0)
+			continue;
+		for (const CString& n : SplitList(v.actors))
+		{
+			if (n.CompareNoCase(actorName) == 0 || ActorKeyOf(index, n) == target)
+			{
+				// 여러 개면 품번 순 첫 번째, 같은 품번(분할 파일)이면 경로 순 첫 번째
+				const int c = (best < 0) ? -1 : v.code.CompareNoCase(items[best].code);
+				if (best < 0 || c < 0 || (c == 0 && v.path.CompareNoCase(items[best].path) < 0))
+					best = static_cast<int>(i);
+				break;
+			}
+		}
+	}
+	return best;
+}
+
 int CVideoLibrary::CalcAge(const CString& birth)
 {
 	int y = 0, m = 0, d = 0;
@@ -2681,7 +2718,7 @@ bool CVideoLibrary::ApplyActorTextInfo(ActorInfo& a, const CString& file)
 void CVideoLibrary::ClearActorTextFields(ActorInfo& a)
 {
 	a.birth.Empty(); a.height.Empty(); a.bust.Empty(); a.waist.Empty(); a.hip.Empty(); a.cup.Empty();
-	a.nationality.Empty(); a.gender.Empty(); a.debut.Empty(); a.retire.Empty(); a.aliases.Empty();
+	a.nationality.Empty(); a.gender.Empty(); a.debut.Empty(); a.retire.Empty(); a.aliases.Empty(); a.urls.Empty();
 }
 
 bool CVideoLibrary::ApplyActorText(ActorInfo& a, CString text)
@@ -2819,8 +2856,61 @@ bool CVideoLibrary::ApplyActorText(ActorInfo& a, CString text)
 		}
 		else if (KeyIs(key, { L"메모", L"설명", L"소개", L"memo", L"note", L"notes", L"details", L"bio", L"プロフィール" }))
 			setIfEmpty(a.memo, val);
+		else if (KeyIs(key, { L"url", L"urls", L"링크", L"주소", L"홈페이지", L"사이트", L"website", L"site", L"homepage", L"link", L"links",
+		                      L"sns", L"twitter", L"x", L"instagram", L"인스타그램", L"트위터", L"公式", L"公式サイト", L"リンク" }))
+		{
+			// URL: 여러 줄 / 한 줄에 여러 개(공백 · | 구분) 모두 추가 (이미 있으면 건너뜀)
+			std::vector<CString> list = SplitUrls(a.urls);
+			for (const CString& u : SplitUrls(val))
+			{
+				bool dup = false;
+				for (const CString& e : list)
+					if (e.CompareNoCase(u) == 0) { dup = true; break; }
+				if (!dup) { list.push_back(u); changed = true; }
+			}
+			a.urls = JoinUrls(list);
+		}
 	}
 	return changed;
+}
+
+std::vector<CString> CVideoLibrary::SplitUrls(const CString& text)
+{
+	std::vector<CString> out;
+	CString t = text;
+	t.Replace(L"\r", L"\n");
+	t.Replace(L'\t', L'\n');
+	t.Replace(L' ', L'\n');
+	t.Replace(L'|', L'\n');
+	t.Replace(L'\x3000', L'\n');
+	int start = 0;
+	for (;;)
+	{
+		CString u = t.Tokenize(L"\n", start);
+		if (start < 0)
+			break;
+		u.Trim();
+		u.Trim(L",;");
+		if (u.IsEmpty())
+			continue;
+		bool dup = false;
+		for (const CString& e : out)
+			if (e.CompareNoCase(u) == 0) { dup = true; break; }
+		if (!dup)
+			out.push_back(u);
+	}
+	return out;
+}
+
+CString CVideoLibrary::JoinUrls(const std::vector<CString>& urls)
+{
+	CString r;
+	for (const CString& u : urls)
+	{
+		if (!r.IsEmpty()) r += L"\n";
+		r += u;
+	}
+	return r;
 }
 
 bool CVideoLibrary::HasNoActorInfo(const ActorInfo& a)
@@ -2952,6 +3042,8 @@ CString CVideoLibrary::ActorInfoText(const ActorInfo& a)
 	AddLine(t, L"은퇴", a.retire);
 	if (a.rating > 0) { CString r; r.Format(L"%d", a.rating); AddLine(t, L"별점", r); }
 	if (a.favorite) AddLine(t, L"즐겨찾기", L"예");
+	for (const CString& u : SplitUrls(a.urls))
+		AddLine(t, L"URL", u);   // 링크는 한 줄에 하나씩
 	AddLine(t, L"메모", a.memo);   // 한 줄로
 	return t;
 }
@@ -3060,6 +3152,8 @@ int CVideoLibrary::ExportActorInfoTxt(int& unchanged, int& noFolder, int& failed
 		AddLine(t, L"은퇴", a.retire);
 		if (a.rating > 0) { CString r; r.Format(L"%d", a.rating); AddLine(t, L"별점", r); }
 		if (a.favorite) AddLine(t, L"즐겨찾기", L"예");
+		for (const CString& u : SplitUrls(a.urls))
+			AddLine(t, L"URL", u);   // 링크는 한 줄에 하나씩
 		AddLine(t, L"메모", a.memo);   // 한 줄로
 
 		const CString path = folder + L"\\" + ::PathFindFileNameW(folder) + L".txt";   // 배우 폴더 이름.txt

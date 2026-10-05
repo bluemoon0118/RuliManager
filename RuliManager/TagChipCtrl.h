@@ -59,5 +59,8 @@ protected:
 	afx_msg void OnEnable(BOOL bEnable);
 	afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
 	afx_msg void OnEditKillFocus();
+	afx_msg LRESULT OnSetFontMsg(WPARAM wp, LPARAM lp);   // SetFont: 칩 · 입력 칸 글꼴 (부모와 다른 글꼴도 가능)
+	afx_msg LRESULT OnGetFontMsg(WPARAM, LPARAM);
+	HFONT m_hFont = nullptr;
 	DECLARE_MESSAGE_MAP()
 };

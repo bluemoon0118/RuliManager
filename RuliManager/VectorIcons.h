@@ -14,6 +14,7 @@ namespace VectorIcon
 	void Gear(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);        // 톱니바퀴 (설정)
 	void Heart(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);       // 하트 (즐겨찾기)
 	void Drops(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);       // 물방울 (영상 카운트)
+	void ArrowRight(CDC* dc, double x0, double x1, double cy, double thick, COLORREF col);   // 오른쪽 화살표 → (x0~x1, 세로 중심 cy, 선 굵기)
 
 	// 실루엣: SVG 경로 데이터([점 수, x, y ...] 반복, -1 = 다음 <path>, 0 = 끝)를 viewBox 비율 그대로 area 안에 맞춤 (evenodd)
 	void Silhouette(CDC* dc, const CRect& area, COLORREF col, const float* data, float vbW, float vbH, double fill = 1.0);

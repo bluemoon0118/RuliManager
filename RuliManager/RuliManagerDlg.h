@@ -88,6 +88,9 @@ protected:
 	CListCtrl  m_listCat;         // 배우/스튜디오/태그 목록
 	CSuggestEdit m_editTags;        // 태그 값 보관용 (숨김) - 화면에는 m_tagChips 로 표시
 	CTagChipCtrl m_tagChips;        // 태그 칩 입력 ([태그 ×] ... × ⌄)
+	CFont        m_detailFont;      // 영상 상세 글자 컨트롤 글꼴 (기본 + 1pt)
+	int          m_detailTmH = 0;   // m_detailFont 글자 높이 (픽셀)
+	void         ApplyDetailFonts();
 	CTagChipCtrl m_studioChips;     // 스튜디오 칩 입력 (배우와 같은 모양, 하나만) - 값은 숨긴 m_editStudio 에 보관
 	bool         m_syncingStudio = false;
 	afx_msg void OnEnChangeStudio();

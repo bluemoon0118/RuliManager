@@ -397,6 +397,25 @@ namespace VectorIcon
 		}
 	}
 
+	void ArrowRight(CDC* dc, double x0, double x1, double cy, double thick, COLORREF col)
+	{
+		if (x1 <= x0 || thick <= 0)
+			return;
+		EnsureGdiPlus();
+		Gdiplus::Graphics g(dc->GetSafeHdc());
+		g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+		g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+		Gdiplus::Pen pen(Gdiplus::Color(255, GetRValue(col), GetGValue(col), GetBValue(col)), static_cast<Gdiplus::REAL>(thick));
+		pen.SetStartCap(Gdiplus::LineCapRound);
+		pen.SetEndCap(Gdiplus::LineCapRound);
+		pen.SetLineJoin(Gdiplus::LineJoinRound);
+		const double head = (std::min)((x1 - x0) * 0.45, thick * 3.2);   // 화살촉 크기
+		const auto P = [](double x, double y) { return Gdiplus::PointF(static_cast<Gdiplus::REAL>(x), static_cast<Gdiplus::REAL>(y)); };
+		g.DrawLine(&pen, P(x0, cy), P(x1, cy));
+		const Gdiplus::PointF tip[] = { P(x1 - head, cy - head), P(x1, cy), P(x1 - head, cy + head) };
+		g.DrawLines(&pen, tip, 3);
+	}
+
 	int FemaleCount()
 	{
 		return static_cast<int>(sizeof(kFemaleSet) / sizeof(kFemaleSet[0]));

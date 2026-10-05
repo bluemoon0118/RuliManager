@@ -43,6 +43,7 @@ struct ActorInfo
 	CString cup;       // 컵 ("A" ~ "Q", 비어 있으면 미지정)
 	CString photo;     // 사진 파일 경로
 	CString memo;      // 메모
+	CString urls;      // 링크 URL (여러 개, 줄바꿈 \n 으로 구분)
 };
 
 // 스튜디오 / 태그 한 개의 정보 (동영상에는 이름으로 저장됨)
@@ -116,6 +117,8 @@ public:
 	void RenameActorInVideos(const CString& oldName, const CString& newName);
 	int  RemoveActorFromVideos(const CString& name);            // 반환: 영향 받은 동영상 수
 	int  CountVideosWithActor(const CString& name) const;
+	CString FindCodeOnDate(const CString& actorName, const CString& date) const;
+	int     FindVideoOnDate(const CString& actorName, const CString& date) const;   // 위 영상의 인덱스 (없으면 -1)   // 그 배우가 나온 영상 중 발매일이 date 인 영상의 품번 (데뷔작 표시, 없으면 빈 문자열)
 
 	// 스튜디오 / 태그 (kind = LIST_STUDIO / LIST_TAG)
 	std::vector<NamedInfo>&       NamedList(int kind)       { return kind == LIST_STUDIO ? studios : tagInfos; }
@@ -173,7 +176,9 @@ public:
 	static bool    ApplyActorTextInfo(ActorInfo& a, const CString& file);                // 텍스트(항목: 값)에서 비어 있는 배우 정보 채우기
 	static bool    ApplyActorText(ActorInfo& a, CString text);                      // 위와 같은 규칙, 파일 대신 글자 (직접 입력 창)
 	static CString ActorInfoText(const ActorInfo& a);                                    // 배우 정보 → "항목: 값" 글자 ([정보 txt 생성]과 같은 형식)
-	static void    ClearActorTextFields(ActorInfo& a);                                   // 텍스트로 읽는 항목만 비움 (직접 입력 창 = 입력한 내용으로 교체)
+	static void    ClearActorTextFields(ActorInfo& a);
+	static std::vector<CString> SplitUrls(const CString& text);   // URL 목록 (줄바꿈 · 공백 · | 구분, 중복 제거)
+	static CString JoinUrls(const std::vector<CString>& urls);   // 줄바꿈(\n)으로 이어 붙임                                   // 텍스트로 읽는 항목만 비움 (직접 입력 창 = 입력한 내용으로 교체)
 	static bool    HasNoActorInfo(const ActorInfo& a);
 	// 정보 txt 내보내기 (같은 폴더, 덮어쓰기 · 내용이 같으면 건너뜀). 반환: 새로 쓴 파일 수
 	static CString ExtractCode(const CString& name);

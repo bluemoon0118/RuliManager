@@ -50,6 +50,7 @@ protected:
 	CStatic        m_staticCount;
 	CStatic        m_staticPhotoPath;
 	CEdit          m_editMemo;
+	CEdit          m_editUrls;         // 링크 URL (한 줄에 하나)
 
 	std::vector<int> m_rows;           // 목록 행 → m_lib.actors 인덱스
 	int     m_cur = -1;                // 편집 중인 배우

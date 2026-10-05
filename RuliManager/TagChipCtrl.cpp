@@ -48,7 +48,31 @@ BEGIN_MESSAGE_MAP(CTagChipCtrl, CWnd)
 	ON_WM_ENABLE()
 	ON_WM_CTLCOLOR()
 	ON_EN_KILLFOCUS(kEditId, &CTagChipCtrl::OnEditKillFocus)
+	ON_MESSAGE(WM_SETFONT, &CTagChipCtrl::OnSetFontMsg)
+	ON_MESSAGE(WM_GETFONT, &CTagChipCtrl::OnGetFontMsg)
 END_MESSAGE_MAP()
+
+LRESULT CTagChipCtrl::OnSetFontMsg(WPARAM wp, LPARAM lp)
+{
+	m_hFont = reinterpret_cast<HFONT>(wp);
+	if (m_edit.GetSafeHwnd())
+	{
+		m_edit.SendMessage(WM_SETFONT, wp, lp);
+		CRect rc;
+		GetClientRect(&rc);
+		DoLayout(rc.Width(), true);   // 글꼴이 바뀌면 칩 크기 · 입력 칸 위치 다시 계산
+		if (m_onHeightChanged && m_lastHeight != 0)
+			m_onHeightChanged();
+	}
+	if (lp)
+		Invalidate(FALSE);
+	return 0;
+}
+
+LRESULT CTagChipCtrl::OnGetFontMsg(WPARAM, LPARAM)
+{
+	return reinterpret_cast<LRESULT>(m_hFont);
+}
 
 CString CTagChipCtrl::DisplayOf(const CString& tag) const
 {
