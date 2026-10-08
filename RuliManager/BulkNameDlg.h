@@ -34,7 +34,7 @@ protected:
 	CStatic        m_staticSummary;
 	std::vector<Entry> m_entries;
 
-	CString KindName() const { return m_kind == LIST_STUDIO ? L"스튜디오" : L"태그"; }
+	CString KindName() const { return m_kind == LIST_STUDIO ? L"제작사" : L"태그"; }
 	void Parse();
 	void UpdatePreview();
 

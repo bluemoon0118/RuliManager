@@ -15,6 +15,8 @@ struct VideoItem
 	CString   actors;        // 쉼표로 구분된 배우
 	CString   actorAliases;  // 이 작품에서 배우가 쓴 별칭 (쉼표 구분)
 	CString   studio;        // 스튜디오 (1개)
+	CString   label;         // 레이블 (스튜디오 하위, 1개 - 스튜디오의 레이블 목록에 자동 등록)
+	CString   series;        // 시리즈 (레이블 하위, 1개 - 레이블의 시리즈 목록에 자동 등록)
 	CString   release;       // 발매일 "YYYY-MM-DD" (없으면 빈 문자열)
 	CString   tags;          // 쉼표로 구분된 태그
 	CString   memo;          // 메모 (여러 줄)
@@ -53,10 +55,21 @@ struct NamedInfo
 	CString memo;    // 메모
 	CString image;   // 이미지(로고 등) 파일 경로
 	CString subName; // 서브이름 (스튜디오만, 여러 개 줄바꿈 \n 구분 - 쉼표는 이름의 일부, 보조 표기 예: S1 NO.1 STYLE → 에스원 / S1) - 이 이름으로 적혀 있어도 같은 스튜디오
+	CString parent;  // 레이블만: 상위 제작사 이름 (labelInfos 항목)
+	CString series;  // 제작사 · 레이블: 시리즈 (여러 개, 한 줄에 하나 "이름␟품번␟라벨␟설명" - ParseSeries / JoinSeries, 시리즈 하나는 제작사나 레이블 하나에만)
 	bool    favorite = false;   // 즐겨찾기 (태그 카드 오른쪽 위 하트)
 };
 
 enum NamedListKind { LIST_STUDIO = 0, LIST_TAG = 1 };
+
+// 시리즈 한 개 (제작사 · 레이블의 series 에 한 줄씩: 이름 ␟ 품번 접두어 ␟ 라벨 ␟ 설명)
+struct SeriesInfo
+{
+	CString name;    // 시리즈 = 품번 접두어 (예: SONE, 쉼표로 여러 개도 가능) - 영상 품번이 이 접두어면 이 시리즈로 자동 지정
+	CString code;    // (예전 형식의 품번 칸 - 읽을 때 name 으로 옮김, 쓰지 않음)
+	CString label;   // 라벨 (별도 표기)
+	CString desc;    // 설명
+};
 
 // 동영상 라이브러리 (목록 + 등록 폴더 + 배우 + 스튜디오 + 태그 + 저장/불러오기)
 // 데이터 파일: %APPDATA%\VideoManager\library.tsv (UTF-8, 탭 구분)
@@ -68,6 +81,7 @@ public:
 	std::vector<ActorInfo> actors;
 	std::vector<NamedInfo> studios;
 	std::vector<NamedInfo> tagInfos;
+	std::vector<NamedInfo> labelInfos;   // 레이블 (제작사 하위, parent = 상위 제작사 이름) - 이름 · 서브이름 · 이미지 · 메모
 
 	bool Load();
 	bool Save() const;               // DB 파일은 AES 로 암호화해서 저장 (DbCrypt.h)
@@ -97,6 +111,9 @@ public:
 	int  FindActorByAnyName(const CString& name) const;
 	int  FindActorByNamePart(const CString& name, int exclude = -1) const;
 	int  MergeEmptyDuplicateActors();
+	int  FindLabelLoose(const CString& label) const;       // 레이블 이름 · 서브이름으로 찾기 (공백 · 대소문자 · 기호 무시, labelInfos 인덱스)
+	int  FindStudioByLabel(const CString& label, CString* labelName = nullptr) const;   // 레이블 이름으로 그 레이블을 가진 스튜디오 찾기 (공백 · 대소문자 · 기호 무시, 없으면 -1) / labelName: 등록된 표기
+	void ResolveVideoLabel(VideoItem& v) const;            // 스튜디오 칸에 레이블 이름이 적혔으면 → 상위 스튜디오 + 레이블, 레이블만 있으면 상위 스튜디오 채움
 	int  FindStudioLoose(const CString& name) const;   // 스튜디오 이름 · 서브이름으로 찾기 (그대로 → 공백 · 대소문자 · 기호 무시 순, 없으면 -1)
 	static bool SameNameByLang(const CString& a, const CString& b);
 	// 성별 목록 (저장 값, 순서 = 배우 관리 창 콤보 순서, 0번 = 미지정 "")
@@ -126,6 +143,25 @@ public:
 	std::vector<NamedInfo>&       NamedList(int kind)       { return kind == LIST_STUDIO ? studios : tagInfos; }
 	const std::vector<NamedInfo>& NamedList(int kind) const { return kind == LIST_STUDIO ? studios : tagInfos; }
 	int  FindNamed(int kind, const CString& name) const;
+	// 레이블 (제작사 하위)
+	int  FindLabel(const CString& name) const;                   // 레이블 이름 · 서브이름으로 찾기 (대소문자 무시, 없으면 -1)
+	std::vector<int> LabelsOf(const CString& studioName) const;   // 이 제작사의 레이블 (labelInfos 인덱스, 이름 순)
+	std::vector<CString> LabelNamesOf(const CString& studioName) const;
+	int  CountLabelVideos(const CString& labelName) const;       // 이 레이블이 지정된 영상 수
+	// 시리즈 (레이블 하위, 레이블의 series 목록)
+	int  FindLabelOfSeries(const CString& series, CString* seriesName = nullptr) const;   // 이 시리즈를 가진 레이블 (labelInfos 인덱스, 없으면 -1) / seriesName: 등록 표기
+	static std::vector<SeriesInfo> ParseSeries(const CString& text);   // series 칸 → 시리즈 목록 (이름 없는 줄 · 같은 이름 중복은 뺌)
+	static CString JoinSeries(const std::vector<SeriesInfo>& list);
+	static std::vector<CString> SeriesNames(const CString& text);     // series 칸의 시리즈 이름만
+	CString SeriesForCode(const CString& code) const;                  // 영상 품번의 접두어가 등록된 시리즈 (없으면 빈 문자열)
+	bool    SeriesInfoForCode(const CString& code, SeriesInfo& out) const;   // 위와 같은 규칙으로 찾은 시리즈 정보 (라벨 · 설명 포함)
+	int  FindStudioOfSeries(const CString& series, CString* seriesName = nullptr) const;  // 이 시리즈를 가진 제작사 (studios 인덱스, 없으면 -1)
+	std::vector<CString> AllSeries() const;                      // 모든 레이블의 시리즈 + 영상에만 있는 시리즈 (이름 순, 중복 제거)
+	void RenameLabelInVideos(const CString& oldName, const CString& newName);
+	int  RemoveLabel(int labelIdx);                              // 레이블 삭제 (영상의 레이블도 비움) → 영향받은 영상 수
+	void SetLabelParent(int labelIdx, const CString& parent);    // 상위 제작사 변경 (그 레이블 영상의 제작사도 바뀜)
+	int  StudioToLabel(int studioIdx, const CString& parent);    // 제작사 → 레이블 (영상: 제작사 = 상위, 레이블 = 이 이름) → 새 레이블 인덱스
+	int  LabelToStudio(int labelIdx);                            // 레이블 → 제작사 (영상: 제작사 = 이 이름, 레이블 비움) → 새 제작사 인덱스
 	bool SyncNamedFromVideos();                                  // 동영상에만 있는 이름을 목록에 추가
 	void RenameNamedInVideos(int kind, const CString& oldName, const CString& newName);
 	int  RemoveNamedFromVideos(int kind, const CString& name);
@@ -198,6 +234,8 @@ public:
 	bool ApplyVideoText(VideoItem& v, CString text) const;                 // 위와 같은 규칙, 파일 대신 글자 (직접 입력 창)
 	static CString VideoInfoText(const VideoItem& v);                           // 영상 정보 → "항목: 값" 글자 ([정보 txt 생성]과 같은 형식)
 	static void    ClearVideoTextFields(VideoItem& v);                          // 텍스트로 읽는 항목만 비움
+	// 웹페이지에서 복사한 글(AVDBS · FANZA 등 "출시: … / 출연: #이름 / 제작사: … / 레이블: … / 장르 상세 …") → "항목: 값" 글자
+	static CString ParsePastedVideoText(const CString& raw);
 	int ExportVideoInfoTxt(int& unchanged, int& failed) const;                  // 영상 폴더\영상이름.txt (저장된 영상)
 	int ExportActorInfoTxt(int& unchanged, int& noFolder, int& failed) const;   // 배우 폴더\배우폴더이름.txt                                    // 생년월일·키·국적·치수 등이 모두 비어 있음
 	static CString StoreImageCopy(const CString& src, LPCWSTR sub, bool force = false);   // force: 보관소 안의 파일도 새 암호화 사본으로

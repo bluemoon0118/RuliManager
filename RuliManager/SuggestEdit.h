@@ -47,6 +47,7 @@ public:
 	std::function<void(const SuggestItem&)> m_onAccept;   // 후보를 고른 뒤 호출 (선택 사항)
 
 	void HidePopup();
+	void ShowAll() { SetFocus(); UpdatePopup(true); }   // 입력 칸에 포커스 + 전체 후보 목록 열기 (⌄ 버튼용)
 	bool IsPopupVisible() const;
 	void Accept(int index);
 	BOOL PreTranslateMessage(MSG* pMsg) override;
