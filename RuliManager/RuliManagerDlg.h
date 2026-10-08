@@ -58,15 +58,39 @@ protected:
 	void ToggleActorFavorite(int actorIdx);
 	afx_msg void OnCatDelete();
 	afx_msg void OnActorDelete();
-	afx_msg void OnVideoTextInfo();   // 영상 카드 오른쪽 클릭 → 텍스트로 정보 입력 (정보 txt 와 같은 규칙)
+	afx_msg void OnVideoTextInfo();
+	afx_msg void OnVideoPasteInfo();   // 영상 카드 오른쪽 클릭 → 웹페이지 내용 붙여넣기 (txt 와 연동 없음)
+	void ApplyTextToVideo(int idx, const CString& text);   // "항목: 값" 글자로 영상 정보 교체 (텍스트로 정보 입력 / 사이트에서 가져오기)   // 영상 카드 오른쪽 클릭 → 텍스트로 정보 입력 (정보 txt 와 같은 규칙)
 	afx_msg void OnActorTextInfo();   // 배우 카드 오른쪽 클릭 → 텍스트로 정보 입력   // 배우 탭 우클릭 → 배우 삭제 (Del)   // 태그 탭 우클릭 → 삭제
 	void ToggleTagFavorite(const CString& tag);   // 태그 즐겨찾기 (태그 목록에 없으면 추가)
 	bool IsTagFavorite(const CString& tag) const;
 	CDropCounter m_dropCounter;      // 영상 상세 정보: 별점 오른쪽 물방울 카운트
 	CMediaInfoLabel m_mediaInfo;     // 영상 상세 정보: [이미지 변경] 위 "fps: 29.97 | 1080p"
 	CActorStrip m_actorStrip;        // 영상 상세 정보 메모 아래: 출연 배우 카드 (가로 한 줄)
+	CActorStrip m_labelStrip;        // 제작사 탭 상세: 선택한 제작사의 하위 레이블 카드 (여러 줄)
+	std::vector<int> m_stripLabels;  // 카드: 0 이상 = labelInfos 인덱스 (하위 레이블), 음수 = -(studios 인덱스 + 1) (레이블의 상위 제작사)
+	CStatic m_staticCodeSeries;      // 영상 상세: 품번 오른쪽 - 품번 접두어가 제작사 · 레이블의 시리즈와 같으면 그 라벨명
+	CString m_codeSeriesLabel, m_codeSeriesDesc;   // 품번 오른쪽에 그릴 라벨 (보통) / 설명 (회색)
+	void UpdateCodeSeriesText();
+	// 영상 상세: 레이블이 있으면 [레이블] 줄만, 없으면 [제작사] 줄만 표시
+	bool LabelRowShown() const { return m_labelChips.GetSafeHwnd() && !m_labelChips.Tags().empty(); }
+	bool m_labelRowShown = false;
+	void RelayoutIfLabelRowChanged(bool focusRow = false);   // focusRow: 바뀐 줄 입력 칸으로 포커스
+	CEdit   m_editNamedMemo;         // 제작사 탭 상세: 선택한 제작사 / 레이블 메모 (바로 편집, 포커스를 잃거나 다른 항목을 고르면 저장)
+	int     m_memoKind = 0;          // 메모 대상: 0 = 없음, 1 = 제작사, 2 = 레이블
+	CString m_memoName;
+	bool    m_memoDirty = false;
+	bool    m_memoLoading = false;
+	void SetNamedMemoTarget(int kind, const CString& name);   // 메모 칸 대상 바꾸기 (이전 메모는 저장)
+	void CommitNamedMemo();
+	afx_msg void OnNamedMemoChanged();
+	afx_msg void OnNamedMemoKillFocus();
+	void UpdateLabelStrip(const CString& studioName, const CString& labelName = CString());   // 제작사 상세: 하위 레이블 카드 / 레이블 상세: 상위 제작사 카드 (둘 다 비면 숨김)
+	void DrawLabelStripCard(CDC* dc, int i, const CRect& rc, bool hot);  // 레이블 카드 하나
 	std::vector<int> m_stripActors;  // 배우 카드 띠의 배우 인덱스
 	int  m_stripCardW = 0, m_stripCardH = 0;
+	bool m_namedActors = false;      // 제작사 탭 상세: 배우 카드 띠를 (하위 레이블 없는) 제작사 / 레이블의 출연 배우로 사용 중
+	void UpdateNamedActorStrip(int kind, const CString& name);   // 제작사 탭 상세 하단 배우 카드 (kind: 0 = 숨김, 1 = 제작사, 2 = 레이블)
 	void RefreshActorStrip();                                        // 숨긴 배우 칸 값으로 카드 띠 갱신
 	void DrawStripCard(CDC* dc, int i, const CRect& rc, bool hot);   // 카드 띠의 배우 카드 하나
 	void OpenActorFromStrip(int i);                                  // 더블클릭: 배우 탭에서 그 배우 선택
@@ -93,6 +117,8 @@ protected:
 	void         ApplyDetailFonts();
 	CTagChipCtrl m_studioChips;     // 스튜디오 칩 입력 (배우와 같은 모양, 하나만) - 값은 숨긴 m_editStudio 에 보관
 	bool         m_syncingStudio = false;
+	CTagChipCtrl m_labelChips;      // 레이블 칩 입력 (스튜디오 하위, 하나만) - 후보는 지금 스튜디오의 레이블 먼저
+	CTagChipCtrl m_seriesChips;     // 시리즈 칩 입력 (레이블 하위, 하나만) - 후보는 지금 레이블의 시리즈 먼저
 	afx_msg void OnEnChangeStudio();
 	CTagChipCtrl m_actorChips;      // 배우 칩 입력 ([배우 (이 작품의 별칭) ×] ... × ⌄) - 값은 숨긴 m_editActors 에 보관
 	bool         m_syncingActors = false;
@@ -178,6 +204,7 @@ protected:
 	// 스튜디오 / 태그 카드 (로고 · 카메라 아이콘 / 꼬리표 아이콘, 이름, ▶ 영상 수 · 배우 수(스튜디오만))
 	int   m_scardW = 255, m_scardH = 230;
 	std::map<CString, int> m_studioActorCounts;   // 스튜디오(소문자) → 출연 배우 수
+	std::map<CString, int> m_labelActorCounts;    // 레이블(소문자) → 출연 배우 수
 	void DrawStudioCard(CDC* dc, int row, const CRect& card, bool selected, bool focused);
 	std::vector<int> m_actorRows;          // 배우 격자 행 → m_lib.actors 인덱스
 	std::map<CString, int> m_actorCounts;  // 배우 이름(소문자) → 출연작 수
@@ -204,7 +231,7 @@ protected:
 
 	// 보기 모드 (상단 라디오 버튼)
 	enum ViewMode { MODE_VIDEO = 0, MODE_ACTOR, MODE_STUDIO, MODE_TAG };
-	enum CatKind  { CAT_ALL = 0, CAT_NONE, CAT_VALUE };
+	enum CatKind  { CAT_ALL = 0, CAT_NONE, CAT_VALUE, CAT_LABEL };   // CAT_LABEL: 제작사 탭의 레이블 항목 (value = 레이블 이름)
 	struct CatRow { int kind; CString value; };
 	int     m_mode = MODE_VIDEO;
 	int     m_catKind = CAT_ALL;      // 선택된 분류
@@ -297,7 +324,7 @@ protected:
 	// 스튜디오 로고 (영상 카드 오른쪽 위에 반투명으로), 이미지 경로(소문자) → GDI+ 이미지
 	std::map<CString, std::unique_ptr<Gdiplus::Bitmap>> m_studioLogos;
 	Gdiplus::Bitmap* GetStudioLogo(const CString& path);
-	void DrawStudioMark(CDC* dc, const CRect& img, const CString& studio);
+	void DrawStudioMark(CDC* dc, const CRect& img, const CString& studio, const CString& label = CString());   // 레이블이 있으면 레이블 이미지
 	void DrawVideoCard(CDC* dc, int row, const CRect& card, bool selected, bool focused);
 
 	// 메시지 처리기

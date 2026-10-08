@@ -64,6 +64,7 @@
 #define ID_ACTOR_DELETE             32814
 #define ID_VIDEO_TEXTINFO           32815
 #define ID_ACTOR_TEXTINFO           32816
+#define ID_VIDEO_PASTEINFO          32817
 #define ID_MANAGE_ACTORS            32810
 #define ID_MANAGE_STUDIOS           32811
 #define ID_MANAGE_TAGS              32812
@@ -175,6 +176,27 @@
 #define IDC_ACT_URLS                1213
 #define IDC_NL_SUB_LBL              1214
 #define IDC_NL_SUB                  1215
+#define IDC_NL_KIND_LBL             1216
+#define IDC_NL_KIND_STUDIO          1217
+#define IDC_STATIC_LABEL_LBL        1218
+#define IDC_LABEL_CHIPS             1219
+#define IDC_NL_KIND_LABEL           1220
+#define IDC_NL_PARENT_LBL           1221
+#define IDC_NL_PARENT               1222
+#define IDC_STATIC_SERIES_LBL       1223
+#define IDC_SERIES_CHIPS            1224
+#define IDC_NL_CHIPS_LBL            1225
+#define IDC_NL_CHIPS_AREA           1226
+#define IDC_NL_LABEL_CHIPS          1227
+#define IDC_NL_SERIES_CHIPS         1228
+#define IDC_NL_PARENT_CHIPS         1229
+#define IDC_NL_CHIPS_LBL2           1230
+#define IDC_NL_CHIPS_AREA2          1231
+#define IDC_LABEL_STRIP             1232
+#define IDC_NL_SERIES_GRID          1234
+#define IDC_NL_CELL_EDIT            1235
+#define IDC_STATIC_CODE_SERIES      1236
+#define IDC_NAMED_MEMO              1233
 #define IDC_ACT_GENDER              1159
 
 // 배우 선택 창
@@ -188,8 +210,8 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE    140
-#define _APS_NEXT_COMMAND_VALUE     32817
-#define _APS_NEXT_CONTROL_VALUE     1216
+#define _APS_NEXT_COMMAND_VALUE     32818
+#define _APS_NEXT_CONTROL_VALUE     1237
 #define _APS_NEXT_SYMED_VALUE       101
 #endif
 #endif

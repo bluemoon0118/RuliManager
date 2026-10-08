@@ -70,8 +70,18 @@ void CActorStrip::SetCount(int count)
 		Invalidate(FALSE);
 }
 
+int CActorStrip::CalcWrapHeight(int width) const
+{
+	if (m_count <= 0)
+		return 0;
+	const int rows = (m_count + PerRow(width) - 1) / PerRow(width);
+	return rows * m_cardH + (rows - 1) * m_gap;
+}
+
 int CActorStrip::ContentWidth() const
 {
+	if (m_wrap)
+		return 0;   // 여러 줄 모드: 가로 스크롤 없음
 	return m_count > 0 ? m_count * m_cardW + (m_count - 1) * m_gap : 0;
 }
 
@@ -97,6 +107,15 @@ void CActorStrip::SetScroll(int pos)
 
 CRect CActorStrip::CardRect(int i) const
 {
+	if (m_wrap)
+	{
+		CRect rc;
+		if (GetSafeHwnd()) GetClientRect(&rc);
+		const int per = PerRow(rc.Width());
+		const int x = (i % per) * (m_cardW + m_gap);
+		const int y = (i / per) * (m_cardH + m_gap);
+		return CRect(x, y, x + m_cardW, y + m_cardH);
+	}
 	const int x = i * (m_cardW + m_gap) - m_scroll;
 	return CRect(x, 0, x + m_cardW, m_cardH);
 }
@@ -118,7 +137,7 @@ bool CActorStrip::ThumbRect(CRect& thumb) const
 
 int CActorStrip::HitTest(CPoint pt) const
 {
-	if (pt.y < 0 || pt.y >= m_cardH)
+	if (!m_wrap && (pt.y < 0 || pt.y >= m_cardH))
 		return -1;
 	for (int i = 0; i < m_count; ++i)
 	{

@@ -22,9 +22,14 @@ public:
 	void SetEmptyText(const CString& text) { m_empty = text; Invalidate(FALSE); }
 	int  BarHeight() const { return m_barH; }
 	int  CalcHeight() const { return m_cardH + m_barH + 2; }   // 카드 + 스크롤바 자리
+	// 여러 줄 모드: 카드가 폭을 넘으면 다음 줄로 (가로 스크롤 없음) - 제작사 상세의 하위 레이블 카드
+	void SetWrap(bool wrap) { m_wrap = wrap; m_scroll = 0; if (GetSafeHwnd()) Invalidate(FALSE); }
+	int  CalcWrapHeight(int width) const;   // 이 폭에서 모든 카드가 들어가는 높이
 
 protected:
 	int m_count = 0;
+	bool m_wrap = false;
+	int  PerRow(int width) const { return (std::max)(1, (width + m_gap) / (std::max)(1, m_cardW + m_gap)); }
 	int m_cardW = 80, m_cardH = 120, m_gap = 6;
 	int m_barH = 7;
 	int m_scroll = 0;     // 가로 스크롤 (픽셀)
