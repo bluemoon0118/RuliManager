@@ -1065,6 +1065,8 @@ bool CVideoLibrary::Load()
 					legacyLabels.push_back({ n.name, l });
 			if (fields.size() >= 8 && kind == LIST_STUDIO)   // 시리즈 (제작사, 줄바꿈 구분)
 				n.series = JoinSeries(ParseSeries(Unescape(fields[7])));
+			if (fields.size() >= 9 && kind == LIST_STUDIO)   // 링크 URL (줄바꿈 구분)
+				n.urls = JoinUrls(SplitUrls(Unescape(fields[8])));
 			if (!n.name.IsEmpty() && FindNamed(kind, n.name) < 0)
 				NamedList(kind).push_back(n);
 		}
@@ -1079,6 +1081,7 @@ bool CVideoLibrary::Load()
 			if (fields.size() >= 6) n.subName = Unescape(fields[5]);
 			if (fields.size() >= 7) n.parent = Unescape(fields[6]);
 			if (fields.size() >= 8) n.series = JoinSeries(ParseSeries(Unescape(fields[7])));   // 시리즈 (한 줄에 하나)
+			if (fields.size() >= 9) n.urls = JoinUrls(SplitUrls(Unescape(fields[8])));        // 링크 URL
 			if (!n.name.IsEmpty() && FindLabel(n.name) < 0)
 				labelInfos.push_back(n);
 		}
@@ -1225,14 +1228,15 @@ bool CVideoLibrary::Save() const
 			text += (kind == LIST_STUDIO ? L"S\t" : L"T\t");
 			text += Escape(n.name) + L"\t" + (kind == LIST_STUDIO ? Escape(n.memo) : CString()) + L"\t" + (kind == LIST_STUDIO ? Escape(ToStoredPath(n.image)) : CString()) +
 				L"\t" + (n.favorite ? L"1" : L"") + L"\t" + (kind == LIST_STUDIO ? Escape(n.subName) : CString()) +
-				L"\t\t" + (kind == LIST_STUDIO ? Escape(n.series) : CString()) + L"\n";   // 6번째 칸: 서브이름, 7번째 칸: (예전 레이블 목록 - 비움), 8번째 칸: 시리즈
+				L"\t\t" + (kind == LIST_STUDIO ? Escape(n.series) : CString()) +
+				L"\t" + (kind == LIST_STUDIO ? Escape(n.urls) : CString()) + L"\n";   // 6번째 칸: 서브이름, 7번째 칸: (예전 레이블 목록 - 비움), 8번째 칸: 시리즈, 9번째 칸: 링크
 		}
 	}
 	for (const NamedInfo& n : labelInfos)   // 레이블: L 이름 메모 이미지 즐겨찾기 서브이름 상위제작사
 	{
 		text += L"L\t" + Escape(n.name) + L"\t" + Escape(n.memo) + L"\t" + Escape(ToStoredPath(n.image)) +
 			L"\t" + (n.favorite ? L"1" : L"") + L"\t" + Escape(n.subName) + L"\t" + Escape(n.parent) +
-			L"\t" + Escape(n.series) + L"\n";   // 8번째 칸: 시리즈
+			L"\t" + Escape(n.series) + L"\t" + Escape(n.urls) + L"\n";   // 8번째 칸: 시리즈, 9번째 칸: 링크
 	}
 	CString pendingText = L"#VideoManager pending v1 (스캔으로 찾은 새 파일 - 정보를 저장하면 library.tsv 로 옮겨짐)\n";
 	for (const VideoItem& v : items)

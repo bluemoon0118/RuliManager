@@ -51,7 +51,7 @@ void CNameListDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_NL_IMAGE_PATH, m_staticImagePath);
 	DDX_Control(pDX, IDC_NL_MEMO, m_editMemo);
 	DDX_Control(pDX, IDC_NL_SUB, m_editSub);
-	DDX_Control(pDX, IDC_NL_SERIES_GRID, m_seriesGrid);
+	DDX_Control(pDX, IDC_NL_URLS, m_editUrls);
 }
 
 BEGIN_MESSAGE_MAP(CNameListDlg, CDialogEx)
@@ -60,10 +60,7 @@ BEGIN_MESSAGE_MAP(CNameListDlg, CDialogEx)
 	ON_EN_CHANGE(IDC_NL_NAME, &CNameListDlg::OnFieldChanged)
 	ON_EN_CHANGE(IDC_NL_MEMO, &CNameListDlg::OnFieldChanged)
 	ON_EN_CHANGE(IDC_NL_SUB, &CNameListDlg::OnFieldChanged)
-	ON_NOTIFY(NM_DBLCLK, IDC_NL_SERIES_GRID, &CNameListDlg::OnSeriesDblClk)
-	ON_NOTIFY(LVN_KEYDOWN, IDC_NL_SERIES_GRID, &CNameListDlg::OnSeriesKeyDown)
-	ON_NOTIFY(NM_RCLICK, IDC_NL_SERIES_GRID, &CNameListDlg::OnSeriesRClick)
-	ON_EN_KILLFOCUS(IDC_NL_CELL_EDIT, &CNameListDlg::OnCellEditKillFocus)
+	ON_EN_CHANGE(IDC_NL_URLS, &CNameListDlg::OnFieldChanged)
 	ON_BN_CLICKED(IDC_NL_KIND_STUDIO, &CNameListDlg::OnKindStudio)
 	ON_BN_CLICKED(IDC_NL_KIND_LABEL, &CNameListDlg::OnKindLabel)
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_NL_LIST, &CNameListDlg::OnLvnItemChanged)
@@ -99,23 +96,6 @@ BOOL CNameListDlg::OnInitDialog()
 		ScreenToClient(&area);
 		GetDlgItem(IDC_NL_CHIPS_AREA)->ShowWindow(SW_HIDE);
 		m_chipsRect1 = area;
-		// 시리즈 표: 제작사는 [레이블] 칩 아래 (리소스 위치), 레이블은 첫 줄 자리
-		m_seriesGrid.GetWindowRect(&m_gridRect2);
-		ScreenToClient(&m_gridRect2);
-		m_gridRect1 = CRect(m_gridRect2.left, area.top, m_gridRect2.right, area.top + m_gridRect2.Height());   // 레이블: 첫 줄부터 (왼쪽 글자 자리까지 전체 폭)
-		{
-			CRect r(0, 0, 100, 0);
-			MapDialogRect(&r);
-			const int w = m_gridRect2.Width() - ::GetSystemMetrics(SM_CXVSCROLL) - 4;
-			m_seriesGrid.ModifyStyle(0, WS_CLIPSIBLINGS);   // 셀 편집 칸이 표 위에 보이게
-			m_seriesGrid.SetExtendedStyle(LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP);
-			// 시리즈 = 품번 접두어 (첫 열이 시리즈의 이름 겸 자동 지정 기준)
-			m_seriesGrid.InsertColumn(0, L"품번", LVCFMT_LEFT, w * 28 / 100);
-			m_seriesGrid.InsertColumn(1, L"라벨", LVCFMT_LEFT, w * 30 / 100);
-			m_seriesGrid.InsertColumn(2, L"설명", LVCFMT_LEFT, w - w * 58 / 100);
-		}
-		m_cellEdit.Create(WS_CHILD | WS_BORDER | ES_AUTOHSCROLL, CRect(0, 0, 10, 10), this, IDC_NL_CELL_EDIT);
-		m_cellEdit.SetFont(GetFont());
 		CTagChipCtrl* chips[] = { &m_labelChips };
 		const UINT ids[] = { IDC_NL_LABEL_CHIPS };
 		for (int i = 0; i < 1; ++i)
@@ -241,7 +221,7 @@ BOOL CNameListDlg::OnInitDialog()
 			GetDlgItem(IDC_NL_COUNT_LBL)->MoveWindow(&cntLbl);
 			GetDlgItem(IDC_NL_COUNT)->MoveWindow(&cnt);
 			const UINT hideIds[] = { IDC_NL_SUB_LBL, IDC_NL_SUB, IDC_NL_KIND_LBL, IDC_NL_KIND_STUDIO, IDC_NL_KIND_LABEL, IDC_NL_PARENT_LBL, IDC_NL_PARENT, IDC_NL_PARENT_CHIPS,
-				IDC_NL_CHIPS_LBL, IDC_NL_LABEL_CHIPS, IDC_NL_SERIES_GRID };
+				IDC_NL_CHIPS_LBL, IDC_NL_LABEL_CHIPS };
 			for (UINT id : hideIds)
 				GetDlgItem(id)->ShowWindow(SW_HIDE);
 		}
@@ -256,9 +236,11 @@ BOOL CNameListDlg::OnInitDialog()
 			rc.OffsetRect(0, -dy);
 			w->MoveWindow(&rc);
 		}
-		// 태그는 메모도 없음
+		// 태그는 메모 · 링크도 없음
 		GetDlgItem(IDC_NL_MEMO_LBL)->ShowWindow(SW_HIDE);
 		m_editMemo.ShowWindow(SW_HIDE);
+		GetDlgItem(IDC_NL_URLS_LBL)->ShowWindow(SW_HIDE);
+		m_editUrls.ShowWindow(SW_HIDE);
 	}
 
 	m_counts = m_lib.CountNamed(m_kind);
@@ -462,17 +444,12 @@ void CNameListDlg::UpdateKindControls()
 		m_labelChips.MoveWindow(&chips);
 	}
 	m_labelChips.ShowWindow(isLabel ? SW_HIDE : SW_SHOW);
-	EndCellEdit(true);
-	m_seriesGrid.MoveWindow(&m_gridRect2);   // 시리즈 표: 메모 아래 (제작사 · 레이블 같은 자리)
-	m_seriesGrid.ShowWindow(SW_SHOW);
 	m_labelChips.EnableWindow(enable);
-	m_seriesGrid.EnableWindow(enable);
 	m_labelChips.m_edit.HidePopup();
 }
 
 void CNameListDlg::ShowItem(int code)
 {
-	EndCellEdit(false);   // 이전 항목의 셀 편집은 버림 (저장은 Commit 이 먼저 함)
 	m_loading = true;
 	m_cur = ValidCode(code) ? code : -1;
 	const BOOL enable = (m_cur >= 0);
@@ -491,6 +468,11 @@ void CNameListDlg::ShowItem(int code)
 		memo.Replace(L"\r\n", L"\n");
 		memo.Replace(L"\n", L"\r\n");
 		m_editMemo.SetWindowText(memo);
+		{
+			CString urls = CVideoLibrary::JoinUrls(CVideoLibrary::SplitUrls(n.urls));
+			urls.Replace(L"\n", L"\r\n");   // 한 줄에 하나
+			m_editUrls.SetWindowText(urls);
+		}
 		CString c;
 		c.Format(L"%d편", CountOfCode(m_cur));
 		m_staticCount.SetWindowText(c);
@@ -502,8 +484,6 @@ void CNameListDlg::ShowItem(int code)
 			m_radioLabel.SetChecked(label);
 			FillParentCombo(label ? CString() : n.name, label ? n.parent : CString());
 			m_labelChips.SetTags(label ? std::vector<CString>() : m_lib.LabelNamesOf(n.name));
-			m_seriesRows = CVideoLibrary::ParseSeries(n.series);   // 제작사 · 레이블 모두
-			FillSeriesGrid();
 		}
 	}
 	else
@@ -511,6 +491,7 @@ void CNameListDlg::ShowItem(int code)
 		m_editName.SetWindowText(L"");
 		m_editSub.SetWindowText(L"");
 		m_editMemo.SetWindowText(L"");
+		m_editUrls.SetWindowText(L"");
 		m_staticCount.SetWindowText(L"");
 		SetImage(CString());
 		if (m_kind == LIST_STUDIO)
@@ -520,14 +501,13 @@ void CNameListDlg::ShowItem(int code)
 			m_parentExclude.Empty();
 			m_parentChips.SetTags({});
 			m_labelChips.SetTags({});
-			m_seriesRows.clear();
-			FillSeriesGrid();
 		}
 	}
 
 	m_editName.EnableWindow(enable);
 	m_editSub.EnableWindow(enable);
 	m_editMemo.EnableWindow(enable);
+	m_editUrls.EnableWindow(enable);
 	GetDlgItem(IDC_NL_DELETE)->EnableWindow(enable);
 	GetDlgItem(IDC_NL_IMG_BROWSE)->EnableWindow(enable);
 	GetDlgItem(IDC_NL_IMG_CLEAR)->EnableWindow(enable);
@@ -617,351 +597,6 @@ void CNameListDlg::SetupChipIcons(CTagChipCtrl& chips, bool label)
 	};
 }
 
-void CNameListDlg::FillSeriesGrid()
-{
-	if (!m_seriesGrid.GetSafeHwnd())
-		return;
-	m_seriesGrid.SetRedraw(FALSE);
-	m_seriesGrid.DeleteAllItems();
-	for (size_t i = 0; i < m_seriesRows.size(); ++i)
-	{
-		const SeriesInfo& s = m_seriesRows[i];
-		const int r = m_seriesGrid.InsertItem(static_cast<int>(i), s.name);
-		m_seriesGrid.SetItemText(r, 1, s.label);
-		m_seriesGrid.SetItemText(r, 2, s.desc);
-	}
-	if (m_cur >= 0)
-		m_seriesGrid.InsertItem(static_cast<int>(m_seriesRows.size()), L"+ 새 시리즈 (더블클릭)");   // 마지막 줄: 추가
-	m_seriesGrid.SetRedraw(TRUE);
-	m_seriesGrid.Invalidate();
-}
-
-void CNameListDlg::BeginCellEdit(int row, int col)
-{
-	EndCellEdit(true);
-	if (row < 0 || row >= static_cast<int>(m_seriesRows.size()) || col < 0 || col > 2)
-		return;
-	CRect rc;
-	if (col == 0)
-	{
-		m_seriesGrid.GetSubItemRect(row, 1, LVIR_BOUNDS, rc);   // 첫 열은 다음 열 왼쪽까지
-		CRect b;
-		m_seriesGrid.GetItemRect(row, &b, LVIR_BOUNDS);
-		rc.right = rc.left;
-		rc.left = b.left;
-	}
-	else
-		m_seriesGrid.GetSubItemRect(row, col, LVIR_BOUNDS, rc);
-	m_seriesGrid.EnsureVisible(row, FALSE);
-	m_seriesGrid.ClientToScreen(&rc);
-	ScreenToClient(&rc);
-	rc.InflateRect(0, 2);
-	const SeriesInfo& s = m_seriesRows[row];
-	const CString text = (col == 0) ? s.name : (col == 1) ? s.label : s.desc;
-	m_editRow = row;
-	m_editCol = col;
-	m_cellEdit.SetWindowText(text);
-	m_cellEdit.SetWindowPos(&CWnd::wndTop, rc.left, rc.top, rc.Width(), rc.Height(), SWP_SHOWWINDOW);
-	m_cellEdit.SetFocus();
-	m_cellEdit.SetSel(0, -1);
-}
-
-void CNameListDlg::EndCellEdit(bool save)
-{
-	if (m_editRow < 0 || !m_cellEdit.GetSafeHwnd())
-		return;
-	const int row = m_editRow, col = m_editCol;
-	m_editRow = m_editCol = -1;   // 먼저 지움 (숨길 때 KILLFOCUS 로 다시 들어오지 않게)
-	CString text;
-	m_cellEdit.GetWindowText(text);
-	m_cellEdit.ShowWindow(SW_HIDE);
-	if (!save || row >= static_cast<int>(m_seriesRows.size()))
-		return;
-	text.Trim();
-	SeriesInfo& s = m_seriesRows[row];
-	if (col == 0)
-		text.MakeUpper();   // 품번 접두어는 대문자로
-	CString& field = (col == 0) ? s.name : (col == 1) ? s.label : s.desc;
-	if (field == text)
-		return;
-	if (col == 0)
-	{
-		for (size_t i = 0; i < m_seriesRows.size(); ++i)
-			if (static_cast<int>(i) != row && !text.IsEmpty() && m_seriesRows[i].name.CompareNoCase(text) == 0)
-			{
-				AfxMessageBox(L"같은 품번의 시리즈가 이미 있습니다.", MB_ICONWARNING);
-				return;
-			}
-	}
-	field = text;
-	if (col == 0 && text.IsEmpty() && s.label.IsEmpty() && s.desc.IsEmpty())
-		m_seriesRows.erase(m_seriesRows.begin() + row);   // 빈 줄은 없앰
-	FillSeriesGrid();
-	OnFieldChanged();
-}
-
-void CNameListDlg::DeleteSeriesRow(int row)
-{
-	EndCellEdit(true);
-	if (row < 0 || row >= static_cast<int>(m_seriesRows.size()))
-		return;
-	m_seriesRows.erase(m_seriesRows.begin() + row);
-	FillSeriesGrid();
-	OnFieldChanged();
-}
-
-void CNameListDlg::OnSeriesDblClk(NMHDR* pNMHDR, LRESULT* pResult)
-{
-	*pResult = 0;
-	if (m_cur < 0)
-		return;
-	const NMITEMACTIVATE* p = reinterpret_cast<NMITEMACTIVATE*>(pNMHDR);
-	LVHITTESTINFO hit = {};
-	hit.pt = p->ptAction;
-	m_seriesGrid.SubItemHitTest(&hit);
-	int row = hit.iItem, col = (hit.iSubItem >= 0) ? hit.iSubItem : 0;
-	if (row < 0 || row >= static_cast<int>(m_seriesRows.size()))
-	{
-		// "+ 새 시리즈" 줄 (또는 빈 곳): 새 줄을 만들고 이름 입력
-		m_seriesRows.push_back(SeriesInfo());
-		FillSeriesGrid();
-		row = static_cast<int>(m_seriesRows.size()) - 1;
-		col = 0;
-	}
-	BeginCellEdit(row, col);
-}
-
-void CNameListDlg::OnSeriesKeyDown(NMHDR* pNMHDR, LRESULT* pResult)
-{
-	*pResult = 0;
-	const NMLVKEYDOWN* k = reinterpret_cast<NMLVKEYDOWN*>(pNMHDR);
-	const int row = m_seriesGrid.GetNextItem(-1, LVNI_SELECTED);
-	if (k->wVKey == VK_DELETE)
-		DeleteSeriesRow(row);
-	else if (k->wVKey == VK_F2 && row >= 0 && row < static_cast<int>(m_seriesRows.size()))
-		BeginCellEdit(row, 0);
-}
-
-void CNameListDlg::OnSeriesRClick(NMHDR* pNMHDR, LRESULT* pResult)
-{
-	*pResult = 0;
-	if (m_cur < 0)
-		return;
-	const NMITEMACTIVATE* p = reinterpret_cast<NMITEMACTIVATE*>(pNMHDR);
-	const int row = (p->iItem >= 0 && p->iItem < static_cast<int>(m_seriesRows.size())) ? p->iItem : -1;
-	CMenu menu;
-	menu.CreatePopupMenu();
-	menu.AppendMenu(MF_STRING, 1, L"시리즈 추가");
-	menu.AppendMenu(MF_STRING, 4, L"웹페이지 내용 붙여넣기 (일괄 추가)...");
-	if (row >= 0)
-	{
-		menu.AppendMenu(MF_STRING, 2, L"셀 편집\tF2");
-		menu.AppendMenu(MF_SEPARATOR);
-		menu.AppendMenu(MF_STRING, 3, L"시리즈 삭제\tDel");
-	}
-	CPoint pt;
-	::GetCursorPos(&pt);
-	const UINT cmd = menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD, pt.x, pt.y, this);
-	if (cmd == 1)
-	{
-		m_seriesRows.push_back(SeriesInfo());
-		FillSeriesGrid();
-		BeginCellEdit(static_cast<int>(m_seriesRows.size()) - 1, 0);
-	}
-	else if (cmd == 2)
-	{
-		LVHITTESTINFO hit = {};
-		hit.pt = p->ptAction;
-		m_seriesGrid.SubItemHitTest(&hit);
-		BeginCellEdit(row, hit.iSubItem >= 0 ? hit.iSubItem : 0);
-	}
-	else if (cmd == 3)
-		DeleteSeriesRow(row);
-	else if (cmd == 4)
-		PasteSeriesFromWeb();
-}
-
-namespace
-{
-	// 글자 조각에서 품번 접두어 꺼내기: "SONE-479" / "SONE479" / "sone" → "SONE", "300MIUM-001" → "300MIUM" (아니면 빈 문자열)
-	CString SeriesPrefixOf(CString t)
-	{
-		t.Trim();
-		t.Trim(L"[]()【】「」<>\"'");
-		t.MakeUpper();
-		if (t.IsEmpty() || t.GetLength() > 20)
-			return CString();
-		CString head = t;
-		const int dash = t.FindOneOf(L"-_");
-		if (dash > 0)
-			head = t.Left(dash);
-		// 영문 · 숫자만, 영문이 2자 이상
-		int letters = 0;
-		for (int i = 0; i < head.GetLength(); ++i)
-		{
-			const wchar_t c = head[i];
-			if (c >= L'A' && c <= L'Z') ++letters;
-			else if (!(c >= L'0' && c <= L'9')) return CString();
-		}
-		if (letters < 2 || head.GetLength() > 10)
-			return CString();
-		if (dash < 0)
-		{
-			// "-" 없이 붙은 번호는 뗌 (SONE479 → SONE), 앞쪽 숫자(300MIUM)는 유지
-			int end = head.GetLength();
-			while (end > 0 && head[end - 1] >= L'0' && head[end - 1] <= L'9') --end;
-			head = head.Left(end);
-			if (head.IsEmpty())
-				return CString();
-		}
-		return head;
-	}
-
-	// 한 줄을 칸으로 나눔: 탭(표 복사) → 없으면 두 칸 이상 공백 · " | " · " / " · " - "
-	std::vector<CString> SplitCells(const CString& line)
-	{
-		std::vector<CString> cells;
-		auto push = [&cells](CString c) { c.Trim(); if (!c.IsEmpty()) cells.push_back(c); };
-		if (line.Find(L'\t') >= 0)
-		{
-			int pos = 0;
-			for (;;)
-			{
-				const int p = line.Find(L'\t', pos);
-				push(p < 0 ? line.Mid(pos) : line.Mid(pos, p - pos));
-				if (p < 0) break;
-				pos = p + 1;
-			}
-			return cells;
-		}
-		CString t = line;
-		for (LPCWSTR sep : { L" | ", L"｜", L" / ", L" - ", L" – ", L"：", L": " })
-			t.Replace(sep, L"\t");
-		while (t.Find(L"   ") >= 0) t.Replace(L"   ", L"  ");
-		t.Replace(L"  ", L"\t");
-		if (t.Find(L'\t') >= 0)
-			return SplitCells(t);
-		// 한 칸뿐: 맨 앞 낱말이 품번이면 나머지를 라벨로
-		const int sp = t.Find(L' ');
-		if (sp > 0 && !SeriesPrefixOf(t.Left(sp)).IsEmpty())
-		{
-			push(t.Left(sp));
-			push(t.Mid(sp + 1));
-		}
-		else
-			push(t);
-		return cells;
-	}
-}
-
-void CNameListDlg::PasteSeriesFromWeb()
-{
-	if (m_cur < 0)
-		return;
-	EndCellEdit(true);
-	CTextInfoDlg dlg(L"시리즈 일괄 추가 - 웹페이지 내용 붙여넣기",
-		L"사이트의 시리즈 / 품번 목록(표)을 드래그해 복사(Ctrl+C)한 뒤 붙여넣으세요(Ctrl+V). 한 줄에 하나씩 읽습니다.\r\n"
-		L"각 줄에서 품번(예: SONE-479, SSIS)을 찾아 접두어를 품번 칸에, 그다음 칸을 라벨, 나머지를 설명으로 넣습니다. 이미 있는 품번은 빈 칸만 채웁니다.",
-		CString(), this);
-	if (dlg.DoModal() != IDOK)
-		return;
-
-	CString text = dlg.m_text;
-	text.Replace(L"\r\n", L"\n");
-	text.Replace(L'\r', L'\n');
-	text.Replace(L'\x00A0', L' ');
-	int added = 0, updated = 0, skipped = 0;
-	int pos = 0;
-	while (pos <= text.GetLength())
-	{
-		int nl = text.Find(L'\n', pos);
-		if (nl < 0) nl = text.GetLength();
-		CString line = text.Mid(pos, nl - pos);
-		pos = nl + 1;
-		line.Trim();
-		if (line.IsEmpty())
-			continue;
-		const std::vector<CString> cells = SplitCells(line);
-		// 품번 칸: 앞쪽 칸 중 처음으로 품번 모양인 것
-		int ci = -1;
-		CString prefix;
-		for (size_t i = 0; i < cells.size() && i < 3; ++i)
-		{
-			prefix = SeriesPrefixOf(cells[i]);
-			if (!prefix.IsEmpty()) { ci = static_cast<int>(i); break; }
-		}
-		if (ci < 0)
-		{
-			++skipped;   // 머리글 · 설명 줄 등
-			continue;
-		}
-		CString label, desc;
-		std::vector<CString> rest;
-		for (size_t i = 0; i < cells.size(); ++i)
-			if (static_cast<int>(i) != ci) rest.push_back(cells[i]);
-		if (!rest.empty())
-			label = rest[0];
-		for (size_t i = 1; i < rest.size(); ++i)
-		{
-			if (!desc.IsEmpty()) desc += L" ";
-			desc += rest[i];
-		}
-		SeriesInfo* found = nullptr;
-		for (SeriesInfo& s : m_seriesRows)
-			if (s.name.CompareNoCase(prefix) == 0) { found = &s; break; }
-		if (found)
-		{
-			bool ch = false;
-			if (found->label.IsEmpty() && !label.IsEmpty()) { found->label = label; ch = true; }
-			if (found->desc.IsEmpty() && !desc.IsEmpty()) { found->desc = desc; ch = true; }
-			if (ch) ++updated;
-		}
-		else
-		{
-			SeriesInfo s;
-			s.name = prefix;
-			s.label = label;
-			s.desc = desc;
-			m_seriesRows.push_back(s);
-			++added;
-		}
-	}
-	if (added + updated > 0)
-	{
-		FillSeriesGrid();
-		OnFieldChanged();
-	}
-	CString msg;
-	msg.Format(L"시리즈 %d개를 추가하고 %d개를 보완했습니다.%s\n\n[저장]을 누르면 반영됩니다.", added, updated,
-		skipped > 0 ? static_cast<LPCWSTR>(CString(L"\n(품번을 찾지 못한 줄은 건너뜀)")) : L"");
-	AfxMessageBox(msg, MB_ICONINFORMATION);
-}
-
-void CNameListDlg::OnCellEditKillFocus()
-{
-	EndCellEdit(true);
-}
-
-BOOL CNameListDlg::PreTranslateMessage(MSG* pMsg)
-{
-	// 셀 편집 중: Enter = 저장, Esc = 취소, Tab = 다음 셀
-	if (pMsg->message == WM_KEYDOWN && m_editRow >= 0 && pMsg->hwnd == m_cellEdit.GetSafeHwnd())
-	{
-		if (pMsg->wParam == VK_RETURN) { EndCellEdit(true); m_seriesGrid.SetFocus(); return TRUE; }
-		if (pMsg->wParam == VK_ESCAPE) { EndCellEdit(false); m_seriesGrid.SetFocus(); return TRUE; }
-		if (pMsg->wParam == VK_TAB)
-		{
-			const int row = m_editRow;
-			const int col = m_editCol + ((::GetKeyState(VK_SHIFT) & 0x8000) ? -1 : 1);
-			EndCellEdit(true);
-			if (row < static_cast<int>(m_seriesRows.size()) && col >= 0 && col <= 2)
-				BeginCellEdit(row, col);
-			return TRUE;
-		}
-	}
-	return CDialogEx::PreTranslateMessage(pMsg);
-}
-
 void CNameListDlg::ApplyLabelChips(const CString& studioName)
 {
 	const std::vector<CString> want = m_labelChips.Tags();
@@ -1022,7 +657,6 @@ void CNameListDlg::OnKindLabel()
 
 bool CNameListDlg::Commit()
 {
-	EndCellEdit(true);   // 편집 중인 시리즈 셀 먼저 반영
 	m_structChanged = false;
 	if (!m_dirty || !ValidCode(m_cur))
 		return true;
@@ -1099,6 +733,9 @@ bool CNameListDlg::Commit()
 	if (m_kind == LIST_STUDIO)
 	{
 		m_editMemo.GetWindowText(n.memo);   // 태그는 메모 없음
+		CString urls;
+		m_editUrls.GetWindowText(urls);
+		n.urls = CVideoLibrary::JoinUrls(CVideoLibrary::SplitUrls(urls));   // 공백 · 빈 줄 · 중복 정리
 		// 서브이름: 한 줄에 하나 (쉼표는 이름의 일부) - 이름과 같은 것 · 빈 줄 · 중복은 뺌
 		CString subs;
 		m_editSub.GetWindowText(subs);
@@ -1112,33 +749,9 @@ bool CNameListDlg::Commit()
 	{
 		n.memo.Empty();
 		n.subName.Empty();
+		n.urls.Empty();
 	}
 	n.image = m_imagePath;
-	if (m_kind == LIST_STUDIO)
-	{
-		// 시리즈 (표) - 같은 시리즈가 다른 제작사 · 레이블에 있으면 그쪽에서 뺌 (시리즈는 하나에만 속함)
-		n.series = CVideoLibrary::JoinSeries(m_seriesRows);
-		const std::vector<CString> mine = CVideoLibrary::SeriesNames(n.series);
-		std::vector<NamedInfo*> others;
-		for (NamedInfo& o : m_lib.labelInfos) others.push_back(&o);
-		for (NamedInfo& o : m_lib.studios) others.push_back(&o);
-		for (NamedInfo* op : others)
-		{
-			NamedInfo& other = *op;
-			if (&other == &n || other.series.IsEmpty())
-				continue;
-			std::vector<SeriesInfo> keep;
-			for (const SeriesInfo& s : CVideoLibrary::ParseSeries(other.series))
-			{
-				bool taken = false;
-				for (const CString& m : mine)
-					if (m.CompareNoCase(s.name) == 0) { taken = true; break; }
-				if (!taken) keep.push_back(s);
-			}
-			other.series = CVideoLibrary::JoinSeries(keep);
-		}
-	}
-
 	// 종류 / 상위 제작사 변경 (영상의 제작사 · 레이블도 맞춤)
 	int newCode = m_cur;
 	if (m_kind == LIST_STUDIO)
@@ -1419,13 +1032,13 @@ BOOL CNamePickDlg::OnInitDialog()
 	m_theme.Apply(this);   // 메인 창과 같은 색상
 
 	const CString kindName = (m_kind == LIST_STUDIO) ? L"제작사" : L"태그";
-	SetWindowText(kindName + (m_multi ? L" 선택 (여러 개 가능)" : L" 선택 (하나만)"));
+	SetWindowText((m_kind == LIST_STUDIO ? CString(L"제작사 / 레이블") : kindName) + (m_multi ? L" 선택 (여러 개 가능)" : L" 선택 (하나만)"));
 	SetDlgItemText(IDC_PICK_NEWLABEL, L"새 " + kindName);
 
 	// 현재 값이 목록에 없으면 추가 (보통은 이미 동기화되어 있음)
 	for (const CString& n : m_order)
 	{
-		if (m_lib.FindNamed(m_kind, n) < 0)
+		if (m_lib.FindNamed(m_kind, n) < 0 && !(m_kind == LIST_STUDIO && m_lib.FindLabel(n) >= 0))   // 레이블 이름이면 그대로
 		{
 			NamedInfo info;
 			info.name = n;
@@ -1482,21 +1095,68 @@ void CNamePickDlg::FillList()
 	query.MakeLower();
 
 	const std::vector<NamedInfo>& items = m_lib.NamedList(m_kind);
-	const std::vector<int> rows = SortedNamedIndices(items, query);
+
+	// 행: (표시 글자, 데이터) - 제작사는 그 아래에 레이블(└)도
+	std::vector<std::pair<CString, int>> rowsOut;
+	if (m_kind == LIST_STUDIO)
+	{
+		auto hit = [&query](const CString& name)
+		{
+			if (query.IsEmpty()) return true;
+			CString h = name;
+			h.MakeLower();
+			return h.Find(query) >= 0;
+		};
+		for (int si : SortedNamedIndices(items, CString()))
+		{
+			const bool stHit = hit(items[si].name);
+			std::vector<int> lbs;
+			for (int li : m_lib.LabelsOf(items[si].name))
+				if (stHit || hit(m_lib.labelInfos[li].name))
+					lbs.push_back(li);
+			if (!stHit && lbs.empty())
+				continue;
+			rowsOut.push_back({ items[si].name, si });
+			for (int li : lbs)
+				rowsOut.push_back({ L"      └ " + m_lib.labelInfos[li].name, kPickLabelBase + li });
+		}
+		// 상위 제작사가 없는 레이블은 맨 아래
+		for (size_t li = 0; li < m_lib.labelInfos.size(); ++li)
+		{
+			const NamedInfo& lb = m_lib.labelInfos[li];
+			if (m_lib.FindNamed(LIST_STUDIO, lb.parent) < 0 && hit(lb.name))
+				rowsOut.push_back({ lb.name + L"  (레이블)", kPickLabelBase + static_cast<int>(li) });
+		}
+	}
+	else
+	{
+		for (int r : SortedNamedIndices(items, query))
+			rowsOut.push_back({ items[r].name, r });
+	}
 
 	m_filling = true;
 	m_list.SetRedraw(FALSE);
 	m_list.DeleteAllItems();
-	for (size_t row = 0; row < rows.size(); ++row)
+	for (size_t row = 0; row < rowsOut.size(); ++row)
 	{
-		const NamedInfo& n = items[rows[row]];
-		const int i = m_list.InsertItem(static_cast<int>(row), n.name);
-		m_list.SetItemData(i, static_cast<DWORD_PTR>(rows[row]));
-		m_list.SetCheck(i, IsChecked(n.name) ? TRUE : FALSE);
+		const int i = m_list.InsertItem(static_cast<int>(row), rowsOut[row].first);
+		m_list.SetItemData(i, static_cast<DWORD_PTR>(rowsOut[row].second));
+		m_list.SetCheck(i, IsChecked(NameOfData(rowsOut[row].second)) ? TRUE : FALSE);
 	}
 	m_list.SetRedraw(TRUE);
 	m_list.Invalidate();
 	m_filling = false;
+}
+
+CString CNamePickDlg::NameOfData(int data) const
+{
+	if (data >= kPickLabelBase)
+	{
+		const int li = data - kPickLabelBase;
+		return (li < static_cast<int>(m_lib.labelInfos.size())) ? m_lib.labelInfos[li].name : CString();
+	}
+	const std::vector<NamedInfo>& items = m_lib.NamedList(m_kind);
+	return (data >= 0 && data < static_cast<int>(items.size())) ? items[data].name : CString();
 }
 
 void CNamePickDlg::UpdateSelectedText()
@@ -1523,13 +1183,12 @@ void CNamePickDlg::OnLvnItemChanged(NMHDR* pNMHDR, LRESULT* pResult)
 	if (oldImg == newImg || oldImg == 0 || newImg == 0)
 		return;
 
-	const std::vector<NamedInfo>& items = m_lib.NamedList(m_kind);
-	const int idx = static_cast<int>(m_list.GetItemData(p->iItem));
-	if (idx < 0 || idx >= static_cast<int>(items.size()))
+	const CString itemName = NameOfData(static_cast<int>(m_list.GetItemData(p->iItem)));
+	if (itemName.IsEmpty())
 		return;
 
 	const bool checked = (newImg == INDEXTOSTATEIMAGEMASK(2));
-	SetChecked(items[idx].name, checked);
+	SetChecked(itemName, checked);
 
 	// 하나만 선택: 다른 체크 해제
 	if (checked && !m_multi)
@@ -1587,8 +1246,7 @@ void CNamePickDlg::OnBnClickedAdd()
 
 	for (int i = 0; i < m_list.GetItemCount(); ++i)
 	{
-		const int idx = static_cast<int>(m_list.GetItemData(i));
-		if (items[idx].name.CompareNoCase(name) == 0)
+		if (NameOfData(static_cast<int>(m_list.GetItemData(i))).CompareNoCase(name) == 0)
 		{
 			m_list.EnsureVisible(i, FALSE);
 			m_list.SetItemState(i, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);

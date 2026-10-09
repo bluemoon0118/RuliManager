@@ -57,6 +57,7 @@ struct NamedInfo
 	CString subName; // 서브이름 (스튜디오만, 여러 개 줄바꿈 \n 구분 - 쉼표는 이름의 일부, 보조 표기 예: S1 NO.1 STYLE → 에스원 / S1) - 이 이름으로 적혀 있어도 같은 스튜디오
 	CString parent;  // 레이블만: 상위 제작사 이름 (labelInfos 항목)
 	CString series;  // 제작사 · 레이블: 시리즈 (여러 개, 한 줄에 하나 "이름␟품번␟라벨␟설명" - ParseSeries / JoinSeries, 시리즈 하나는 제작사나 레이블 하나에만)
+	CString urls;    // 제작사 · 레이블: 링크 URL (여러 개, 줄바꿈 \n 구분 - SplitUrls / JoinUrls)
 	bool    favorite = false;   // 즐겨찾기 (태그 카드 오른쪽 위 하트)
 };
 

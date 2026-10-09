@@ -106,6 +106,7 @@
     <ClInclude Include="BulkNameDlg.h" />
     <ClInclude Include="TextInfoDlg.h" />
     <ClInclude Include="NameListDlg.h" />
+    <ClInclude Include="SeriesDlg.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="targetver.h" />
@@ -133,6 +134,7 @@
     <ClCompile Include="BulkNameDlg.cpp" />
     <ClCompile Include="TextInfoDlg.cpp" />
     <ClCompile Include="NameListDlg.cpp" />
+    <ClCompile Include="SeriesDlg.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>

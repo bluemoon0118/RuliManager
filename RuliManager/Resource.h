@@ -13,6 +13,7 @@
 #define IDB_FLAGS                   135
 #define IDD_SETTINGS                136
 #define IDD_IMAGE_SEARCH            137
+#define IDD_SERIES                  140
 
 #define IDC_BTN_ADDFOLDER           1000
 #define IDC_BTN_REMOVEFOLDER        1001
@@ -62,12 +63,17 @@
 #define ID_ACTOR_EDIT               32801
 #define ID_CAT_DELETE               32813
 #define ID_ACTOR_DELETE             32814
+#define ID_NEW_ACTOR                32818
+#define ID_NEW_STUDIO               32819
+#define ID_NEW_LABEL                32820
+#define ID_NEW_TAG                  32821
 #define ID_VIDEO_TEXTINFO           32815
 #define ID_ACTOR_TEXTINFO           32816
 #define ID_VIDEO_PASTEINFO          32817
 #define ID_MANAGE_ACTORS            32810
 #define ID_MANAGE_STUDIOS           32811
 #define ID_MANAGE_TAGS              32812
+#define ID_MANAGE_SERIES            32822
 #define IDC_BTN_PICKSTUDIO          1046
 #define IDC_BTN_PICKTAGS            1047
 #define IDC_STATIC_VALIASES_LBL     1156
@@ -196,6 +202,16 @@
 #define IDC_NL_SERIES_GRID          1234
 #define IDC_NL_CELL_EDIT            1235
 #define IDC_STATIC_CODE_SERIES      1236
+#define IDC_STUDIO_CARD             1237
+#define IDC_NL_URLS_LBL             1238
+#define IDC_NL_URLS                 1239
+#define IDC_NAMED_LINKS             1240
+#define IDC_SR_SEARCH               1241
+#define IDC_SR_LIST                 1242
+#define IDC_SR_TITLE                1243
+#define IDC_SR_GRID                 1244
+#define IDC_SR_PASTE                1245
+#define IDC_SR_CELL_EDIT            1246
 #define IDC_NAMED_MEMO              1233
 #define IDC_ACT_GENDER              1159
 
@@ -209,9 +225,9 @@
 // 다음은 새 개체에 사용할 기본값입니다.
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE    140
-#define _APS_NEXT_COMMAND_VALUE     32818
-#define _APS_NEXT_CONTROL_VALUE     1237
+#define _APS_NEXT_RESOURCE_VALUE    141
+#define _APS_NEXT_COMMAND_VALUE     32823
+#define _APS_NEXT_CONTROL_VALUE     1247
 #define _APS_NEXT_SYMED_VALUE       101
 #endif
 #endif

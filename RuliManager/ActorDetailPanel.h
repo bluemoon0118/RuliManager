@@ -80,3 +80,33 @@ protected:
 	afx_msg LRESULT OnGetFont(WPARAM, LPARAM);   // 자식(별점 숫자)이 부모 글꼴을 쓰도록
 	DECLARE_MESSAGE_MAP()
 };
+
+// 링크 줄: "링크:" + 사이트 아이콘(파비콘)을 가는 세로 구분선으로 나란히 (제작사 탭 상세 - 제작사 / 레이블 링크)
+//   마우스를 올리면 주소 풍선 도움말 · 손 모양 커서, 더블클릭하면 기본 브라우저로 열기
+class CLinkBar : public CWnd
+{
+public:
+	bool Create(CWnd* parent, UINT id);
+	void SetColors(COLORREF back, COLORREF label) { m_back = back; m_label = label; }
+	void SetUrls(const std::vector<CString>& urls);
+	bool HasUrls() const { return !m_urls.empty(); }
+
+protected:
+	std::vector<CString> m_urls;
+	COLORREF m_back = RGB(0x20, 0x2B, 0x33);
+	COLORREF m_label = RGB(0x8A, 0x9B, 0xA8);
+	std::vector<std::pair<CRect, CString>> m_linkRects;   // 마지막으로 그린 아이콘 영역 → URL
+	std::vector<std::pair<CRect, CString>> m_tipRects;
+	std::map<CString, std::unique_ptr<Gdiplus::Bitmap>> m_favicons;
+	std::set<CString> m_faviconRequested;
+	Gdiplus::Bitmap* Favicon(const CString& domain);
+	CToolTipCtrl m_tip;
+	void UpdateTips();
+	BOOL PreTranslateMessage(MSG* pMsg) override;
+	afx_msg void OnPaint();
+	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
+	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
+	afx_msg BOOL OnEraseBkgnd(CDC*) { return TRUE; }
+	afx_msg LRESULT OnFaviconReady(WPARAM, LPARAM);
+	DECLARE_MESSAGE_MAP()
+};

@@ -36,28 +36,15 @@ protected:
 	CStatic        m_staticImagePath;
 	CEdit          m_editMemo;
 	CEdit          m_editSub;          // 서브이름 (제작사 · 레이블)
+	CEdit          m_editUrls;         // 링크 URL (제작사 · 레이블, 한 줄에 하나)
 	CDarkButton    m_radioStudio;      // 종류: [제작사] 토글 버튼 (선택 파란색, 나머지 회색 - 메인 창 탭 버튼과 같은 모양)
 	CDarkButton    m_radioLabel;       // 종류: [레이블] 토글 버튼
 	CTagChipCtrl   m_parentChips;      // 레이블의 상위 제작사 (칩 하나, 비우면 상위 없음 - 등록된 제작사만)
 	CString        m_parentExclude;    // 상위로 고를 수 없는 이름 (지금 항목이 제작사일 때 자기 자신)
 	CTagChipCtrl   m_labelChips;       // 제작사: 하위 레이블 (여러 개, 태그처럼 칩) - 빼면 그 레이블은 상위 없음으로
-	// 제작사 · 레이블: 시리즈 표 (시리즈 | 품번 | 라벨 | 설명) - 더블클릭으로 셀 편집, 마지막 줄 "+ 새 시리즈", Delete / 오른쪽 클릭으로 삭제
-	CListCtrl      m_seriesGrid;
-	CEdit          m_cellEdit;         // 셀 편집 칸 (표 위에 띄움)
-	int            m_editRow = -1, m_editCol = -1;
-	std::vector<SeriesInfo> m_seriesRows;   // 표의 시리즈 (저장 전 작업 사본)
+	// (시리즈 = 품번 표는 별도 창 CSeriesDlg [품번 관리] 로 옮김)
 	CRect          m_chipsLblRect, m_parentRect, m_parentLblRect;   // 제작사일 때 [레이블] 줄을 [상위] 줄 높이로 올림
-	CRect          m_chipsRect1, m_gridRect1, m_gridRect2;   // 제작사 = [레이블] 칩 1 / 시리즈 표 2, 레이블 = 시리즈 표 1
-	void FillSeriesGrid();
-	void BeginCellEdit(int row, int col);
-	void EndCellEdit(bool save);
-	void DeleteSeriesRow(int row);
-	void PasteSeriesFromWeb();   // 웹페이지에서 복사한 표/목록 붙여넣기 → 시리즈 여러 줄 한꺼번에 추가
-	afx_msg void OnSeriesDblClk(NMHDR* pNMHDR, LRESULT* pResult);
-	afx_msg void OnSeriesKeyDown(NMHDR* pNMHDR, LRESULT* pResult);
-	afx_msg void OnSeriesRClick(NMHDR* pNMHDR, LRESULT* pResult);
-	afx_msg void OnCellEditKillFocus();
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	CRect          m_chipsRect1;   // [레이블] 칩 자리
 	void ApplyLabelChips(const CString& studioName);
 	void SetupChipIcons(CTagChipCtrl& chips, bool label);   // 칩 이름 왼쪽에 제작사(label=false) / 레이블 이미지   // 제작사의 레이블 칩 → 레이블 상위 지정 / 새 레이블 / 뺀 레이블은 상위 없음
 
@@ -135,6 +122,9 @@ protected:
 
 	bool IsChecked(const CString& name) const;
 	void SetChecked(const CString& name, bool checked);
+	// 목록 행 데이터: 0 이상 = 이름 목록 인덱스, kPickLabelBase 이상 = 레이블 (제작사 선택 창에 레이블도 표시)
+	static const int kPickLabelBase = 1000000;
+	CString NameOfData(int data) const;
 	void FillList();
 	void UpdateSelectedText();
 

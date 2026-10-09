@@ -59,7 +59,14 @@ protected:
 	afx_msg void OnCatDelete();
 	afx_msg void OnActorDelete();
 	afx_msg void OnVideoTextInfo();
-	afx_msg void OnVideoPasteInfo();   // 영상 카드 오른쪽 클릭 → 웹페이지 내용 붙여넣기 (txt 와 연동 없음)
+	afx_msg void OnVideoPasteInfo();
+	// 격자 빈곳 오른쪽 클릭 → 새 항목
+	afx_msg void OnNewActor();
+	afx_msg void OnNewStudio();
+	afx_msg void OnNewLabel();
+	afx_msg void OnNewTag();
+	void ShowNewItemMenu(CPoint screenPt);   // 지금 탭에 맞는 [새 …] 메뉴
+	bool AskNewName(const CString& caption, const CString& prompt, CString& name);   // 영상 카드 오른쪽 클릭 → 웹페이지 내용 붙여넣기 (txt 와 연동 없음)
 	void ApplyTextToVideo(int idx, const CString& text);   // "항목: 값" 글자로 영상 정보 교체 (텍스트로 정보 입력 / 사이트에서 가져오기)   // 영상 카드 오른쪽 클릭 → 텍스트로 정보 입력 (정보 txt 와 같은 규칙)
 	afx_msg void OnActorTextInfo();   // 배우 카드 오른쪽 클릭 → 텍스트로 정보 입력   // 배우 탭 우클릭 → 배우 삭제 (Del)   // 태그 탭 우클릭 → 삭제
 	void ToggleTagFavorite(const CString& tag);   // 태그 즐겨찾기 (태그 목록에 없으면 추가)
@@ -67,15 +74,26 @@ protected:
 	CDropCounter m_dropCounter;      // 영상 상세 정보: 별점 오른쪽 물방울 카운트
 	CMediaInfoLabel m_mediaInfo;     // 영상 상세 정보: [이미지 변경] 위 "fps: 29.97 | 1080p"
 	CActorStrip m_actorStrip;        // 영상 상세 정보 메모 아래: 출연 배우 카드 (가로 한 줄)
+	CLinkBar    m_namedLinks;        // 제작사 탭 상세: 제작사 / 레이블 링크 (사이트 아이콘, 정보 줄 아래 - 링크가 있을 때만)
 	CActorStrip m_labelStrip;        // 제작사 탭 상세: 선택한 제작사의 하위 레이블 카드 (여러 줄)
 	std::vector<int> m_stripLabels;  // 카드: 0 이상 = labelInfos 인덱스 (하위 레이블), 음수 = -(studios 인덱스 + 1) (레이블의 상위 제작사)
+	bool m_stripForActor = false;    // true = 배우 상세: 그 배우 출연작의 제작사 / 레이블 카드 (m_stripCounts = 출연 편수)
+	std::vector<int> m_stripCounts;
+	void UpdateActorStudioStrip(int actorIdx);   // 배우 상세 하단: 출연작의 제작사 / 레이블 카드 (하위 레이블이 있는 제작사는 제외)
+	void OpenNamedTarget(const CString& name, bool label);   // 제작사 탭에서 그 제작사 / 레이블의 영상 목록
 	CStatic m_staticCodeSeries;      // 영상 상세: 품번 오른쪽 - 품번 접두어가 제작사 · 레이블의 시리즈와 같으면 그 라벨명
 	CString m_codeSeriesLabel, m_codeSeriesDesc;   // 품번 오른쪽에 그릴 라벨 (보통) / 설명 (회색)
 	void UpdateCodeSeriesText();
 	// 영상 상세: 레이블이 있으면 [레이블] 줄만, 없으면 [제작사] 줄만 표시
 	bool LabelRowShown() const { return m_labelChips.GetSafeHwnd() && !m_labelChips.Tags().empty(); }
 	bool m_labelRowShown = false;
-	void RelayoutIfLabelRowChanged(bool focusRow = false);   // focusRow: 바뀐 줄 입력 칸으로 포커스
+	void RelayoutIfLabelRowChanged(bool focusRow = false);
+	// 영상 상세: 제작사 / 레이블 카드 (제작사 탭 상세의 카드 모양, [변경...] 버튼 · × 로 비우기 · 더블클릭 = 그 영상 보기)
+	CActorStrip m_studioCard;
+	int  m_studioCardW = 0, m_studioCardH = 0;
+	void DrawVideoStudioCard(CDC* dc, const CRect& rc, bool hot);
+	CRect StudioCardXRect(const CRect& card);   // DX() 가 const 가 아니므로 const 멤버로 두지 않음
+	void OpenStudioCardTarget();   // focusRow: 바뀐 줄 입력 칸으로 포커스
 	CEdit   m_editNamedMemo;         // 제작사 탭 상세: 선택한 제작사 / 레이블 메모 (바로 편집, 포커스를 잃거나 다른 항목을 고르면 저장)
 	int     m_memoKind = 0;          // 메모 대상: 0 = 없음, 1 = 제작사, 2 = 레이블
 	CString m_memoName;
@@ -370,6 +388,7 @@ protected:
 	afx_msg void OnManageActors();
 	afx_msg void OnManageStudios();
 	afx_msg void OnManageTags();
+	afx_msg void OnManageSeries();   // [목록 관리 ▾] → 품번 관리 (제작사 / 레이블의 시리즈 표)
 	afx_msg void OnBnClickedPickStudio();
 	afx_msg void OnBnClickedPickTags();
 	afx_msg void OnBnClickedPickVAliases();
