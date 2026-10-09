@@ -1227,6 +1227,16 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 		? (std::max)(rowH, m_labelChips.CalcHeight(rw - lblW0)) : rowH;
 	const int seriesChipsH = (showDetail && m_seriesChips.GetSafeHwnd())
 		? (std::max)(rowH, m_seriesChips.CalcHeight(rw - lblW0)) : rowH;
+	// 배우 카드 높이: 제작사 탭(출연 배우 띠)은 제작 당시 나이 줄을 뺀 높이
+	if (m_actorStrip.GetSafeHwnd() && m_stripCardH > 0)
+	{
+		const int wantH = StripShowsAge() ? m_stripCardH : m_stripCardH - StripAgeH();
+		if (wantH != m_stripCardCurH)
+		{
+			m_stripCardCurH = wantH;
+			m_actorStrip.SetCardSize(m_stripCardW, m_stripCardCurH, DX(4));
+		}
+	}
 	const int stripH = (m_mode == MODE_VIDEO && m_actorStrip.GetSafeHwnd()) ? m_actorStrip.CalcHeight() : 0;   // 태그 아래 배우 카드 (영상 탭에서만)
 	// 제작사 탭 상세(제작사 선택): 정보 줄 아래 하위 레이블 카드 (여러 줄, 오른쪽 영역 높이의 절반까지)
 	int labelStripH = 0;
@@ -4365,8 +4375,9 @@ void CRuliManagerDlg::SetupActorCards()
 	m_stripCardW = DX(78);   // 1.5배 (예전 DX(52))
 	m_stripCardH = m_stripCardW * 4 / 3 + m_cardPad / 2 + m_cardLineB + m_cardLine * 2 + m_cardPad / 2   // 글자 3줄 (굵은 이름 + 2줄)
 		+ 1 + m_cardPad / 2 + m_cardLine + m_cardPad / 2;                          // 구분선 + 제작 당시 나이
+	m_stripCardCurH = StripShowsAge() ? m_stripCardH : m_stripCardH - StripAgeH();
 	if (m_actorStrip.GetSafeHwnd())
-		m_actorStrip.SetCardSize(m_stripCardW, m_stripCardH, DX(4));
+		m_actorStrip.SetCardSize(m_stripCardW, m_stripCardCurH, DX(4));
 	if (m_cardW != oldCardW)
 		m_actorPortraits.clear();
 
@@ -7424,7 +7435,8 @@ void CRuliManagerDlg::DrawStripCard(CDC* dc, int i, const CRect& rc, bool hot)
 		}
 	}
 
-	// 맨 아래: 구분선 + 제작 당시 나이 (발매일 - 생년월일)
+	// 맨 아래: 구분선 + 제작 당시 나이 (발매일 - 생년월일) - 제작사 탭 상세의 출연 배우 카드는 없음
+	if (StripShowsAge())
 	{
 		const int lineY = rc.bottom - m_cardPad / 2 - m_cardLine - m_cardPad / 2 - 1;
 		dc->FillSolidRect(rc.left, lineY, rc.Width(), 1, kCardLine);

@@ -107,6 +107,9 @@ protected:
 	void DrawLabelStripCard(CDC* dc, int i, const CRect& rc, bool hot);  // 레이블 카드 하나
 	std::vector<int> m_stripActors;  // 배우 카드 띠의 배우 인덱스
 	int  m_stripCardW = 0, m_stripCardH = 0;
+	int  m_stripCardCurH = 0;        // 배우 카드 띠의 지금 카드 높이 (제작사 탭 = 제작 당시 나이 줄 없음)
+	int  StripAgeH() const { return 1 + m_cardPad / 2 + m_cardLine + m_cardPad / 2; }   // 구분선 + 제작 당시 나이 줄 높이
+	bool StripShowsAge() const { return m_mode != MODE_STUDIO; }   // 제작사 탭 상세(제작사 · 레이블의 출연 배우)는 영상이 없으므로 나이 줄 없음
 	bool m_namedActors = false;      // 제작사 탭 상세: 배우 카드 띠를 (하위 레이블 없는) 제작사 / 레이블의 출연 배우로 사용 중
 	void UpdateNamedActorStrip(int kind, const CString& name);   // 제작사 탭 상세 하단 배우 카드 (kind: 0 = 숨김, 1 = 제작사, 2 = 레이블)
 	void RefreshActorStrip();                                        // 숨긴 배우 칸 값으로 카드 띠 갱신
