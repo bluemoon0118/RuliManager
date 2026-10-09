@@ -48,6 +48,68 @@ namespace
 	{
 		return CVideoLibrary::GetImageRoot() + L"\\favicons\\" + domain + L".png";
 	}
+
+	// Microsoft Edge 실행 파일 경로 (App Paths 레지스트리 → 기본 설치 위치), 없으면 빈 문자열
+	CString EdgeExePath()
+	{
+		static bool done = false;
+		static CString path;
+		if (done)
+			return path;
+		done = true;
+		const HKEY roots[] = { HKEY_LOCAL_MACHINE, HKEY_CURRENT_USER };
+		for (HKEY root : roots)
+		{
+			wchar_t buf[MAX_PATH * 2] = {};
+			DWORD cb = sizeof(buf);
+			if (::RegGetValueW(root, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\msedge.exe", nullptr,
+				RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ, nullptr, buf, &cb) == ERROR_SUCCESS && ::PathFileExistsW(buf))
+			{
+				path = buf;
+				return path;
+			}
+		}
+		const LPCWSTR envs[] = { L"ProgramFiles(x86)", L"ProgramFiles", L"LOCALAPPDATA" };
+		for (LPCWSTR env : envs)
+		{
+			wchar_t base[MAX_PATH] = {};
+			if (::GetEnvironmentVariableW(env, base, MAX_PATH) == 0)
+				continue;
+			const CString p = CString(base) + L"\\Microsoft\\Edge\\Application\\msedge.exe";
+			if (::PathFileExistsW(p))
+			{
+				path = p;
+				return path;
+			}
+		}
+		return path;
+	}
+
+	// 사이트 아이콘이 없을 때 대신 그리는 Edge 브라우저 아이콘 (크기별로 한 번만 꺼냄), Edge 가 없으면 false
+	bool DrawEdgeIcon(CDC& dc, const CRect& rc)
+	{
+		static std::map<int, HICON> cache;   // 크기 → 아이콘 (nullptr = 꺼내기 실패)
+		const int sz = (std::max)(1, (std::min)(rc.Width(), rc.Height()));
+		HICON icon = nullptr;
+		auto it = cache.find(sz);
+		if (it != cache.end())
+			icon = it->second;
+		else
+		{
+			const CString exe = EdgeExePath();
+			if (!exe.IsEmpty())
+				::SHDefExtractIconW(exe, 0, 0, &icon, nullptr, static_cast<UINT>(MAKELONG(sz, sz)));
+			cache[sz] = icon;
+		}
+		if (!icon)
+			return false;
+		::DrawIconEx(dc.GetSafeHdc(), rc.left + (rc.Width() - sz) / 2, rc.top + (rc.Height() - sz) / 2, icon, sz, sz, 0, nullptr, DI_NORMAL);
+		return true;
+	}
+
+	// 링크 아이콘 크기: 정보 줄 높이의 약 105% (예전 70% 의 1.5배), 링크 줄 높이는 아이콘 + 위아래 여백
+	int LinkIconSize(int rowH) { return (std::max)(18, rowH * 21 / 20); }
+	int LinkRowHeight(int rowH) { return (std::max)(rowH, LinkIconSize(rowH) + 4); }
 }
 #include <cmath>
 
@@ -326,7 +388,9 @@ void CActorDetailPanel::DrawLinkIcon(CDC& dc, const CString& url, const CRect& r
 			static_cast<INT>(icon->GetWidth()), static_cast<INT>(icon->GetHeight()), Gdiplus::UnitPixel);
 		return;
 	}
-	// 아이콘이 아직 없으면: 둥근 사각형 + 도메인 첫 글자
+	// 사이트 아이콘이 없으면(받기 전 · 실패): Edge 브라우저 아이콘, Edge 도 없으면 둥근 사각형 + 도메인 첫 글자
+	if (DrawEdgeIcon(dc, rc))
+		return;
 	CBrush br(RGB(0x39, 0x4B, 0x59));
 	CPen pen(PS_SOLID, 1, RGB(0x5C, 0x70, 0x80));
 	CBrush* ob = dc.SelectObject(&br);
@@ -549,8 +613,11 @@ int CActorDetailPanel::CalcHeight(int width)
 		return 0;
 	const int nameH = NameHeight();
 	const int rowH = RowHeight();
-	const int rows = m_has ? static_cast<int>(m_rows.size()) : 0;
-	int h = nameH + 4 + StarRowHeight() + 6 + rows * rowH + 4;   // 이름 + 별 + 줄들
+	int rowsH = 0;
+	if (m_has)
+		for (const Row& r : m_rows)
+			rowsH += r.links.empty() ? rowH : LinkRowHeight(rowH);   // 링크 줄은 아이콘이 커서 조금 높음
+	int h = nameH + 4 + StarRowHeight() + 6 + rowsH + 4;   // 이름 + 별 + 줄들
 	if (m_has && m_history.size() >= 2)
 	{
 		if (width <= 0)
@@ -674,10 +741,11 @@ void CActorDetailPanel::OnPaint()
 		int y = nameH + 4 + StarRowHeight() + 6;
 		for (const Row& r : m_rows)
 		{
+			const int rh = r.links.empty() ? rowH : LinkRowHeight(rowH);   // 이 줄 높이 (링크 줄은 아이콘 크기만큼)
 			mem.SetTextColor(m_label);
-			mem.DrawText(r.label, CRect(0, y, labelW, y + rowH), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+			mem.DrawText(r.label, CRect(0, y, labelW, y + rh), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 			mem.SetTextColor(m_text);
-			CRect vr(labelW, y, rc.right, y + rowH);
+			CRect vr(labelW, y, rc.right, y + rh);
 			if (!r.symbol.IsEmpty())
 			{
 				// 값 왼쪽 기호 (성별): 기호 색으로, 글꼴에 없으면 대체 글꼴
@@ -703,7 +771,7 @@ void CActorDetailPanel::OnPaint()
 			{
 				// 링크: 사이트 아이콘을 나란히, 사이에 가는 세로 구분선  예) [X] | [Instagram] | [YouTube]
 				//   아이콘 = 각 사이트의 파비콘 (줄 높이의 약 70% 정사각형), 넘치면 생략
-				const int sz = (std::max)(12, static_cast<int>(rowH) * 7 / 10);
+				const int sz = LinkIconSize(rowH);   // 줄 높이의 약 105% (예전 70% 의 1.5배)
 				const int sepGap = 7;                      // 아이콘과 구분선 사이
 				const int sepH = (std::max)(8, sz * 8 / 10);
 				int ix = vr.left;
@@ -716,10 +784,10 @@ void CActorDetailPanel::OnPaint()
 					if (!firstIcon)
 					{
 						ix += sepGap;
-						mem.FillSolidRect(ix, y + (rowH - sepH) / 2, 1, sepH, RGB(0x5C, 0x70, 0x80));   // 구분선
+						mem.FillSolidRect(ix, y + (rh - sepH) / 2, 1, sepH, RGB(0x5C, 0x70, 0x80));   // 구분선
 						ix += 1 + sepGap;
 					}
-					const CRect ir(ix, y + (rowH - sz) / 2, ix + sz, y + (rowH - sz) / 2 + sz);
+					const CRect ir(ix, y + (rh - sz) / 2, ix + sz, y + (rh - sz) / 2 + sz);
 					DrawLinkIcon(mem, u, ir);
 					m_linkRects.push_back({ ir, u });
 					ix += sz;
@@ -757,7 +825,7 @@ void CActorDetailPanel::OnPaint()
 			{
 				TextFB::Draw(&mem, r.value, vr, DT_LEFT, true);
 			}
-			y += rowH;
+			y += rh;
 		}
 
 		// 별칭 변경 이력: 아스카 아카 → 시오세 → 나기 히카루
@@ -807,4 +875,209 @@ void CActorDetailPanel::OnPaint()
 	paint.BitBlt(0, 0, rc.Width(), rc.Height(), &mem, 0, 0, SRCCOPY);
 	UpdateLinkTips();   // 링크 아이콘 풍선 도움말
 	mem.SelectObject(old);
+}
+
+// ---------------------------------------------------------------------------
+// CLinkBar: 제작사 / 레이블 링크 줄
+
+BEGIN_MESSAGE_MAP(CLinkBar, CWnd)
+	ON_WM_PAINT()
+	ON_WM_LBUTTONDBLCLK()
+	ON_WM_SETCURSOR()
+	ON_WM_ERASEBKGND()
+	ON_MESSAGE(WM_APP_FAVICON, &CLinkBar::OnFaviconReady)
+END_MESSAGE_MAP()
+
+bool CLinkBar::Create(CWnd* parent, UINT id)
+{
+	const CString cls = AfxRegisterWndClass(CS_DBLCLKS, ::LoadCursor(nullptr, IDC_ARROW), nullptr);
+	return CWnd::Create(cls, L"", WS_CHILD, CRect(0, 0, 100, 20), parent, id) != FALSE;
+}
+
+void CLinkBar::SetUrls(const std::vector<CString>& urls)
+{
+	if (urls == m_urls)
+		return;
+	m_urls = urls;
+	if (GetSafeHwnd())
+		Invalidate(FALSE);
+}
+
+Gdiplus::Bitmap* CLinkBar::Favicon(const CString& domain)
+{
+	// 배우 상세와 같은 방식: Image\favicons\<도메인>.png, 없으면 백그라운드로 받기
+	if (domain.IsEmpty())
+		return nullptr;
+	auto it = m_favicons.find(domain);
+	if (it != m_favicons.end() && it->second)
+		return it->second.get();
+	const CString file = FaviconFile(domain);
+	if (::PathFileExistsW(file))
+	{
+		EnsureGdiPlusPanel();
+		std::unique_ptr<Gdiplus::Bitmap> tmp(Gdiplus::Bitmap::FromFile(file));
+		if (tmp && tmp->GetLastStatus() == Gdiplus::Ok && tmp->GetWidth() > 0)
+		{
+			std::unique_ptr<Gdiplus::Bitmap> copy(tmp->Clone(0, 0, static_cast<INT>(tmp->GetWidth()), static_cast<INT>(tmp->GetHeight()), PixelFormat32bppARGB));
+			if (!copy || copy->GetLastStatus() != Gdiplus::Ok)
+				return nullptr;
+			Gdiplus::Bitmap* p = copy.get();
+			m_favicons[domain] = std::move(copy);
+			return p;
+		}
+	}
+	if (m_faviconRequested.insert(domain).second)
+	{
+		const HWND hwnd = GetSafeHwnd();
+		const CString url = L"https://www.google.com/s2/favicons?sz=64&domain=" + Web::UrlEncode(domain);
+		std::thread([hwnd, url, file]()
+		{
+			std::vector<BYTE> data;
+			if (!Web::HttpGet(url, data, nullptr, nullptr, 512 * 1024) || data.size() < 16)
+				return;
+			const CString dir = file.Left(file.ReverseFind(L'\\'));
+			::SHCreateDirectoryExW(nullptr, dir, nullptr);
+			HANDLE h = ::CreateFileW(file, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+			if (h == INVALID_HANDLE_VALUE)
+				return;
+			DWORD written = 0;
+			const BOOL ok = ::WriteFile(h, data.data(), static_cast<DWORD>(data.size()), &written, nullptr);
+			::CloseHandle(h);
+			if (ok && ::IsWindow(hwnd))
+				::PostMessageW(hwnd, WM_APP_FAVICON, 0, 0);
+		}).detach();
+	}
+	return nullptr;
+}
+
+void CLinkBar::OnPaint()
+{
+	CPaintDC pdc(this);
+	CRect rc;
+	GetClientRect(&rc);
+	CDC mem;
+	mem.CreateCompatibleDC(&pdc);
+	CBitmap bmp;
+	bmp.CreateCompatibleBitmap(&pdc, (std::max)(1, rc.Width()), (std::max)(1, rc.Height()));
+	CBitmap* ob = mem.SelectObject(&bmp);
+	mem.FillSolidRect(rc, m_back);
+	CWnd* parent = GetParent();
+	CFont* of = mem.SelectObject(parent ? parent->GetFont() : nullptr);
+	mem.SetBkMode(TRANSPARENT);
+	mem.SetTextColor(m_label);
+	m_linkRects.clear();
+	const int h = rc.Height();
+	const CString cap = L"링크:";
+	const int capW = mem.GetTextExtent(cap).cx;
+	mem.DrawText(cap, CRect(0, 0, capW + 2, h), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+	// 아이콘: 줄 높이에 맞춘 정사각형 (위아래 2px 여백, 예전의 1.5배), 사이에 가는 세로 구분선, 넘치면 생략
+	const int sz = (std::max)(18, h - 4);
+	const int sepGap = 7;
+	const int sepH = (std::max)(8, sz * 8 / 10);
+	int ix = capW + 8;
+	bool first = true;
+	for (const CString& u : m_urls)
+	{
+		const int need = (first ? 0 : sepGap * 2 + 1) + sz;
+		if (ix + need > rc.right)
+			break;
+		if (!first)
+		{
+			ix += sepGap;
+			mem.FillSolidRect(ix, (h - sepH) / 2, 1, sepH, RGB(0x5C, 0x70, 0x80));
+			ix += 1 + sepGap;
+		}
+		const CRect ir(ix, (h - sz) / 2, ix + sz, (h - sz) / 2 + sz);
+		const CString domain = DomainOf(u);
+		if (Gdiplus::Bitmap* icon = Favicon(domain))
+		{
+			Gdiplus::Graphics g(mem.GetSafeHdc());
+			g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+			g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+			g.DrawImage(icon, Gdiplus::Rect(ir.left, ir.top, ir.Width(), ir.Height()), 0, 0,
+				static_cast<INT>(icon->GetWidth()), static_cast<INT>(icon->GetHeight()), Gdiplus::UnitPixel);
+		}
+		else if (!DrawEdgeIcon(mem, ir))
+		{
+			// 사이트 아이콘이 없으면 Edge 아이콘, Edge 도 없으면: 둥근 사각형 + 도메인 첫 글자
+			CBrush br(RGB(0x39, 0x4B, 0x59));
+			CPen pen(PS_SOLID, 1, RGB(0x5C, 0x70, 0x80));
+			CBrush* obr = mem.SelectObject(&br);
+			CPen* op = mem.SelectObject(&pen);
+			mem.RoundRect(ir, CPoint(6, 6));
+			mem.SelectObject(obr);
+			mem.SelectObject(op);
+			CString letter = domain.IsEmpty() ? CString(L"?") : domain.Left(1);
+			letter.MakeUpper();
+			mem.SetTextColor(RGB(0xE6, 0xEA, 0xEE));
+			TextFB::Draw(&mem, letter, ir, DT_CENTER, false);
+		}
+		m_linkRects.push_back({ ir, u });
+		ix += sz;
+		first = false;
+	}
+	pdc.BitBlt(0, 0, rc.Width(), rc.Height(), &mem, 0, 0, SRCCOPY);
+	mem.SelectObject(of);
+	mem.SelectObject(ob);
+	UpdateTips();
+}
+
+void CLinkBar::UpdateTips()
+{
+	if (m_tipRects == m_linkRects && m_tip.GetSafeHwnd())
+		return;
+	m_tipRects = m_linkRects;
+	if (m_tip.GetSafeHwnd())
+		m_tip.DestroyWindow();
+	if (m_linkRects.empty() || !m_tip.Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX))
+		return;
+	m_tip.SetMaxTipWidth(600);
+	for (size_t i = 0; i < m_linkRects.size(); ++i)
+		m_tip.AddTool(this, m_linkRects[i].second + L"  (더블클릭하면 열기)", m_linkRects[i].first, static_cast<UINT_PTR>(i + 1));
+	m_tip.Activate(TRUE);
+}
+
+BOOL CLinkBar::PreTranslateMessage(MSG* pMsg)
+{
+	if (m_tip.GetSafeHwnd())
+		m_tip.RelayEvent(pMsg);
+	return CWnd::PreTranslateMessage(pMsg);
+}
+
+void CLinkBar::OnLButtonDblClk(UINT nFlags, CPoint point)
+{
+	for (const auto& lr : m_linkRects)
+	{
+		if (lr.first.PtInRect(point))
+		{
+			CString url = lr.second;
+			if (url.Find(L"://") < 0)
+				url = L"https://" + url;
+			::ShellExecuteW(GetSafeHwnd(), L"open", url, nullptr, nullptr, SW_SHOWNORMAL);
+			return;
+		}
+	}
+	CWnd::OnLButtonDblClk(nFlags, point);
+}
+
+BOOL CLinkBar::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
+{
+	CPoint pt;
+	::GetCursorPos(&pt);
+	ScreenToClient(&pt);
+	for (const auto& lr : m_linkRects)
+	{
+		if (nHitTest == HTCLIENT && lr.first.PtInRect(pt))
+		{
+			::SetCursor(::LoadCursor(nullptr, IDC_HAND));
+			return TRUE;
+		}
+	}
+	return CWnd::OnSetCursor(pWnd, nHitTest, message);
+}
+
+LRESULT CLinkBar::OnFaviconReady(WPARAM, LPARAM)
+{
+	Invalidate(FALSE);
+	return 0;
 }
