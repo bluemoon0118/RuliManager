@@ -505,24 +505,47 @@ void CActorDetailPanel::SetActor(const ActorInfo* a, int videoCount, const CStri
 				CString y = d.Left(4);
 				return (y.GetLength() == 4 && y.SpanIncluding(L"0123456789") == y) ? y : CString();
 			};
-			const CString from = yearOf(a->debut);
+			// 날짜 읽기: "2015-03-12" 외에 "2015.03.12" · "2015/3/12" · "2015年3月12日" · "2015-03" · "2015" 도 (없는 월 · 일은 1)
+			auto parseYmd = [](const CString& d, SYSTEMTIME& st) -> bool
+			{
+				int nums[3] = { 0, 0, 0 };
+				int count = 0, cur = -1;
+				for (int i = 0; i <= d.GetLength() && count < 3; ++i)
+				{
+					const wchar_t c = (i < d.GetLength()) ? d[i] : L' ';
+					if (c >= L'0' && c <= L'9')
+						cur = (cur < 0 ? 0 : cur) * 10 + (c - L'0');
+					else if (cur >= 0)
+					{
+						nums[count++] = cur;
+						cur = -1;
+					}
+				}
+				const int y = nums[0];
+				const int m = (count >= 2) ? nums[1] : 1;
+				const int dd = (count >= 3) ? nums[2] : 1;
+				if (count < 1 || y < 1900 || y > 2200 || m < 1 || m > 12 || dd < 1 || dd > 31)
+					return false;
+				st = {};
+				st.wYear = static_cast<WORD>(y); st.wMonth = static_cast<WORD>(m); st.wDay = static_cast<WORD>(dd);
+				return true;
+			};
+			SYSTEMTIME s0 = {};
+			CString from = yearOf(a->debut);
+			if (from.IsEmpty() && parseYmd(a->debut, s0))
+				from.Format(L"%d", s0.wYear);
 			if (!from.IsEmpty())
 			{
-				const CString to = yearOf(a->retire);
-				CString period = from + L"년 ~ " + (to.IsEmpty() ? CString(L"현재") : to + L"년");   // 2015년 ~ 현재 / 2015년 ~ 2023년
+				// 은퇴일이 있으면 은퇴일까지 (은퇴 년도), 없으면 오늘까지 (현재)
+				SYSTEMTIME s1 = {};
+				const bool retired = !a->retire.IsEmpty() && parseYmd(a->retire, s1);
+				CString to = retired ? CString() : yearOf(a->retire);
+				if (retired)
+					to.Format(L"%d", s1.wYear);
+				CString period = from + L"년 ~ " + (to.IsEmpty() ? CString(a->retire.IsEmpty() ? L"현재" : L"은퇴") : to + L"년");   // 2015년 ~ 현재 / 2015년 ~ 2023년
 				// 데뷔일(년-월-일)로부터 지난 날 수 · 주년: 활동 중이면 오늘까지, 은퇴했으면 은퇴일까지
-				//   예: "2015년 ~ 현재 (+3,912일, 10주년)"
-				auto parseYmd = [](const CString& d, SYSTEMTIME& st) -> bool
-				{
-					int y = 0, m = 0, dd = 0;
-					if (swscanf_s(d, L"%d-%d-%d", &y, &m, &dd) != 3 || y < 1900 || m < 1 || m > 12 || dd < 1 || dd > 31)
-						return false;
-					st = {};
-					st.wYear = static_cast<WORD>(y); st.wMonth = static_cast<WORD>(m); st.wDay = static_cast<WORD>(dd);
-					return true;
-				};
-				SYSTEMTIME s0 = {}, s1 = {};
-				bool haveEnd = !a->retire.IsEmpty() && parseYmd(a->retire, s1);
+				//   예: "2015년 ~ 현재 (+3,912일, 10주년)" / "2015년 ~ 2023년 (+2,950일, 8주년)"
+				bool haveEnd = retired;
 				if (!haveEnd && a->retire.IsEmpty())
 				{
 					::GetLocalTime(&s1);

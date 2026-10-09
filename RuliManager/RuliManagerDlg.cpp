@@ -396,7 +396,7 @@ BOOL CRuliManagerDlg::OnInitDialog()
 	CDarkDialogTheme::ThemeChild(m_editNamedMemo.GetSafeHwnd());   // 어두운 스크롤바
 	// 영상 상세: 제작사 / 레이블 카드 (한 장)
 	m_studioCardW = DX(160);   // 폭은 LayoutControls 에서 상세 칸 폭으로 맞춤
-	m_studioCardH = DY(40);    // 한 줄 카드: [이미지] 이름 (높이 2배)
+	m_studioCardH = DY(32);    // 한 줄 카드: [이미지] 이름 (DY(40) 에서 20% 줄임)
 	m_studioCard.Create(this, IDC_STUDIO_CARD);
 	m_studioCard.SetColors(kBackColor, RGB(0x8A, 0x9B, 0xA8), RGB(0x2A, 0x35, 0x3D), kScrollColor);
 	m_studioCard.SetCardSize(m_studioCardW, m_studioCardH, DX(4));
