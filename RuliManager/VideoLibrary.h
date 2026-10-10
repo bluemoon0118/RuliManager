@@ -242,10 +242,10 @@ public:
 	static CString ParsePastedVideoText(const CString& raw);
 	int ExportVideoInfoTxt(int& unchanged, int& failed) const;                  // 영상 폴더\영상이름.txt (저장된 영상)
 	int ExportActorInfoTxt(int& unchanged, int& noFolder, int& failed) const;   // 배우 폴더\배우폴더이름.txt                                    // 생년월일·키·국적·치수 등이 모두 비어 있음
-	static CString StoreImageCopy(const CString& src, LPCWSTR sub, bool force = false);   // force: 보관소 안의 파일도 새 암호화 사본으로
+	static CString StoreImageCopy(const CString& src, LPCWSTR sub, bool force = false);   // 평문 사본 (암호화된 .vmimg 은 풀어서), force: 보관소 안의 파일도 새 사본으로
 	bool MigrateImagesToStore();      // 보관소 밖 이미지(기존 데이터)를 복사본으로 교체 (변경 시 true)
-	// Image 폴더의 평문 이미지를 암호화 사본(.vmimg)으로 바꾸고 연결도 바꿈 (평문 경로는 plainFiles 에, 저장 후 지울 것)
-	bool EncryptImageStore(std::vector<CString>& plainFiles);
+	// Image 폴더의 예전 암호화 사본(.vmimg)을 평문 사본으로 풀고 연결도 바꿈 (원래 .vmimg 은 지우지 않음)
+	bool DecryptImageStore();
 	static bool IsEncryptedFile(const CString& path);   // DbCrypt 형식으로 암호화된 파일인지
 	int  CleanupImageStore() const;   // 어디에도 연결되지 않은 복사본을 휴지통으로 (반환: 정리한 수)
 	static bool    IsVideoFile(LPCWSTR path);

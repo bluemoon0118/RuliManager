@@ -12,6 +12,10 @@
 #include "ActorDetailPanel.h"
 #include "ActorStrip.h"
 #include "MediaInfoLabel.h"
+#include <mutex>
+#include <condition_variable>
+#include <deque>
+#include <thread>
 #include "DropCounter.h"
 
 class CRuliManagerDlg : public CDialogEx, public IVideoGridOwner
@@ -137,6 +141,9 @@ protected:
 	CListCtrl  m_listCat;         // 배우/스튜디오/태그 목록
 	CSuggestEdit m_editTags;        // 태그 값 보관용 (숨김) - 화면에는 m_tagChips 로 표시
 	CTagChipCtrl m_tagChips;        // 태그 칩 입력 ([태그 ×] ... × ⌄)
+	CCardPopup   m_tagPopup;        // 태그 칩에 마우스를 올리면 그 태그 카드 (태그 탭 카드 모양)
+	CString      m_tagPopupName;
+	void DrawTagPopupCard(CDC* dc, const CRect& rc, const CString& tag);
 	CFont        m_detailFont;      // 영상 상세 글자 컨트롤 글꼴 (기본 + 1pt)
 	int          m_detailTmH = 0;   // m_detailFont 글자 높이 (픽셀)
 	void         ApplyDetailFonts();
@@ -343,6 +350,13 @@ protected:
 	void GridActivate(int row) override;
 	void GridKey(UINT vk) override;
 	bool GridDrawCard(CDC* dc, int row, const CRect& card, bool selected, bool focused) override;   // 영상 카드
+	int  GridHoverZone(int row, const CRect& card, CPoint pt) override;   // 1 = 영상 카드 이미지 위 (이미지만 표시)
+	CString GridTipText(int row, const CRect& card, CPoint pt) override;   // 영상 카드 제목 3줄 칸: 잘렸으면 제목 전체
+	// 영상 카드 덧그림(로고 · 별점 리본 · 해상도 / 재생 시간) 페이드: 행 → 지금 불투명도 (0 ~ 255, 바뀌는 중인 카드만)
+	std::map<int, int> m_overlayFade;
+	UINT_PTR m_fadeTimer = 0;
+	static const UINT_PTR kOverlayFadeTimer = 0x4F46;
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	static CString FindImageFor(const CString& videoPath);
 
 	// 영상 카드 (가로 이미지 / 제목 / 발매일(또는 ● 임시) / 메모 3줄 / 태그 수 · 배우 수)
@@ -351,6 +365,8 @@ protected:
 	CBitmap* GetVideoCover(int itemIdx, int w, int h);
 	// 스튜디오 로고 (영상 카드 오른쪽 위에 반투명으로), 이미지 경로(소문자) → GDI+ 이미지
 	std::map<CString, std::unique_ptr<Gdiplus::Bitmap>> m_studioLogos;
+	std::map<CString, std::unique_ptr<Gdiplus::Bitmap>> m_logoMarks;   // 영상 카드 오른쪽 위 로고: 카드 크기로 줄이고 75% 불투명을 미리 적용한 사본 (경로|폭x높이)
+	std::map<CString, std::vector<CString>> m_titleLines;              // 영상 카드 제목 3줄 줄바꿈 결과 (제목|폭|줄높이) - 스크롤 때마다 다시 재지 않게
 	Gdiplus::Bitmap* GetStudioLogo(const CString& path);
 	void DrawStudioMark(CDC* dc, const CRect& img, const CString& studio, const CString& label = CString());   // 레이블이 있으면 레이블 이미지
 	void DrawVideoCard(CDC* dc, int row, const CRect& card, bool selected, bool focused);
@@ -424,6 +440,23 @@ protected:
 	afx_msg void OnLvnCatItemChanged(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnLvnCatColumnClick(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg LRESULT OnRebuildCategories(WPARAM wParam, LPARAM lParam);
+	// 영상 카드 이미지 오른쪽 아래 해상도 · 재생 시간: Windows 속성을 백그라운드 스레드에서 읽어 경로별로 보관
+	struct MediaQueue
+	{
+		std::mutex mx;
+		std::condition_variable cv;
+		std::deque<CString> q;
+		HWND hwnd = nullptr;
+		bool stop = false;   // 창을 닫을 때 스레드 끝내기
+	};
+	std::shared_ptr<MediaQueue> m_mediaQ;                        // 읽을 경로 대기열 (스레드와 공유)
+	std::thread m_mediaThread;                                   // 읽기 스레드 (창을 닫을 때 끝날 때까지 기다림 - 메모리 누수 방지)
+	void StopCardMediaThread();
+	afx_msg void OnDestroy();
+	std::map<CString, CMediaInfoLabel::Info> m_cardMedia;        // 경로(소문자) → 해상도 · 재생 시간
+	std::set<CString> m_cardMediaRequested;                      // 읽기를 요청한 경로 (다시 요청하지 않음)
+	const CMediaInfoLabel::Info* CardMediaInfo(const CString& path);   // 있으면 정보, 없으면 백그라운드 읽기 요청 후 nullptr
+	afx_msg LRESULT OnCardMediaReady(WPARAM wParam, LPARAM lParam);
 
 	DECLARE_MESSAGE_MAP()
 };

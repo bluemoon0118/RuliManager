@@ -3,6 +3,13 @@
 #include "TextDraw.h"
 #include <shobjidl.h>
 #include <propidl.h>
+#include <mfapi.h>
+#include <mfidl.h>
+#include <mfreadwrite.h>
+#include <mutex>
+#pragma comment(lib, "mfplat.lib")
+#pragma comment(lib, "mfreadwrite.lib")
+#pragma comment(lib, "mfuuid.lib")
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -79,6 +86,51 @@ void CMediaInfoLabel::SetColors(COLORREF back, COLORREF sub, COLORREF text)
 		Invalidate(FALSE);
 }
 
+namespace
+{
+	// Windows 속성에 값이 없을 때: Media Foundation 으로 파일을 직접 열어 영상 스트림의 크기 · fps · 전체 길이를 읽음
+	//  (MP4 · MOV · M4V · WMV · AVI · MKV(Windows 10 이상) 등 Windows 에서 재생되는 형식)
+	void ReadInfoMediaFoundation(const CString& path, CMediaInfoLabel::Info& info)
+	{
+		static std::once_flag once;
+		static bool started = false;
+		std::call_once(once, []() { started = SUCCEEDED(::MFStartup(MF_VERSION, MFSTARTUP_LITE)); });   // 한 번만 (끝날 때까지 유지)
+		if (!started)
+			return;
+		// COM 이 아직 없는 스레드면 이 호출 동안만 초기화
+		const HRESULT co = ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+		{
+			CComPtr<IMFSourceReader> reader;
+			if (SUCCEEDED(::MFCreateSourceReaderFromURL(path, nullptr, &reader)) && reader)
+			{
+				if (info.duration100ns == 0)
+				{
+					PROPVARIANT var;
+					::PropVariantInit(&var);
+					if (SUCCEEDED(reader->GetPresentationAttribute(static_cast<DWORD>(MF_SOURCE_READER_MEDIASOURCE), MF_PD_DURATION, &var)) && var.vt == VT_UI8)
+						info.duration100ns = var.uhVal.QuadPart;
+					::PropVariantClear(&var);
+				}
+				CComPtr<IMFMediaType> type;
+				if (SUCCEEDED(reader->GetNativeMediaType(static_cast<DWORD>(MF_SOURCE_READER_FIRST_VIDEO_STREAM), 0, &type)) && type)
+				{
+					UINT32 w = 0, h = 0;
+					if ((info.width == 0 || info.height == 0) && SUCCEEDED(::MFGetAttributeSize(type, MF_MT_FRAME_SIZE, &w, &h)) && w > 0 && h > 0)
+					{
+						info.width = w;
+						info.height = h;
+					}
+					UINT32 num = 0, den = 0;
+					if (info.fps <= 0 && SUCCEEDED(::MFGetAttributeRatio(type, MF_MT_FRAME_RATE, &num, &den)) && num > 0 && den > 0)
+						info.fps = static_cast<double>(num) / den;
+				}
+			}
+		}
+		if (SUCCEEDED(co))
+			::CoUninitialize();
+	}
+}
+
 CMediaInfoLabel::Info CMediaInfoLabel::ReadInfo(const CString& path)
 {
 	Info info;
@@ -94,6 +146,9 @@ CMediaInfoLabel::Info CMediaInfoLabel::ReadInfo(const CString& path)
 		info.duration100ns = ReadUInt64(store, kDuration);
 		store->Release();
 	}
+	// 속성에 없는 값(해상도 · fps · 재생 시간)은 파일을 직접 열어서 채움
+	if (info.width == 0 || info.height == 0 || info.duration100ns == 0 || info.fps <= 0)
+		ReadInfoMediaFoundation(path, info);
 	info.ok = (info.width > 0 && info.height > 0) || info.fps > 0 || info.duration100ns > 0;
 	return info;
 }

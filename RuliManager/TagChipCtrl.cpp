@@ -43,6 +43,8 @@ BEGIN_MESSAGE_MAP(CTagChipCtrl, CWnd)
 	ON_WM_ERASEBKGND()
 	ON_WM_SIZE()
 	ON_WM_LBUTTONDOWN()
+	ON_WM_MOUSEMOVE()
+	ON_MESSAGE(WM_MOUSELEAVE, &CTagChipCtrl::OnMouseLeave)
 	ON_WM_SETCURSOR()
 	ON_WM_SETFOCUS()
 	ON_WM_ENABLE()
@@ -51,6 +53,60 @@ BEGIN_MESSAGE_MAP(CTagChipCtrl, CWnd)
 	ON_MESSAGE(WM_SETFONT, &CTagChipCtrl::OnSetFontMsg)
 	ON_MESSAGE(WM_GETFONT, &CTagChipCtrl::OnGetFontMsg)
 END_MESSAGE_MAP()
+
+void CTagChipCtrl::OnMouseMove(UINT nFlags, CPoint point)
+{
+	if (!m_trackLeave)
+	{
+		TRACKMOUSEEVENT tme = { sizeof(tme), TME_LEAVE, GetSafeHwnd(), 0 };
+		m_trackLeave = ::TrackMouseEvent(&tme) != FALSE;
+	}
+	int hit = -1;
+	for (size_t i = 0; i < m_chipRects.size() && i < m_tags.size(); ++i)
+		if (m_chipRects[i].PtInRect(point)) { hit = static_cast<int>(i); break; }
+	SetHoverChip(hit);
+	// 칩 × 위: 빨간 바탕 (바뀐 칩만 다시 그림)
+	int hx = -1;
+	if (hit >= 0 && hit < static_cast<int>(m_xRects.size()) && m_xRects[hit].PtInRect(point) && IsWindowEnabled())
+		hx = hit;
+	if (hx != m_hoverX)
+	{
+		if (m_hoverX >= 0 && m_hoverX < static_cast<int>(m_chipRects.size()))
+			InvalidateRect(&m_chipRects[m_hoverX], FALSE);
+		m_hoverX = hx;
+		if (m_hoverX >= 0)
+			InvalidateRect(&m_chipRects[m_hoverX], FALSE);
+	}
+	CWnd::OnMouseMove(nFlags, point);
+}
+
+LRESULT CTagChipCtrl::OnMouseLeave(WPARAM, LPARAM)
+{
+	m_trackLeave = false;
+	SetHoverChip(-1);
+	if (m_hoverX >= 0)
+	{
+		m_hoverX = -1;
+		Invalidate(FALSE);
+	}
+	return 0;
+}
+
+void CTagChipCtrl::SetHoverChip(int index)
+{
+	if (index == m_hoverChip)
+		return;
+	m_hoverChip = index;
+	if (!m_onChipHover)
+		return;
+	CRect r;
+	if (index >= 0 && index < static_cast<int>(m_chipRects.size()))
+	{
+		r = m_chipRects[index];
+		ClientToScreen(&r);
+	}
+	m_onChipHover(index, r);
+}
 
 LRESULT CTagChipCtrl::OnSetFontMsg(WPARAM wp, LPARAM lp)
 {
@@ -111,6 +167,8 @@ void CTagChipCtrl::SetColors(COLORREF back, COLORREF chipBack, COLORREF chipText
 
 void CTagChipCtrl::SetTags(const std::vector<CString>& tags)
 {
+	SetHoverChip(-1);   // 칩이 바뀌면 떠 있던 팝업은 닫음
+	m_hoverX = -1;
 	m_tags = tags;
 	TagsChanged(false);
 }
@@ -311,7 +369,26 @@ void CTagChipCtrl::OnPaint()
 			}
 		}
 		if (enabled)
-			DrawCross(&mem, m_xRects[i], 3, m_chipText, 2);
+		{
+			if (static_cast<int>(i) == m_hoverX)
+			{
+				// 마우스가 올라간 ×: 빨간 둥근 바탕 + 흰 ×
+				CRect xr = m_xRects[i];
+				xr.DeflateRect(1, 2);
+				const int d = (std::min)(xr.Width(), xr.Height());
+				CRect cr(xr.CenterPoint().x - d / 2, xr.CenterPoint().y - d / 2, xr.CenterPoint().x - d / 2 + d, xr.CenterPoint().y - d / 2 + d);
+				CBrush rb(RGB(0xE8, 0x3B, 0x3B));
+				CPen rp(PS_SOLID, 1, RGB(0xE8, 0x3B, 0x3B));
+				CBrush* ob2 = mem.SelectObject(&rb);
+				CPen* op2 = mem.SelectObject(&rp);
+				mem.RoundRect(cr, CPoint(d / 2, d / 2));
+				mem.SelectObject(ob2);
+				mem.SelectObject(op2);
+				DrawCross(&mem, m_xRects[i], 3, RGB(255, 255, 255), 2);
+			}
+			else
+				DrawCross(&mem, m_xRects[i], 3, m_chipText, 2);
+		}
 	}
 
 	if (enabled)

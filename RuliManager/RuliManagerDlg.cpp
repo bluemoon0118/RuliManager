@@ -4,6 +4,7 @@
 #include "ActorDlg.h"
 #include "TextInfoDlg.h"
 #include <cmath>
+#include <thread>
 #include "SettingsDlg.h"
 #include "ImageSearchDlg.h"
 #include "NameListDlg.h"
@@ -16,6 +17,7 @@
 #include <uxtheme.h>
 #pragma comment(lib, "uxtheme.lib")
 #pragma comment(lib, "gdiplus.lib")
+#pragma comment(lib, "msimg32.lib")   // AlphaBlend (영상 카드 덧그림 페이드)
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -24,6 +26,12 @@
 namespace
 {
 	const UINT WM_APP_REBUILD_CATS = WM_APP + 1;
+	const UINT WM_APP_CARD_MEDIA = WM_APP + 2;   // 백그라운드에서 영상 해상도 · 재생 시간을 읽음 (lParam = CardMediaResult*)
+	struct CardMediaResult
+	{
+		CString key;
+		CMediaInfoLabel::Info info;
+	};
 
 	enum Column { COL_NAME = 0, COL_TITLE, COL_SIZE, COL_DATE, COL_RATING, COL_RELEASE, COL_ACTORS, COL_STUDIO, COL_TAGS, COL_PATH, COL_COUNT };
 
@@ -216,6 +224,8 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_WM_CTLCOLOR()
 	ON_WM_DRAWITEM()
 	ON_WM_CONTEXTMENU()
+	ON_WM_TIMER()
+	ON_WM_DESTROY()
 
 	ON_BN_CLICKED(IDC_BTN_ADDFOLDER, &CRuliManagerDlg::OnBnClickedAddFolder)
 	ON_BN_CLICKED(IDC_BTN_REMOVEFOLDER, &CRuliManagerDlg::OnBnClickedRemoveFolder)
@@ -287,6 +297,7 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_LIST_CATEGORY, &CRuliManagerDlg::OnLvnCatItemChanged)
 	ON_NOTIFY(LVN_COLUMNCLICK, IDC_LIST_CATEGORY, &CRuliManagerDlg::OnLvnCatColumnClick)
 	ON_MESSAGE(WM_APP_REBUILD_CATS, &CRuliManagerDlg::OnRebuildCategories)
+	ON_MESSAGE(WM_APP_CARD_MEDIA, &CRuliManagerDlg::OnCardMediaReady)
 END_MESSAGE_MAP()
 
 // ---------------------------------------------------------------------------
@@ -638,6 +649,23 @@ BOOL CRuliManagerDlg::OnInitDialog()
 			m_syncingTags = false;
 		};
 		m_tagChips.m_onDropDown = [this]() { OnBnClickedPickTags(); };
+		// 태그 칩 위에 마우스 → 그 태그 카드 팝업 (태그 탭 카드와 같은 모양), 벗어나면 닫음
+		m_tagPopup.CreatePopup(this);
+		m_tagPopup.m_back = kBackColor;
+		m_tagPopup.m_onDraw = [this](CDC* dc, const CRect& rc) { DrawTagPopupCard(dc, rc, m_tagPopupName); };
+		m_tagChips.m_onChipHover = [this](int index, const CRect& chipScreen)
+		{
+			if (index < 0 || index >= static_cast<int>(m_tagChips.Tags().size()))
+			{
+				m_tagPopup.Hide();
+				return;
+			}
+			m_tagPopupName = m_tagChips.Tags()[index];
+			// 태그 탭 카드 크기 (영상 카드 폭의 75%)
+			const int w = m_vcardW * 3 / 4;
+			const int h = m_cardPad * 2 + (w - m_cardPad * 2) * 9 / 16 + m_cardPad + m_cardLineB + m_cardPad / 2 + 1 + m_cardPad + m_cardLine + m_cardPad;
+			m_tagPopup.ShowNear(chipScreen, CSize(w + 2, h + 2));
+		};
 		m_tagChips.m_onHeightChanged = [this]()
 		{
 			CRect client;
@@ -1026,10 +1054,9 @@ BOOL CRuliManagerDlg::OnInitDialog()
 		const bool parts = m_lib.UnifyPartGroups() > 0;
 		// 예전에 원본 경로로 등록한 이미지를 DB 폴더(images)의 복사본으로 교체
 		bool img = m_lib.MigrateImagesToStore();
-		// Image 폴더의 평문 이미지 → 암호화(.vmimg)로 바꿈 (DB 를 정상적으로 읽었을 때만, 평문은 저장 후 삭제)
-		std::vector<CString> plainImages;
+		// Image 폴더의 예전 암호화 이미지(.vmimg) → 평문 사본으로 풀어 연결 (DB 를 정상적으로 읽었을 때만, 원래 파일은 지우지 않음)
 		if (haveLibrary && !m_lib.DbBroken())
-			img = m_lib.EncryptImageStore(plainImages) || img;
+			img = m_lib.DecryptImageStore() || img;
 		// 경로가 바뀐(옮기거나 이름을 바꾼) 영상 파일을 기존 정보에 다시 연결
 		{
 			CWaitCursor wait;
@@ -1037,17 +1064,13 @@ BOOL CRuliManagerDlg::OnInitDialog()
 		}
 		if (a || n || img || codes || parts || m_startupRelinked > 0 || m_lib.LoadedPlainText())   // 예전 평문 DB 는 바로 암호화해서 다시 저장
 		{
-			if (m_lib.Save())
-			{
-				for (const CString& f : plainImages)
-					::DeleteFileW(f);   // 암호화 사본으로 바뀐 평문 이미지 삭제 (휴지통 거치지 않음)
-			}
+			m_lib.Save();
 		}
 		if (m_lib.DbBroken())
 			AfxMessageBox(L"DB 파일을 복호화하지 못했습니다 (손상되었거나 다른 프로그램 버전의 키).\n"
 				L"기존 DB 를 보호하기 위해 이번 실행에서는 DB 를 저장하지 않습니다.", MB_ICONERROR);
 		// 교체/삭제되어 더 이상 쓰이지 않는 복사본 정리 (DB를 정상적으로 읽은 경우에만)
-		if (haveLibrary)
+		if (haveLibrary && !m_lib.DbBroken())
 			m_lib.CleanupImageStore();
 	}
 	UpdateApplyDbButton();   // 시작 때 정리하며 저장했으면 활성
@@ -1269,9 +1292,9 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 	int labelStripH = 0;
 	if (!showDetail && m_mode == MODE_STUDIO && !IsActorGridMode() && m_labelStrip.GetSafeHwnd() && !m_stripForActor && !m_stripLabels.empty())   // 하위 레이블 · 상위 제작사 카드
 		labelStripH = (std::min)(m_labelStrip.CalcWrapHeight(rw), (std::max)(0, (bottom - top) / 2));
-	// 배우 상세: 배우 정보 패널 아래 출연작의 제작사 / 레이블 카드 (여러 줄, 오른쪽 영역 높이의 1/3 까지)
+	// 배우 상세: 배우 정보 패널 아래 출연작의 제작사 / 레이블 카드 (여러 줄 - 3줄까지 보이고, 4줄 이상이면 세로 스크롤)
 	if (IsActorGridMode() && m_labelStrip.GetSafeHwnd() && m_stripForActor && !m_stripLabels.empty())
-		labelStripH = (std::min)(m_labelStrip.CalcWrapHeight(rw), (std::max)(0, (bottom - top) / 3));
+		labelStripH = (std::min)(m_labelStrip.CalcWrapHeight(rw), m_labelStrip.RowsHeight(3));
 	// 제작사 탭 상세(제작사 · 레이블 선택): 정보 줄 아래 링크 줄 (링크가 있을 때만)
 	const int namedLinksH = (!showDetail && m_mode == MODE_STUDIO && !IsActorGridMode() && m_namedLinks.GetSafeHwnd() && m_namedLinks.HasUrls())
 		? DY(14) * 21 / 20 + 4 : 0;   // 아이콘 = 높이 - 4px = 예전(DY(14) 의 70%)의 1.5배
@@ -1744,6 +1767,12 @@ void CRuliManagerDlg::ApplyFilter()
 						(m_mode == MODE_ACTOR && m_lib.ActorKeyOf(actorIndex, n) == actorTarget)) { hit = true; break; }
 				}
 				if (!hit) continue;
+				// 제작사 카드의 영상 목록: 레이블 없이 제작사만 지정한 영상만 (레이블 영상은 그 레이블 카드에서 - 카드 합계와 같게)
+				if (m_mode == MODE_STUDIO && m_catKind == CAT_VALUE)
+				{
+					CString lb = v.label;
+					if (!lb.Trim().IsEmpty()) continue;
+				}
 			}
 		}
 		if (!terms.empty())
@@ -2034,6 +2063,104 @@ void CRuliManagerDlg::MarkCategoriesDirty()
 	PostMessage(WM_APP_REBUILD_CATS);
 }
 
+const CMediaInfoLabel::Info* CRuliManagerDlg::CardMediaInfo(const CString& path)
+{
+	if (path.IsEmpty())
+		return nullptr;
+	CString key = path;
+	key.MakeLower();
+	auto it = m_cardMedia.find(key);
+	if (it != m_cardMedia.end())
+		return &it->second;
+	if (!m_cardMediaRequested.insert(key).second)
+		return nullptr;   // 읽는 중
+	if (!m_mediaQ)
+	{
+		// 처음 요청할 때 읽기 스레드 하나 시작 (대기열이 비면 기다림, 프로그램이 끝날 때까지)
+		m_mediaQ = std::make_shared<MediaQueue>();
+		m_mediaQ->hwnd = GetSafeHwnd();
+		std::shared_ptr<MediaQueue> q = m_mediaQ;
+		m_mediaThread = std::thread([q]()
+		{
+			const HRESULT hr = ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+			for (;;)
+			{
+				CString p;
+				{
+					std::unique_lock<std::mutex> lock(q->mx);
+					q->cv.wait(lock, [&q]() { return q->stop || !q->q.empty(); });
+					if (q->stop)
+						break;
+					p = q->q.front();
+					q->q.pop_front();
+				}
+				if (!::IsWindow(q->hwnd))
+					break;
+				CardMediaResult* r = new CardMediaResult;
+				r->key = p;
+				r->key.MakeLower();
+				r->info = CMediaInfoLabel::ReadInfo(p);
+				if (!::PostMessageW(q->hwnd, WM_APP_CARD_MEDIA, 0, reinterpret_cast<LPARAM>(r)))
+				{
+					delete r;
+					break;
+				}
+			}
+			if (SUCCEEDED(hr))
+				::CoUninitialize();
+		});
+	}
+	{
+		std::lock_guard<std::mutex> lock(m_mediaQ->mx);
+		m_mediaQ->q.push_back(path);
+	}
+	m_mediaQ->cv.notify_one();
+	return nullptr;
+}
+
+void CRuliManagerDlg::StopCardMediaThread()
+{
+	// 읽기 스레드 끝내기: 대기열을 비우고 멈춤 신호 → 지금 읽는 파일이 끝날 때까지 기다림
+	if (m_mediaQ)
+	{
+		{
+			std::lock_guard<std::mutex> lock(m_mediaQ->mx);
+			m_mediaQ->stop = true;
+			m_mediaQ->q.clear();
+		}
+		m_mediaQ->cv.notify_all();
+	}
+	if (m_mediaThread.joinable())
+		m_mediaThread.join();
+	m_mediaQ.reset();
+	// 아직 처리하지 못한 결과 메시지의 메모리 정리
+	MSG msg;
+	while (::PeekMessageW(&msg, GetSafeHwnd(), WM_APP_CARD_MEDIA, WM_APP_CARD_MEDIA, PM_REMOVE))
+		delete reinterpret_cast<CardMediaResult*>(msg.lParam);
+}
+
+void CRuliManagerDlg::OnDestroy()
+{
+	StopCardMediaThread();
+	if (m_fadeTimer)
+	{
+		KillTimer(kOverlayFadeTimer);
+		m_fadeTimer = 0;
+	}
+	CDialogEx::OnDestroy();
+}
+
+LRESULT CRuliManagerDlg::OnCardMediaReady(WPARAM, LPARAM lParam)
+{
+	std::unique_ptr<CardMediaResult> r(reinterpret_cast<CardMediaResult*>(lParam));
+	if (!r)
+		return 0;
+	m_cardMedia[r->key] = r->info;
+	if (r->info.ok && m_grid.GetSafeHwnd() && m_grid.IsWindowVisible())
+		m_grid.Invalidate(FALSE);   // 받은 해상도 · 재생 시간으로 다시 그림
+	return 0;
+}
+
 LRESULT CRuliManagerDlg::OnRebuildCategories(WPARAM, LPARAM)
 {
 	if (!m_catsDirty)
@@ -2079,7 +2206,7 @@ void CRuliManagerDlg::RebuildCategories()
 		}
 	}
 
-	// 스튜디오 카드용: 스튜디오별 출연 배우 수
+	// 스튜디오 카드용: 스튜디오별 출연 배우 수 (레이블 없이 제작사만 지정한 영상만 - 레이블 영상은 레이블 카드에서 셈)
 	m_studioActorCounts.clear();
 	if (m_mode == MODE_STUDIO)
 	{
@@ -2091,6 +2218,9 @@ void CRuliManagerDlg::RebuildCategories()
 			s.Trim();
 			if (s.IsEmpty())
 				continue;
+			CString lb = v.label;
+			if (!lb.Trim().IsEmpty())
+				continue;   // 레이블이 있는 영상은 제작사 카드 합계에서 뺌
 			s.MakeLower();
 			for (const CString& n : CVideoLibrary::SplitList(v.actors))
 				actorsOf[s].insert(m_lib.ActorKeyOf(nameIndex, n));
@@ -2127,6 +2257,13 @@ void CRuliManagerDlg::RebuildCategories()
 			++none;
 			continue;
 		}
+		// 제작사 탭: 레이블까지 지정한 영상은 제작사 영상 수에 넣지 않음 (순수하게 제작사만 고른 영상만 집계 - 레이블 영상은 레이블 카드에서 셈)
+		bool countIt = true;
+		if (m_mode == MODE_STUDIO)
+		{
+			CString lb = v.label;
+			countIt = lb.Trim().IsEmpty();
+		}
 		std::set<CString> seen;
 		for (const CString& n : vals)
 		{
@@ -2137,7 +2274,8 @@ void CRuliManagerDlg::RebuildCategories()
 			Entry& e = groups[key];
 			if (e.name.IsEmpty())
 				e.name = n;
-			++e.count;
+			if (countIt)
+				++e.count;
 		}
 	}
 
@@ -2598,6 +2736,7 @@ void CRuliManagerDlg::ResetThumbnails()
 	m_actorPortraits.clear();   // 배우 사진이 바뀌었을 수 있음
 	m_videoCovers.clear();      // 영상 이미지가 추가/변경됐을 수 있음
 	m_studioLogos.clear();      // 스튜디오 이미지가 바뀌었을 수 있음
+	m_logoMarks.clear();
 	AddThumbnail(nullptr, L"이미지 없음");
 	m_grid.Invalidate(FALSE);
 	m_actorGrid.Invalidate(FALSE);
@@ -4869,6 +5008,88 @@ namespace
 	}
 }
 
+void CRuliManagerDlg::DrawTagPopupCard(CDC* dc, const CRect& outer, const CString& tag)
+{
+	// 태그 칩 팝업: 태그 탭 카드와 같은 모양 (꼬리표 아이콘 · 이름 (영어, 일본어) · 구분선 · ▶ 영상 수, 즐겨찾기 하트)
+	CRect rc = outer;
+	rc.DeflateRect(1, 1);
+	const int radius = DX(4);
+	{
+		CBrush br(kCardBack);
+		CPen pen(PS_SOLID, 1, RGB(0x5C, 0x70, 0x80));
+		CBrush* ob = dc->SelectObject(&br);
+		CPen* op = dc->SelectObject(&pen);
+		dc->RoundRect(rc, CPoint(radius, radius));
+		dc->SelectObject(ob);
+		dc->SelectObject(op);
+	}
+	const int w = rc.Width();
+	const CRect area(rc.left + m_cardPad * 2, rc.top + m_cardPad * 2, rc.right - m_cardPad * 2,
+		rc.top + m_cardPad * 2 + (w - m_cardPad * 2) * 9 / 16 - m_cardPad * 2);
+	DrawBigTagIcon(dc, area, RGB(255, 255, 255), kCardBack);
+	if (IsTagFavorite(tag))
+		DrawHeart(dc, ActorHeartRect(rc), RGB(0xF2, 0x5C, 0x54), 255, true);
+
+	CFont* normal = GetFont();
+	CFont* oldFont = dc->SelectObject(&m_cardNameFont);
+	dc->SetBkMode(TRANSPARENT);
+	const int x = rc.left + m_cardPad * 2;
+	const int right = rc.right - m_cardPad * 2;
+	int y = rc.top + m_cardPad * 2 + (w - m_cardPad * 2) * 9 / 16;
+
+	// 이름 (굵게) + 회색 " (영어, 일본어)"
+	CString name = tag, extra;
+	const int ti = m_lib.FindNamed(LIST_TAG, tag);
+	if (ti >= 0)
+	{
+		const NamedInfo& tg = m_lib.tagInfos[ti];
+		name = tg.name;
+		CString parts = tg.nameEn;
+		if (!tg.nameJa.IsEmpty())
+			parts += (parts.IsEmpty() ? L"" : L", ") + tg.nameJa;
+		if (!parts.IsEmpty())
+			extra = L" (" + parts + L")";
+	}
+	dc->SetTextColor(kTextColor);
+	TextFB::Draw(dc, name, CRect(x, y, right, y + m_cardLineB), DT_LEFT, true);
+	if (!extra.IsEmpty())
+	{
+		const int nw = TextFB::Width(dc, name);
+		if (x + nw < right)
+		{
+			dc->SelectObject(normal);
+			dc->SetTextColor(kCardSub);
+			TextFB::Draw(dc, extra, CRect(x + nw, y, right, y + m_cardLineB), DT_LEFT, true);
+		}
+	}
+	y += m_cardLineB + m_cardPad / 2;
+
+	// 구분선
+	dc->FillSolidRect(rc.left + m_cardPad, y, rc.Width() - m_cardPad * 2, 1, kCardLine);
+	y += 1 + m_cardPad;
+
+	// ▶ 영상 수 (가운데)
+	dc->SelectObject(normal);
+	int videos = 0;
+	{
+		for (const VideoItem& v : m_lib.items)
+			for (const CString& t : CVideoLibrary::SplitList(v.tags))
+				if (t.CompareNoCase(name) == 0) { ++videos; break; }
+	}
+	CString vText;
+	vText.Format(L"%d", videos);
+	const int iconR = (std::max)(4, m_cardLine * 2 / 5);
+	const int gapIcon = DX(3);
+	const int total = iconR * 2 + gapIcon + dc->GetTextExtent(vText).cx;
+	int sx = rc.left + (rc.Width() - total) / 2;
+	const int cy = y + m_cardLine / 2;
+	dc->SetTextColor(kTextColor);
+	DrawPlayIcon(dc, sx + iconR, cy, iconR, kCardIcon, kCardBack);
+	sx += iconR * 2 + gapIcon;
+	dc->TextOut(sx, y, vText);
+	dc->SelectObject(oldFont);
+}
+
 void CRuliManagerDlg::DrawStudioCard(CDC* dc, int row, const CRect& rc, bool selected, bool focused)
 {
 	if (row < 0 || row >= static_cast<int>(m_catRows.size()))
@@ -5225,7 +5446,15 @@ void CRuliManagerDlg::DrawLabelStripCard(CDC* dc, int i, const CRect& rc, bool h
 	CFont* old = dc->SelectObject(GetFont());
 	dc->SetBkMode(TRANSPARENT);
 	dc->SetTextColor(kTextColor);
-	TextFB::Draw(dc, lb.name, CRect(rc.left + pad, rc.bottom - nameH - pad / 2, rc.right - pad, rc.bottom - pad / 2), DT_CENTER, true);
+	CString cardName = lb.name;
+	if (m_stripForActor && i < static_cast<int>(m_stripCounts.size()))
+	{
+		// 배우 상세: 이름 오른쪽에 그 배우의 출연 편수  예) "S1 NO.1 STYLE (12)"
+		CString c;
+		c.Format(L" (%d)", m_stripCounts[i]);
+		cardName += c;
+	}
+	TextFB::Draw(dc, cardName, CRect(rc.left + pad, rc.bottom - nameH - pad / 2, rc.right - pad, rc.bottom - pad / 2), DT_CENTER, true);
 	dc->SelectObject(old);
 }
 
@@ -5423,6 +5652,87 @@ bool CRuliManagerDlg::GridDrawCard(CDC* dc, int row, const CRect& card, bool sel
 	return true;
 }
 
+void CRuliManagerDlg::OnTimer(UINT_PTR nIDEvent)
+{
+	if (nIDEvent != kOverlayFadeTimer)
+	{
+		CDialogEx::OnTimer(nIDEvent);
+		return;
+	}
+	// 영상 카드 덧그림 페이드: 목표(이미지 위 = 0, 아니면 255)까지 한 번에 조금씩 (약 0.12초)
+	const int step = 36;
+	for (auto it = m_overlayFade.begin(); it != m_overlayFade.end(); )
+	{
+		const int row = it->first;
+		const bool hidden = (m_grid.HotRow() == row && m_grid.HotZone() == 1);
+		const int target = hidden ? 0 : 255;
+		int& a = it->second;
+		a = (a < target) ? (std::min)(target, a + step) : (std::max)(target, a - step);
+		CRect r;
+		if (m_grid.GetSafeHwnd() && m_grid.GetTileRect(row, r))
+			m_grid.InvalidateRect(&r, FALSE);
+		if (a == 255 && !hidden)
+			it = m_overlayFade.erase(it);   // 다 나타남 → 추적 끝
+		else
+			++it;
+	}
+	// 숨긴 채 멈춘 카드만 남으면 타이머는 쉼 (다시 바뀌면 그릴 때 다시 시작)
+	bool moving = false;
+	for (const auto& kv : m_overlayFade)
+	{
+		const bool hidden = (m_grid.HotRow() == kv.first && m_grid.HotZone() == 1);
+		if (kv.second != (hidden ? 0 : 255)) { moving = true; break; }
+	}
+	if (!moving && m_fadeTimer)
+	{
+		KillTimer(kOverlayFadeTimer);
+		m_fadeTimer = 0;
+	}
+}
+
+CString CRuliManagerDlg::GridTipText(int row, const CRect& card, CPoint pt)
+{
+	// 영상 카드의 제목 3줄 칸 위에서, 제목이 다 보이지 않으면(3줄을 넘어 "…") 제목 전체를 풍선 도움말로
+	if (row < 0 || row >= static_cast<int>(m_view.size()))
+		return CString();
+	const VideoItem& v = m_lib.items[m_view[row]];
+	CString rest = v.title;
+	rest.Replace(L"\r\n", L" ");
+	rest.Replace(L'\n', L' ');
+	rest.Trim();
+	if (rest.IsEmpty())
+		return CString();
+	// DrawVideoCard 와 같은 배치: 이미지 → 품번 줄 → 발매일 줄 → 제목 3줄
+	const int x = card.left + m_cardPad;
+	const int right = card.right - m_cardPad;
+	const int top = card.top + m_vcardImgH + m_cardPad + m_videoLineB + DX(2) + m_vcardSubLine + m_vcardMemoGap;
+	const CRect titleRc(x, top, right, top + m_vcardSubLine * 3);
+	if (!titleRc.PtInRect(pt))
+		return CString();
+	const int lineW = right - x;
+	CString lkey;
+	lkey.Format(L"%d|%d|", lineW, m_vcardSubLine);
+	lkey += rest;
+	auto it = m_titleLines.find(lkey);
+	if (it == m_titleLines.end() || it->second.empty())
+		return CString();
+	const std::vector<CString>& lines = it->second;
+	if (lines.size() < 3)
+		return CString();   // 3줄 안에 다 들어감
+	CClientDC cdc(this);
+	CFont* old = cdc.SelectObject(&m_vcardSubFont);
+	const bool cut = TextFB::Width(&cdc, lines.back()) > lineW;   // 마지막 줄이 넘치면 "…" 로 잘림
+	cdc.SelectObject(old);
+	return cut ? rest : CString();
+}
+
+int CRuliManagerDlg::GridHoverZone(int /*row*/, const CRect& card, CPoint pt)
+{
+	// 영상 카드 이미지 영역 (DrawVideoCard 의 img 와 같음)
+	const CRect img(card.left, card.top, card.right, card.top + m_vcardImgH);
+	return img.PtInRect(pt) ? 1 : 0;
+}
+
 CBitmap* CRuliManagerDlg::GetVideoCover(int itemIdx, int w, int h)
 {
 	if (itemIdx < 0 || itemIdx >= static_cast<int>(m_lib.items.size()) || w <= 0 || h <= 0)
@@ -5561,18 +5871,45 @@ void CRuliManagerDlg::DrawStudioMark(CDC* dc, const CRect& img, const CString& s
 		const int x = img.right - margin - w;
 		const int y = img.top + margin;
 
-		Gdiplus::Graphics g(dc->GetSafeHdc());
-		g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-		g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-		Gdiplus::ColorMatrix cm = {
-			1, 0, 0, 0, 0,
-			0, 1, 0, 0, 0,
-			0, 0, 1, 0, 0,
-			0, 0, 0, 0.75f, 0,
-			0, 0, 0, 0, 1 };
-		Gdiplus::ImageAttributes attr;
-		attr.SetColorMatrix(&cm);
-		g.DrawImage(logo, Gdiplus::Rect(x, y, w, h), 0, 0, static_cast<INT>(lw), static_cast<INT>(lh), Gdiplus::UnitPixel, &attr);
+		// 줄이기(고품질) + 75% 불투명은 처음 한 번만 해서 보관 → 그릴 때는 크기 그대로 복사 (스크롤 중 CPU 사용량 줄임)
+		CString key;
+		key.Format(L"%p|%dx%d", static_cast<void*>(logo), w, h);
+		Gdiplus::Bitmap* mark = nullptr;
+		auto it = m_logoMarks.find(key);
+		if (it != m_logoMarks.end())
+			mark = it->second.get();
+		else
+		{
+			if (m_logoMarks.size() > 400)
+				m_logoMarks.clear();
+			auto bmp = std::make_unique<Gdiplus::Bitmap>(w, h, PixelFormat32bppPARGB);
+			{
+				Gdiplus::Graphics bg(bmp.get());
+				bg.Clear(Gdiplus::Color(0, 0, 0, 0));
+				bg.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+				bg.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+				Gdiplus::ColorMatrix cm = {
+					1, 0, 0, 0, 0,
+					0, 1, 0, 0, 0,
+					0, 0, 1, 0, 0,
+					0, 0, 0, 0.75f, 0,
+					0, 0, 0, 0, 1 };
+				Gdiplus::ImageAttributes attr;
+				attr.SetColorMatrix(&cm);
+				bg.DrawImage(logo, Gdiplus::Rect(0, 0, w, h), 0, 0, static_cast<INT>(lw), static_cast<INT>(lh), Gdiplus::UnitPixel, &attr);
+			}
+			if (bmp->GetLastStatus() != Gdiplus::Ok)
+				bmp.reset();
+			mark = bmp.get();
+			m_logoMarks[key] = std::move(bmp);
+		}
+		if (mark)
+		{
+			Gdiplus::Graphics g(dc->GetSafeHdc());
+			g.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+			g.SetCompositingQuality(Gdiplus::CompositingQualityHighSpeed);
+			g.DrawImage(mark, x, y, w, h);   // 크기 그대로 (다시 줄이지 않음)
+		}
 		return;
 	}
 
@@ -5644,11 +5981,96 @@ void CRuliManagerDlg::DrawVideoCard(CDC* dc, int row, const CRect& rc, bool sele
 		dc->SelectClipRgn(nullptr);
 	}
 
-	// 스튜디오가 지정되어 있으면 이미지 오른쪽 위에 로고(없으면 이름)를 반투명으로
-	DrawStudioMark(dc, img, v.studio, v.label);   // 레이블이 있으면 레이블 이미지
+	// 이미지 위에 마우스를 올리면 이미지만 (로고 · 별점 리본 · 해상도 / 재생 시간이 부드럽게 사라짐 / 나타남)
+	const bool imageOnly = (m_grid.HotRow() == row && m_grid.HotZone() == 1);
+	int overlayAlpha = 255;   // 0 = 숨김, 255 = 다 보임
+	{
+		auto fit = m_overlayFade.find(row);
+		if (fit != m_overlayFade.end())
+			overlayAlpha = fit->second;
+		if ((imageOnly && overlayAlpha != 0) || (!imageOnly && overlayAlpha != 255))
+		{
+			m_overlayFade[row] = overlayAlpha;   // 목표까지 타이머로 조금씩 (StepOverlayFade)
+			if (!m_fadeTimer)
+				m_fadeTimer = SetTimer(kOverlayFadeTimer, 15, nullptr);
+		}
+	}
+	auto drawOverlays = [&](CDC* d, const CRect& rcX, const CRect& imgX)
+	{
+		// 스튜디오가 지정되어 있으면 이미지 오른쪽 위에 로고(없으면 이름)를 반투명으로
+		DrawStudioMark(d, imgX, v.studio, v.label);   // 레이블이 있으면 레이블 이미지
 
-	// 별점: 이미지 왼쪽 위 대각선 리본 (배우 카드와 같은 모양/색)
-	DrawRatingRibbon(dc, rc, img, radius, v.rating, GetFont());
+		// 별점: 이미지 왼쪽 위 대각선 리본 (배우 카드와 같은 모양/색)
+		DrawRatingRibbon(d, rcX, imgX, radius, v.rating, GetFont());
+
+		// 이미지 오른쪽 아래: 해상도(굵게) + 재생 시간(시:분:초)  예) 1080p 2:03:15 - 바탕 없이, 글자 뒤에 어두운 그림자 (밝은 이미지에서도 보이게)
+		if (const CMediaInfoLabel::Info* mi = CardMediaInfo(v.path))
+		{
+			const CString res = CMediaInfoLabel::ResolutionText(mi->width, mi->height);
+			CString dur;
+			if (mi->duration100ns > 0)
+			{
+				const ULONGLONG sec = mi->duration100ns / 10000000ULL;
+				dur.Format(L"%llu:%02llu:%02llu", sec / 3600, (sec / 60) % 60, sec % 60);
+			}
+			if (!res.IsEmpty() || !dur.IsEmpty())
+			{
+				CFont* prev = d->SelectObject(&m_vcardSubFont);   // 굵은 글꼴
+				const int resW = res.IsEmpty() ? 0 : d->GetTextExtent(res).cx;
+				d->SelectObject(GetFont());
+				const int gapW = (!res.IsEmpty() && !dur.IsEmpty()) ? DX(3) : 0;
+				const int durW = dur.IsEmpty() ? 0 : d->GetTextExtent(dur).cx;
+				const int margin = DX(4);
+				const int bh = m_vcardSubLine + DX(1);
+				const CRect box(imgX.right - margin - (resW + gapW + durW), imgX.bottom - margin - bh, imgX.right - margin, imgX.bottom - margin);
+				d->SetBkMode(TRANSPARENT);
+				auto shadowText = [d](const CString& s, const CRect& r, COLORREF color)
+				{
+					const UINT fmt = DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX;
+					CRect sr = r;
+					sr.OffsetRect(1, 1);
+					d->SetTextColor(RGB(0, 0, 0));
+					d->DrawText(s, sr, fmt);   // 그림자
+					CRect r2 = r;
+					d->SetTextColor(color);
+					d->DrawText(s, r2, fmt);
+				};
+				int tx = box.left;
+				if (!res.IsEmpty())
+				{
+					d->SelectObject(&m_vcardSubFont);
+					shadowText(res, CRect(tx, box.top, tx + resW + 1, box.bottom), RGB(255, 255, 255));
+					tx += resW + gapW;
+				}
+				if (!dur.IsEmpty())
+				{
+					d->SelectObject(GetFont());
+					shadowText(dur, CRect(tx, box.top, tx + durW + 1, box.bottom), RGB(0xE6, 0xEA, 0xEE));
+				}
+				d->SelectObject(prev);
+			}
+		}
+	};
+	if (overlayAlpha >= 255)
+		drawOverlays(dc, rc, img);
+	else if (overlayAlpha > 0)
+	{
+		// 이미지 부분을 복사한 임시 그림에 덧그림을 그리고, 그 결과를 투명도(alpha)로 원래 이미지 위에 섞음
+		CDC tmp;
+		tmp.CreateCompatibleDC(dc);
+		CBitmap tbmp;
+		tbmp.CreateCompatibleBitmap(dc, img.Width(), img.Height());
+		CBitmap* ob = tmp.SelectObject(&tbmp);
+		tmp.BitBlt(0, 0, img.Width(), img.Height(), dc, img.left, img.top, SRCCOPY);
+		CRect rcX = rc, imgX = img;
+		rcX.OffsetRect(-img.left, -img.top);
+		imgX.OffsetRect(-img.left, -img.top);
+		drawOverlays(&tmp, rcX, imgX);
+		tmp.SelectClipRgn(nullptr);
+		BLENDFUNCTION bf = { AC_SRC_OVER, 0, static_cast<BYTE>(overlayAlpha), 0 };
+		::AlphaBlend(dc->GetSafeHdc(), img.left, img.top, img.Width(), img.Height(), tmp.GetSafeHdc(), 0, 0, img.Width(), img.Height(), bf);
+		tmp.SelectObject(ob);
+	}
 
 	CFont* normal = GetFont();
 	CFont* oldFont = dc->SelectObject(&m_videoTitleFont);   // 제목: 2pt 큰 글꼴
@@ -5714,24 +6136,42 @@ void CRuliManagerDlg::DrawVideoCard(CDC* dc, int row, const CRect& rc, bool sele
 		rest.Trim();
 		dc->SetTextColor(RGB(0xCE, 0xD9, 0xE0));
 		const int lineW = right - x;
-		for (int line = 0; line < 3 && !rest.IsEmpty() && lineW > 0; ++line)
+		// 줄바꿈 계산(글자 폭을 한 글자씩 잼)은 제목 · 폭 · 글꼴 높이별로 한 번만 하고 보관 (스크롤 중 CPU 사용량 줄임)
+		CString lkey;
+		lkey.Format(L"%d|%d|", lineW, m_vcardSubLine);
+		lkey += rest;
+		auto lit = m_titleLines.find(lkey);
+		if (lit == m_titleLines.end())
 		{
-			CRect lr(x, y + m_vcardSubLine * line, right, y + m_vcardSubLine * (line + 1));
-			if (line == 2 || TextFB::Width(dc, rest) <= lineW)
+			if (m_titleLines.size() > 3000)
+				m_titleLines.clear();
+			std::vector<CString> lines;
+			CString r = rest;
+			for (int line = 0; line < 3 && !r.IsEmpty() && lineW > 0; ++line)
 			{
-				TextFB::Draw(dc, rest, lr, DT_LEFT, true);   // 마지막 줄: 넘치면 "…"
-				break;
+				if (line == 2 || TextFB::Width(dc, r) <= lineW)
+				{
+					lines.push_back(r);   // 마지막 줄: 넘치면 그릴 때 "…"
+					break;
+				}
+				// 이 줄에 들어가는 글자 수 (최소 1자), 가능하면 공백에서 끊음
+				int fit = 1;
+				while (fit < r.GetLength() && TextFB::Width(dc, r.Left(fit + 1)) <= lineW)
+					++fit;
+				const int sp = r.Left(fit + 1).ReverseFind(L' ');
+				if (sp > 0 && sp <= fit)
+					fit = sp;
+				lines.push_back(r.Left(fit));
+				r = r.Mid(fit);
+				r.TrimLeft();
 			}
-			// 이 줄에 들어가는 글자 수 (최소 1자), 가능하면 공백에서 끊음
-			int fit = 1;
-			while (fit < rest.GetLength() && TextFB::Width(dc, rest.Left(fit + 1)) <= lineW)
-				++fit;
-			const int sp = rest.Left(fit + 1).ReverseFind(L' ');
-			if (sp > 0 && sp <= fit)
-				fit = sp;
-			TextFB::Draw(dc, rest.Left(fit), lr, DT_LEFT, false);
-			rest = rest.Mid(fit);
-			rest.TrimLeft();
+			lit = m_titleLines.emplace(lkey, std::move(lines)).first;
+		}
+		const std::vector<CString>& lines = lit->second;
+		for (size_t line = 0; line < lines.size(); ++line)
+		{
+			CRect lr(x, y + m_vcardSubLine * static_cast<int>(line), right, y + m_vcardSubLine * static_cast<int>(line + 1));
+			TextFB::Draw(dc, lines[line], lr, DT_LEFT, line + 1 == lines.size());   // 마지막 줄만 "…"
 		}
 	}
 	y += m_vcardSubLine * 3 + m_cardPad;

@@ -18,6 +18,10 @@ public:
 	virtual bool GridClick(int /*row*/, const CRect& /*card*/, CPoint /*pt*/) { return false; }
 	// 마우스가 카드의 어느 부분 위에 있는지 (0: 버튼 아님, 1 이상: 버튼 번호) - 바뀔 때만 다시 그림
 	virtual int  GridHitPart(int /*row*/, const CRect& /*card*/, CPoint /*pt*/) { return 0; }
+	// 마우스가 카드의 어느 영역 위에 있는지 (그리기용, 클릭 · 더블클릭에는 영향 없음 - 예: 영상 카드 이미지 위) - 바뀔 때만 다시 그림
+	virtual int  GridHoverZone(int /*row*/, const CRect& /*card*/, CPoint /*pt*/) { return 0; }
+	// 마우스 위치의 풍선 도움말 글자 (비우면 표시 안 함 - 예: 영상 카드에서 잘린 제목 전체)
+	virtual CString GridTipText(int /*row*/, const CRect& /*card*/, CPoint /*pt*/) { return CString(); }
 };
 
 // 썸네일 + 파일명 + 발매일 + 메모를 카드 형태로 바둑판 배열하는 컨트롤
@@ -37,6 +41,7 @@ public:
 	void SetFixedTile(int cardW, int cardH);
 	int  HotRow() const { return m_hot; }   // 마우스가 올라가 있는 카드 (-1: 없음)
 	int  HotPart() const { return m_hotPart; }   // 그 카드에서 마우스가 올라간 버튼 (GridHitPart 값)
+	int  HotZone() const { return m_hotZone; }   // 그 카드에서 마우스가 올라간 영역 (GridHoverZone 값)
 
 	// 고정 카드의 카드 영역 (클라이언트 좌표)
 	bool GetCardRect(int row, CRect& rc) const;
@@ -68,9 +73,14 @@ protected:
 	CFont m_fontBold;
 	int  m_hot = -1;          // 마우스가 올라간 카드
 	int  m_hotPart = 0;       // 마우스가 올라간 카드 위 버튼
+	int  m_hotZone = 0;
 	void SetHot(int row, CPoint pt);
 	bool m_tracking = false;
 	void UpdateHot();         // 커서 위치로 m_hot 다시 계산
+	CToolTipCtrl m_tip;       // GridTipText 풍선 도움말
+	CString m_tipText;        // 지금 풍선 도움말 글자
+	void UpdateTip(int row, CPoint pt);
+	virtual BOOL PreTranslateMessage(MSG* pMsg);
 
 	void UpdateLayout();
 	void SetScroll(int pos);

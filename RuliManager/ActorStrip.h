@@ -23,8 +23,10 @@ public:
 	int  BarHeight() const { return m_barH; }
 	int  CalcHeight() const { return m_cardH + m_barH + 2; }   // 카드 + 스크롤바 자리
 	// 여러 줄 모드: 카드가 폭을 넘으면 다음 줄로 (가로 스크롤 없음) - 제작사 상세의 하위 레이블 카드
-	void SetWrap(bool wrap) { m_wrap = wrap; m_scroll = 0; if (GetSafeHwnd()) Invalidate(FALSE); }
+	void SetWrap(bool wrap) { m_wrap = wrap; m_scroll = 0; m_vscroll = 0; if (GetSafeHwnd()) Invalidate(FALSE); }
 	int  CalcWrapHeight(int width) const;   // 이 폭에서 모든 카드가 들어가는 높이
+	int  RowsHeight(int rows) const { return rows <= 0 ? 0 : rows * m_cardH + (rows - 1) * m_gap; }   // 카드 n줄 높이
+	//  여러 줄 모드에서 창 높이보다 카드가 많으면 오른쪽에 얇은 세로 스크롤바 (휠 / 끌기 / 트랙 클릭)
 
 protected:
 	int m_count = 0;
@@ -33,6 +35,14 @@ protected:
 	int m_cardW = 80, m_cardH = 120, m_gap = 6;
 	int m_barH = 7;
 	int m_scroll = 0;     // 가로 스크롤 (픽셀)
+	int m_vscroll = 0;    // 여러 줄 모드: 세로 스크롤 (픽셀)
+	bool m_dragVBar = false;
+	int  m_dragStartY = 0, m_dragStartVScroll = 0;
+	bool NeedVBar() const;          // 여러 줄 모드에서 세로 스크롤이 필요한지
+	int  WrapWidth() const;         // 카드를 놓는 폭 (세로 스크롤바 자리 제외)
+	int  MaxVScroll() const;
+	void SetVScroll(int pos);
+	bool VThumbRect(CRect& rc) const;
 	int m_hot = -1;
 	int m_hotPart = 0;
 	bool m_tracking = false;
@@ -68,3 +78,23 @@ protected:
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 	DECLARE_MESSAGE_MAP()
 };
+
+// 마우스를 올린 항목 옆에 잠깐 띄우는 카드 팝업 (예: 태그 칩 위 → 태그 카드)
+//  - 포커스를 가져가지 않고 마우스도 통과 (아래 컨트롤 그대로 사용), 내용은 주인이 그림 (m_onDraw)
+class CCardPopup : public CWnd
+{
+public:
+	std::function<void(CDC*, const CRect&)> m_onDraw;
+	bool CreatePopup(CWnd* owner);
+	void ShowNear(const CRect& anchorScreen, CSize size);   // 기준 영역 위(공간이 없으면 아래)에 표시
+	void Hide();
+	COLORREF m_back = RGB(0x20, 0x2B, 0x33);
+
+protected:
+	afx_msg void OnPaint();
+	afx_msg BOOL OnEraseBkgnd(CDC*) { return TRUE; }
+	afx_msg LRESULT OnNcHitTest(CPoint) { return HTTRANSPARENT; }
+	afx_msg int OnMouseActivate(CWnd*, UINT, UINT) { return MA_NOACTIVATE; }
+	DECLARE_MESSAGE_MAP()
+};
+
