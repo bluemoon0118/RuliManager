@@ -16,7 +16,8 @@ struct VideoItem
 	CString   actorAliases;  // 이 작품에서 배우가 쓴 별칭 (쉼표 구분)
 	CString   studio;        // 스튜디오 (1개)
 	CString   label;         // 레이블 (스튜디오 하위, 1개 - 스튜디오의 레이블 목록에 자동 등록)
-	CString   series;        // 시리즈 (레이블 하위, 1개 - 레이블의 시리즈 목록에 자동 등록)
+	CString   series;        // 시리즈 (레이블 하위, 1개 - 레이블의 시리즈 목록에 자동 등록) = 품번 접두어 시리즈
+	CString   seriesTitle;   // 시리즈 이름 (품번 시리즈와 별개의 자유 글자 - 영상 상세 [시리즈] 칸)
 	CString   release;       // 발매일 "YYYY-MM-DD" (없으면 빈 문자열)
 	CString   tags;          // 쉼표로 구분된 태그
 	CString   memo;          // 메모 (여러 줄)
@@ -54,10 +55,12 @@ struct NamedInfo
 	CString name;    // 이름 (중복 불가)
 	CString memo;    // 메모
 	CString image;   // 이미지(로고 등) 파일 경로
-	CString subName; // 서브이름 (스튜디오만, 여러 개 줄바꿈 \n 구분 - 쉼표는 이름의 일부, 보조 표기 예: S1 NO.1 STYLE → 에스원 / S1) - 이 이름으로 적혀 있어도 같은 스튜디오
+	CString subName; // 서브이름 (제작사 · 레이블 · 태그(다른 이름), 여러 개 줄바꿈 \n 구분 - 쉼표는 이름의 일부, 보조 표기 예: S1 NO.1 STYLE → 에스원 / S1) - 이 이름으로 적혀 있어도 같은 스튜디오
 	CString parent;  // 레이블만: 상위 제작사 이름 (labelInfos 항목)
 	CString series;  // 제작사 · 레이블: 시리즈 (여러 개, 한 줄에 하나 "이름␟품번␟라벨␟설명" - ParseSeries / JoinSeries, 시리즈 하나는 제작사나 레이블 하나에만)
 	CString urls;    // 제작사 · 레이블: 링크 URL (여러 개, 줄바꿈 \n 구분 - SplitUrls / JoinUrls)
+	CString nameEn;  // 태그: 영어 이름 (카드에 "한글 (영어, 일본어)", 텍스트 · 붙여넣기에서 이 이름도 그 태그로)
+	CString nameJa;  // 태그: 일본어 이름
 	bool    favorite = false;   // 즐겨찾기 (태그 카드 오른쪽 위 하트)
 };
 

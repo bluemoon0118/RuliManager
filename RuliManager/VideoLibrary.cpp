@@ -1054,7 +1054,7 @@ bool CVideoLibrary::Load()
 			if (fields.size() >= 3 && kind == LIST_STUDIO) n.memo = Unescape(fields[2]);   // 태그는 메모 없음
 			if (fields.size() >= 4 && kind == LIST_STUDIO) n.image = FromStoredPath(Unescape(fields[3]));   // 태그는 이미지 없음
 			if (fields.size() >= 5) n.favorite = (fields[4] == L"1");
-			if (fields.size() >= 6 && kind == LIST_STUDIO)   // 서브이름 (스튜디오만, 줄바꿈 구분)
+			if (fields.size() >= 6)   // 서브이름 (스튜디오) / 다른 이름 (태그), 줄바꿈 구분
 			{
 				n.subName = Unescape(fields[5]);
 				if (n.subName.Find(L'\n') < 0 && n.subName.Find(L',') >= 0)
@@ -1067,6 +1067,10 @@ bool CVideoLibrary::Load()
 				n.series = JoinSeries(ParseSeries(Unescape(fields[7])));
 			if (fields.size() >= 9 && kind == LIST_STUDIO)   // 링크 URL (줄바꿈 구분)
 				n.urls = JoinUrls(SplitUrls(Unescape(fields[8])));
+			if (fields.size() >= 10 && kind == LIST_TAG)   // 태그: 영어 이름 · 일본어 이름
+				n.nameEn = Unescape(fields[9]).Trim();
+			if (fields.size() >= 11 && kind == LIST_TAG)
+				n.nameJa = Unescape(fields[10]).Trim();
 			if (!n.name.IsEmpty() && FindNamed(kind, n.name) < 0)
 				NamedList(kind).push_back(n);
 		}
@@ -1147,6 +1151,8 @@ bool CVideoLibrary::Load()
 				v.label = Unescape(fields[14]);
 			if (fields.size() >= 16)         // 시리즈 필드
 				v.series = Unescape(fields[15]);
+			if (fields.size() >= 17)         // 시리즈 이름 필드 (자유 글자)
+				v.seriesTitle = Unescape(fields[16]);
 			if (!v.path.IsEmpty())
 				items.push_back(v);
 		}
@@ -1227,9 +1233,10 @@ bool CVideoLibrary::Save() const
 		{
 			text += (kind == LIST_STUDIO ? L"S\t" : L"T\t");
 			text += Escape(n.name) + L"\t" + (kind == LIST_STUDIO ? Escape(n.memo) : CString()) + L"\t" + (kind == LIST_STUDIO ? Escape(ToStoredPath(n.image)) : CString()) +
-				L"\t" + (n.favorite ? L"1" : L"") + L"\t" + (kind == LIST_STUDIO ? Escape(n.subName) : CString()) +
+				L"\t" + (n.favorite ? L"1" : L"") + L"\t" + Escape(n.subName) +   // 서브이름 / 태그의 다른 이름
 				L"\t\t" + (kind == LIST_STUDIO ? Escape(n.series) : CString()) +
-				L"\t" + (kind == LIST_STUDIO ? Escape(n.urls) : CString()) + L"\n";   // 6번째 칸: 서브이름, 7번째 칸: (예전 레이블 목록 - 비움), 8번째 칸: 시리즈, 9번째 칸: 링크
+				L"\t" + (kind == LIST_STUDIO ? Escape(n.urls) : CString()) +
+				L"\t" + (kind == LIST_TAG ? Escape(n.nameEn) : CString()) + L"\t" + (kind == LIST_TAG ? Escape(n.nameJa) : CString()) + L"\n";   // 6번째 칸: 서브이름, 7번째 칸: (예전 레이블 목록 - 비움), 8번째 칸: 시리즈, 9번째 칸: 링크, 10 · 11번째 칸: 태그 영어 · 일본어 이름
 		}
 	}
 	for (const NamedInfo& n : labelInfos)   // 레이블: L 이름 메모 이미지 즐겨찾기 서브이름 상위제작사
@@ -1249,7 +1256,7 @@ bool CVideoLibrary::Save() const
 			continue;   // 임시 항목은 정식 DB에 쓰지 않음
 		}
 		CString line;
-		line.Format(L"V\t%s\t%llu\t%llu\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\n",   // 15번째 칸: 레이블, 16번째 칸: 시리즈
+		line.Format(L"V\t%s\t%llu\t%llu\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\n",   // 15번째 칸: 레이블, 16번째 칸: 시리즈(품번), 17번째 칸: 시리즈 이름
 			static_cast<LPCWSTR>(Escape(v.path)),
 			v.size, v.modified, v.rating,
 			static_cast<LPCWSTR>(Escape(v.tags)),
@@ -1262,7 +1269,8 @@ bool CVideoLibrary::Save() const
 			v.oCount,
 			static_cast<LPCWSTR>(Escape(v.code)),
 			static_cast<LPCWSTR>(Escape(v.label)),
-			static_cast<LPCWSTR>(Escape(v.series)));
+			static_cast<LPCWSTR>(Escape(v.series)),
+			static_cast<LPCWSTR>(Escape(v.seriesTitle)));
 		text += line;
 	}
 
@@ -1599,6 +1607,7 @@ int CVideoLibrary::UnifyPartGroups()
 			else if (merged.label.IsEmpty() && merged.studio == o.studio) merged.label = o.label;
 			if (merged.series.IsEmpty() && merged.label == o.label) merged.series = o.series;
 			if (merged.tags.IsEmpty())         merged.tags = o.tags;
+			if (merged.seriesTitle.IsEmpty())  merged.seriesTitle = o.seriesTitle;
 		}
 		for (size_t i : list)
 		{
@@ -2475,8 +2484,16 @@ int CVideoLibrary::FindNamed(int kind, const CString& name) const
 		if (list[i].name.CompareNoCase(name) == 0)
 			return static_cast<int>(i);
 	}
-	// 스튜디오는 서브이름(보조 표기)으로도 찾음
-	if (kind == LIST_STUDIO && !name.IsEmpty())
+	// 태그는 영어 이름 · 일본어 이름으로도 찾음
+	if (kind == LIST_TAG && !name.IsEmpty())
+	{
+		for (size_t i = 0; i < list.size(); ++i)
+			if ((!list[i].nameEn.IsEmpty() && list[i].nameEn.CompareNoCase(name) == 0) ||
+			    (!list[i].nameJa.IsEmpty() && list[i].nameJa.CompareNoCase(name) == 0))
+				return static_cast<int>(i);
+	}
+	// 스튜디오 · 태그는 서브이름(보조 표기 / 태그의 다른 이름)으로도 찾음
+	if (!name.IsEmpty())
 	{
 		for (size_t i = 0; i < list.size(); ++i)
 		{
@@ -2510,6 +2527,29 @@ bool CVideoLibrary::SyncNamedFromVideos()
 		if (n >= 0 && studios[n].name != v.studio)
 		{
 			v.studio = studios[n].name;
+			added = true;
+		}
+	}
+	// 영상의 태그가 다른 이름으로 적혀 있으면 태그 이름으로 바꿈 (같은 태그로 묶이도록, 중복은 하나로)
+	for (VideoItem& v : items)
+	{
+		if (v.tags.IsEmpty())
+			continue;
+		std::vector<CString> list = SplitList(v.tags), out;
+		for (const CString& t : list)
+		{
+			const int n = FindNamed(LIST_TAG, t);
+			const CString name = (n >= 0) ? tagInfos[n].name : t;
+			bool dup = false;
+			for (const CString& o : out)
+				if (o.CompareNoCase(name) == 0) { dup = true; break; }
+			if (!dup)
+				out.push_back(name);
+		}
+		const CString joined = JoinList(out);
+		if (joined != v.tags)
+		{
+			v.tags = joined;
 			added = true;
 		}
 	}

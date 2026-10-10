@@ -74,6 +74,7 @@
 #define ID_MANAGE_STUDIOS           32811
 #define ID_MANAGE_TAGS              32812
 #define ID_MANAGE_SERIES            32822
+#define ID_CAT_MERGE                32823
 #define IDC_BTN_PICKSTUDIO          1046
 #define IDC_BTN_PICKTAGS            1047
 #define IDC_STATIC_VALIASES_LBL     1156
@@ -212,6 +213,12 @@
 #define IDC_SR_GRID                 1244
 #define IDC_SR_PASTE                1245
 #define IDC_SR_CELL_EDIT            1246
+#define IDC_EDIT_SERIES             1247
+#define IDC_NL_EN_LBL               1248
+#define IDC_NL_EN                   1249
+#define IDC_NL_JA_LBL               1250
+#define IDC_NL_JA                   1251
+#define IDC_TI_PASTE_COMPACT        1252
 #define IDC_NAMED_MEMO              1233
 #define IDC_ACT_GENDER              1159
 
@@ -226,8 +233,8 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE    141
-#define _APS_NEXT_COMMAND_VALUE     32823
-#define _APS_NEXT_CONTROL_VALUE     1247
+#define _APS_NEXT_COMMAND_VALUE     32824
+#define _APS_NEXT_CONTROL_VALUE     1253
 #define _APS_NEXT_SYMED_VALUE       101
 #endif
 #endif

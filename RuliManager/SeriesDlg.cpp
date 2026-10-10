@@ -536,6 +536,7 @@ void CSeriesDlg::PasteFromWeb()
 		L"사이트의 시리즈 / 품번 목록(표)을 드래그해 복사(Ctrl+C)한 뒤 붙여넣으세요(Ctrl+V). 한 줄에 하나씩 읽습니다.\r\n"
 		L"각 줄에서 품번(예: SONE-479, SSIS)을 찾아 접두어를 품번 칸에, 그다음 칸을 라벨, 나머지를 설명으로 넣습니다. 이미 있는 품번은 빈 칸만 채웁니다.",
 		CString(), this);
+	dlg.m_pasteButton = true;   // [공백라인 제거]
 	if (dlg.DoModal() != IDOK)
 		return;
 
