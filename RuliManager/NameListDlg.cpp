@@ -52,6 +52,8 @@ void CNameListDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_NL_MEMO, m_editMemo);
 	DDX_Control(pDX, IDC_NL_SUB, m_editSub);
 	DDX_Control(pDX, IDC_NL_URLS, m_editUrls);
+	DDX_Control(pDX, IDC_NL_EN, m_editEn);
+	DDX_Control(pDX, IDC_NL_JA, m_editJa);
 }
 
 BEGIN_MESSAGE_MAP(CNameListDlg, CDialogEx)
@@ -61,6 +63,8 @@ BEGIN_MESSAGE_MAP(CNameListDlg, CDialogEx)
 	ON_EN_CHANGE(IDC_NL_MEMO, &CNameListDlg::OnFieldChanged)
 	ON_EN_CHANGE(IDC_NL_SUB, &CNameListDlg::OnFieldChanged)
 	ON_EN_CHANGE(IDC_NL_URLS, &CNameListDlg::OnFieldChanged)
+	ON_EN_CHANGE(IDC_NL_EN, &CNameListDlg::OnFieldChanged)
+	ON_EN_CHANGE(IDC_NL_JA, &CNameListDlg::OnFieldChanged)
 	ON_BN_CLICKED(IDC_NL_KIND_STUDIO, &CNameListDlg::OnKindStudio)
 	ON_BN_CLICKED(IDC_NL_KIND_LABEL, &CNameListDlg::OnKindLabel)
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_NL_LIST, &CNameListDlg::OnLvnItemChanged)
@@ -209,10 +213,12 @@ BOOL CNameListDlg::OnInitDialog()
 		GetDlgItem(IDC_NL_NAME_LBL)->GetWindowRect(&nameLblRc);
 		const int dy = nameLblRc.top - imageRc.top - 2;   // 올릴 거리 (픽셀)
 
-		// 태그는 서브이름 · 종류(제작사/레이블)도 없음: 그 줄들을 숨기고 영상 수를 서브이름 자리로
+		// 태그는 종류(제작사/레이블) · 상위 · 레이블 줄이 없음: 그 줄들을 숨기고 영상 수를 종류 줄 자리로
+		//  (서브이름 칸은 태그의 "다른 이름" 으로 사용 - 텍스트 파일 · 웹페이지 붙여넣기 · 태그 입력에서 그 태그로 인식)
+		SetDlgItemText(IDC_NL_SUB_LBL, L"다른 이름\n(줄마다)");
 		{
 			CRect subLbl, cntLbl, cnt;
-			GetDlgItem(IDC_NL_SUB_LBL)->GetWindowRect(&subLbl);  ScreenToClient(&subLbl);
+			GetDlgItem(IDC_NL_CHIPS_LBL)->GetWindowRect(&subLbl);  ScreenToClient(&subLbl);   // 영어 · 일본어 줄(종류 · 상위 자리) 아래
 			GetDlgItem(IDC_NL_COUNT_LBL)->GetWindowRect(&cntLbl); ScreenToClient(&cntLbl);
 			GetDlgItem(IDC_NL_COUNT)->GetWindowRect(&cnt);       ScreenToClient(&cnt);
 			const int up = cntLbl.top - subLbl.top;
@@ -220,13 +226,13 @@ BOOL CNameListDlg::OnInitDialog()
 			cnt.OffsetRect(0, -up);
 			GetDlgItem(IDC_NL_COUNT_LBL)->MoveWindow(&cntLbl);
 			GetDlgItem(IDC_NL_COUNT)->MoveWindow(&cnt);
-			const UINT hideIds[] = { IDC_NL_SUB_LBL, IDC_NL_SUB, IDC_NL_KIND_LBL, IDC_NL_KIND_STUDIO, IDC_NL_KIND_LABEL, IDC_NL_PARENT_LBL, IDC_NL_PARENT, IDC_NL_PARENT_CHIPS,
+			const UINT hideIds[] = { IDC_NL_KIND_LBL, IDC_NL_KIND_STUDIO, IDC_NL_KIND_LABEL, IDC_NL_PARENT_LBL, IDC_NL_PARENT, IDC_NL_PARENT_CHIPS,
 				IDC_NL_CHIPS_LBL, IDC_NL_LABEL_CHIPS };
 			for (UINT id : hideIds)
 				GetDlgItem(id)->ShowWindow(SW_HIDE);
 		}
 
-		const UINT moveIds[] = { IDC_NL_NAME_LBL, IDC_NL_NAME, IDC_NL_COUNT_LBL, IDC_NL_COUNT };
+		const UINT moveIds[] = { IDC_NL_NAME_LBL, IDC_NL_NAME, IDC_NL_SUB_LBL, IDC_NL_SUB, IDC_NL_EN_LBL, IDC_NL_EN, IDC_NL_JA_LBL, IDC_NL_JA, IDC_NL_COUNT_LBL, IDC_NL_COUNT };
 		for (UINT id : moveIds)
 		{
 			CWnd* w = GetDlgItem(id);
@@ -241,6 +247,19 @@ BOOL CNameListDlg::OnInitDialog()
 		m_editMemo.ShowWindow(SW_HIDE);
 		GetDlgItem(IDC_NL_URLS_LBL)->ShowWindow(SW_HIDE);
 		m_editUrls.ShowWindow(SW_HIDE);
+	}
+
+	if (m_kind != LIST_TAG)
+	{
+		// 영어 · 일본어 이름은 태그만 (제작사 관리에서는 종류 · 상위 줄 자리라 숨김)
+		const UINT ids[] = { IDC_NL_EN_LBL, IDC_NL_EN, IDC_NL_JA_LBL, IDC_NL_JA };
+		for (UINT id : ids)
+			GetDlgItem(id)->ShowWindow(SW_HIDE);
+	}
+	else
+	{
+		m_editEn.SetCueBanner(L"English name");
+		m_editJa.SetCueBanner(L"日本語名");
 	}
 
 	m_counts = m_lib.CountNamed(m_kind);
@@ -468,6 +487,8 @@ void CNameListDlg::ShowItem(int code)
 		memo.Replace(L"\r\n", L"\n");
 		memo.Replace(L"\n", L"\r\n");
 		m_editMemo.SetWindowText(memo);
+		m_editEn.SetWindowText(n.nameEn);
+		m_editJa.SetWindowText(n.nameJa);
 		{
 			CString urls = CVideoLibrary::JoinUrls(CVideoLibrary::SplitUrls(n.urls));
 			urls.Replace(L"\n", L"\r\n");   // 한 줄에 하나
@@ -492,6 +513,8 @@ void CNameListDlg::ShowItem(int code)
 		m_editSub.SetWindowText(L"");
 		m_editMemo.SetWindowText(L"");
 		m_editUrls.SetWindowText(L"");
+		m_editEn.SetWindowText(L"");
+		m_editJa.SetWindowText(L"");
 		m_staticCount.SetWindowText(L"");
 		SetImage(CString());
 		if (m_kind == LIST_STUDIO)
@@ -508,6 +531,8 @@ void CNameListDlg::ShowItem(int code)
 	m_editSub.EnableWindow(enable);
 	m_editMemo.EnableWindow(enable);
 	m_editUrls.EnableWindow(enable);
+	m_editEn.EnableWindow(enable);
+	m_editJa.EnableWindow(enable);
 	GetDlgItem(IDC_NL_DELETE)->EnableWindow(enable);
 	GetDlgItem(IDC_NL_IMG_BROWSE)->EnableWindow(enable);
 	GetDlgItem(IDC_NL_IMG_CLEAR)->EnableWindow(enable);
@@ -730,26 +755,35 @@ bool CNameListDlg::Commit()
 		}
 	}
 	n.name = name;
+	{
+		// 서브이름 (제작사 · 레이블) / 다른 이름 (태그): 한 줄에 하나 - 이름과 같은 것 · 빈 줄 · 중복은 뺌
+		CString subs;
+		m_editSub.GetWindowText(subs);
+		std::vector<CString> list;
+		for (const CString& sub : CVideoLibrary::SplitLines(subs))
+			if (sub.CompareNoCase(name) != 0)
+				list.push_back(sub);
+		n.subName = CVideoLibrary::JoinLines(list);
+	}
 	if (m_kind == LIST_STUDIO)
 	{
 		m_editMemo.GetWindowText(n.memo);   // 태그는 메모 없음
 		CString urls;
 		m_editUrls.GetWindowText(urls);
 		n.urls = CVideoLibrary::JoinUrls(CVideoLibrary::SplitUrls(urls));   // 공백 · 빈 줄 · 중복 정리
-		// 서브이름: 한 줄에 하나 (쉼표는 이름의 일부) - 이름과 같은 것 · 빈 줄 · 중복은 뺌
-		CString subs;
-		m_editSub.GetWindowText(subs);
-		std::vector<CString> list;
-		for (const CString& sub : CVideoLibrary::SplitLines(subs))
-			if (sub.CompareNoCase(n.name) != 0)
-				list.push_back(sub);
-		n.subName = CVideoLibrary::JoinLines(list);
 	}
 	else
 	{
 		n.memo.Empty();
-		n.subName.Empty();
 		n.urls.Empty();
+	}
+	if (m_kind == LIST_TAG)
+	{
+		// 태그: 영어 · 일본어 이름 (카드에 "한글 (영어, 일본어)", 텍스트 · 붙여넣기에서 이 이름도 그 태그로)
+		m_editEn.GetWindowText(n.nameEn);
+		n.nameEn.Trim();
+		m_editJa.GetWindowText(n.nameJa);
+		n.nameJa.Trim();
 	}
 	n.image = m_imagePath;
 	// 종류 / 상위 제작사 변경 (영상의 제작사 · 레이블도 맞춤)
@@ -1030,9 +1064,16 @@ BOOL CNamePickDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
 	m_theme.Apply(this);   // 메인 창과 같은 색상
+	if (m_single)
+	{
+		m_multi = false;
+		if (m_order.size() > 1)
+			m_order.resize(1);
+	}
 
 	const CString kindName = (m_kind == LIST_STUDIO) ? L"제작사" : L"태그";
-	SetWindowText((m_kind == LIST_STUDIO ? CString(L"제작사 / 레이블") : kindName) + (m_multi ? L" 선택 (여러 개 가능)" : L" 선택 (하나만)"));
+	SetWindowText(!m_caption.IsEmpty() ? m_caption :
+		(m_kind == LIST_STUDIO ? CString(L"제작사 / 레이블") : kindName) + (m_multi ? L" 선택 (여러 개 가능)" : L" 선택 (하나만)"));
 	SetDlgItemText(IDC_PICK_NEWLABEL, L"새 " + kindName);
 
 	// 현재 값이 목록에 없으면 추가 (보통은 이미 동기화되어 있음)
@@ -1131,7 +1172,8 @@ void CNamePickDlg::FillList()
 	else
 	{
 		for (int r : SortedNamedIndices(items, query))
-			rowsOut.push_back({ items[r].name, r });
+			if (m_exclude.IsEmpty() || items[r].name.CompareNoCase(m_exclude) != 0)
+				rowsOut.push_back({ items[r].name, r });
 	}
 
 	m_filling = true;

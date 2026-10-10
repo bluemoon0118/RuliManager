@@ -15,6 +15,28 @@ namespace
 	const PROPERTYKEY kFrameWidth  = { kVideoFmtId, 3 };   // PKEY_Video_FrameWidth
 	const PROPERTYKEY kFrameHeight = { kVideoFmtId, 4 };   // PKEY_Video_FrameHeight
 	const PROPERTYKEY kFrameRate   = { kVideoFmtId, 6 };   // PKEY_Video_FrameRate (1000초당 프레임 수)
+	// FMTID_AudioSummaryInformation {64440490-4C8B-11D1-8B70-080036B11A03}
+	const GUID kMediaFmtId = { 0x64440490, 0x4C8B, 0x11D1, { 0x8B, 0x70, 0x08, 0x00, 0x36, 0xB1, 0x1A, 0x03 } };
+	const PROPERTYKEY kDuration    = { kMediaFmtId, 3 };   // PKEY_Media_Duration (100ns 단위)
+
+	ULONGLONG ReadUInt64(IPropertyStore* store, const PROPERTYKEY& key)
+	{
+		PROPVARIANT pv;
+		::PropVariantInit(&pv);
+		ULONGLONG value = 0;
+		if (SUCCEEDED(store->GetValue(key, &pv)))
+		{
+			switch (pv.vt)
+			{
+			case VT_UI8: value = pv.uhVal.QuadPart; break;
+			case VT_I8:  value = pv.hVal.QuadPart > 0 ? static_cast<ULONGLONG>(pv.hVal.QuadPart) : 0; break;
+			case VT_UI4: value = pv.ulVal; break;
+			default: break;
+			}
+		}
+		::PropVariantClear(&pv);
+		return value;
+	}
 
 	UINT ReadUInt(IPropertyStore* store, const PROPERTYKEY& key)
 	{
@@ -69,9 +91,10 @@ CMediaInfoLabel::Info CMediaInfoLabel::ReadInfo(const CString& path)
 		info.height = ReadUInt(store, kFrameHeight);
 		const UINT rate = ReadUInt(store, kFrameRate);
 		info.fps = rate / 1000.0;
+		info.duration100ns = ReadUInt64(store, kDuration);
 		store->Release();
 	}
-	info.ok = (info.width > 0 && info.height > 0) || info.fps > 0;
+	info.ok = (info.width > 0 && info.height > 0) || info.fps > 0 || info.duration100ns > 0;
 	return info;
 }
 
@@ -110,6 +133,19 @@ CString CMediaInfoLabel::FpsText(double fps)
 		if (dot)
 			break;
 	}
+	return t;
+}
+
+CString CMediaInfoLabel::DurationText(ULONGLONG duration100ns)
+{
+	if (duration100ns == 0)
+		return CString();
+	const ULONGLONG sec = duration100ns / 10000000ULL;
+	ULONGLONG minutes = (sec + 30) / 60;   // 반올림
+	if (minutes == 0)
+		minutes = 1;
+	CString t;
+	t.Format(L"%llu분", minutes);
 	return t;
 }
 
@@ -161,8 +197,10 @@ void CMediaInfoLabel::BuildParts(CString& left, CString& sep, CString& res) cons
 		return;
 	const CString fps = FpsText(m_info.fps);
 	res = ResolutionText(m_info.width, m_info.height);
+	// 왼쪽(회색): 총 재생 시간 + fps  예) "123분 | fps: 29.97"
+	left = DurationText(m_info.duration100ns);
 	if (!fps.IsEmpty())
-		left = L"fps: " + fps;
+		left += (left.IsEmpty() ? L"" : L" | ") + CString(L"fps: ") + fps;
 	if (!left.IsEmpty() && !res.IsEmpty())
 		sep = L" | ";
 }

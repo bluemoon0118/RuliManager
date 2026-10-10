@@ -57,6 +57,8 @@ protected:
 	CActorDetailPanel m_actorPanel;  // 배우 탭 오른쪽 아래: 큰 이름 + ♥ / 별점 / 성별·나이·국적·키 …
 	void ToggleActorFavorite(int actorIdx);
 	afx_msg void OnCatDelete();
+	afx_msg void OnCatMerge();
+	static void SortTagsKo(std::vector<CString>& tags);   // 영상 상세 태그 칩: 가나다 순   // 태그 탭: 선택한 태그를 다른 태그에 병합
 	afx_msg void OnActorDelete();
 	afx_msg void OnVideoTextInfo();
 	afx_msg void OnVideoPasteInfo();
@@ -93,7 +95,7 @@ protected:
 	int  m_studioCardW = 0, m_studioCardH = 0;
 	void DrawVideoStudioCard(CDC* dc, const CRect& rc, bool hot);
 	CRect StudioCardXRect(const CRect& card);   // DX() 가 const 가 아니므로 const 멤버로 두지 않음
-	void OpenStudioCardTarget();   // focusRow: 바뀐 줄 입력 칸으로 포커스
+	void OpenStudioCardTarget(int which = 0);   // which: 0 = 레이블이 있으면 레이블, 1 = 제작사, 2 = 레이블   // focusRow: 바뀐 줄 입력 칸으로 포커스
 	CEdit   m_editNamedMemo;         // 제작사 탭 상세: 선택한 제작사 / 레이블 메모 (바로 편집, 포커스를 잃거나 다른 항목을 고르면 저장)
 	int     m_memoKind = 0;          // 메모 대상: 0 = 없음, 1 = 제작사, 2 = 레이블
 	CString m_memoName;
@@ -109,7 +111,8 @@ protected:
 	int  m_stripCardW = 0, m_stripCardH = 0;
 	int  m_stripCardCurH = 0;        // 배우 카드 띠의 지금 카드 높이 (제작사 탭 = 제작 당시 나이 줄 없음)
 	int  StripAgeH() const { return 1 + m_cardPad / 2 + m_cardLine + m_cardPad / 2; }   // 구분선 + 제작 당시 나이 줄 높이
-	bool StripShowsAge() const { return m_mode != MODE_STUDIO; }   // 제작사 탭 상세(제작사 · 레이블의 출연 배우)는 영상이 없으므로 나이 줄 없음
+	bool StripShowsAge() const { return m_mode != MODE_STUDIO || !m_drill.IsEmpty(); }   // 제작사 탭 상세(제작사 · 레이블의 출연 배우)는 영상이 없으므로 나이 줄 없음 (제작사 영상 화면은 있음)
+	bool VideoStripShown() const { return m_mode == MODE_VIDEO || (m_mode == MODE_STUDIO && !m_drill.IsEmpty()); }   // 영상 상세 태그 아래 출연 배우 카드: 영상 탭 + 제작사(레이블) 영상 화면
 	bool m_namedActors = false;      // 제작사 탭 상세: 배우 카드 띠를 (하위 레이블 없는) 제작사 / 레이블의 출연 배우로 사용 중
 	void UpdateNamedActorStrip(int kind, const CString& name);   // 제작사 탭 상세 하단 배우 카드 (kind: 0 = 숨김, 1 = 제작사, 2 = 레이블)
 	void RefreshActorStrip();                                        // 숨긴 배우 칸 값으로 카드 띠 갱신
@@ -124,6 +127,7 @@ protected:
 	int             m_actorInfoIdx = -1;   // 오른쪽 패널에 표시 중인 배우
 	CDarkCombo m_comboSort;        // 영상 정렬 기준 (격자에는 열 머리글이 없음)
 	CEdit      m_editCode;    // 품번 (제목 위)
+	CEdit      m_editSeries;  // 시리즈 이름 (제작사 / 레이블 카드 아래, 품번 시리즈와 별개의 고유 글자 - VideoItem::seriesTitle)
 	CEdit      m_editTitle;
 	// 배우 / 별칭 / 스튜디오 / 태그: 입력하면 DB에서 실시간 검색해 목록으로 선택 (자동 완성)
 	CSuggestEdit m_editActors;
@@ -244,6 +248,9 @@ protected:
 	void RecyclePartImages(const std::vector<CString>& videoPaths, const CString& keepBase);   // 분할 파일별 이미지 → 휴지통   // "ABC-123_2.mp4" → 묶음 키 + 순번 2 (순번 없으면 false)
 	int   m_sortColumn = 0;
 	bool  m_sortAsc = true;
+	int   m_actorSortCol = 0;        // 배우 격자 정렬: 0 = 이름, 1 = 작품 수 (즐겨찾기는 항상 먼저)
+	bool  m_actorSortAsc = true;
+	int   m_sortComboKind = -1;      // 정렬 콤보 항목: 0 = 영상, 1 = 배우 (탭이 바뀌면 다시 채움)
 	int   m_curItem = -1;             // 상세 정보에 표시 중인 항목
 	bool  m_detailsDirty = false;
 	bool  m_loadingDetails = false;
@@ -305,7 +312,7 @@ protected:
 	// 배우 보기
 	bool IsActorGridMode() const { return m_mode == MODE_ACTOR && m_drill.IsEmpty(); }
 	// 영상 상세 정보(편집 칸) 표시: 영상 탭 + 배우 탭에서 배우를 더블클릭해 들어간 출연작 화면
-	bool ShowVideoDetail() const { return m_mode == MODE_VIDEO || (m_mode == MODE_ACTOR && !m_drill.IsEmpty()); }
+	bool ShowVideoDetail() const { return m_mode == MODE_VIDEO || ((m_mode == MODE_ACTOR || m_mode == MODE_STUDIO) && !m_drill.IsEmpty()); }   // 영상 탭 + 배우 출연작 · 제작사(레이블) 영상 화면
 	bool IsCategoryListMode() const { return (m_mode == MODE_STUDIO || m_mode == MODE_TAG) && m_drill.IsEmpty(); }
 	int  NamedKind() const { return m_mode == MODE_STUDIO ? LIST_STUDIO : LIST_TAG; }
 	// 스튜디오/태그는 항상 격자 표시

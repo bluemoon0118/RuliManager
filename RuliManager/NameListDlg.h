@@ -37,6 +37,8 @@ protected:
 	CEdit          m_editMemo;
 	CEdit          m_editSub;          // 서브이름 (제작사 · 레이블)
 	CEdit          m_editUrls;         // 링크 URL (제작사 · 레이블, 한 줄에 하나)
+	CEdit          m_editEn;           // 태그: 영어 이름
+	CEdit          m_editJa;           // 태그: 일본어 이름
 	CDarkButton    m_radioStudio;      // 종류: [제작사] 토글 버튼 (선택 파란색, 나머지 회색 - 메인 창 탭 버튼과 같은 모양)
 	CDarkButton    m_radioLabel;       // 종류: [레이블] 토글 버튼
 	CTagChipCtrl   m_parentChips;      // 레이블의 상위 제작사 (칩 하나, 비우면 상위 없음 - 등록된 제작사만)
@@ -103,6 +105,9 @@ public:
 
 	CString m_result;          // 확인 시: 선택한 이름 (태그는 쉼표 구분)
 	bool    m_added = false;   // 새 항목을 추가했는지
+	bool    m_single = false;  // 태그도 하나만 고르기 (태그 병합 대상 선택)
+	CString m_exclude;         // 목록에서 뺄 이름 (병합할 원래 태그)
+	CString m_caption;         // 창 제목 (비우면 기본)
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);
