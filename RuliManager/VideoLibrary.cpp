@@ -345,15 +345,17 @@ CString CVideoLibrary::StoreImageCopy(const CString& src, LPCWSTR sub, bool forc
 	if (!::PathFileExistsW(src))
 		return CString();
 
-	// 원본을 읽어서 암호화한 사본(이름.확장자.vmimg)으로 저장
+	// 원본을 그대로 복사한 사본(이름.확장자)으로 저장 - 암호화하지 않음 (예전 암호화 사본 .vmimg 은 풀어서 평문으로)
 	std::vector<BYTE> data, enc;
 	if (!ReadWholeFile(src, data) || data.empty())
 		return CString();
 	if (DbCrypt::IsEncrypted(data.data(), data.size()))
-		enc.swap(data);                         // 이미 암호화된 파일
-	else if (!DbCrypt::Encrypt(data.data(), data.size(), enc))
-		return CString();
-	::SecureZeroMemory(data.data(), data.size());
+	{
+		if (!DbCrypt::Decrypt(data.data(), data.size(), enc) || enc.empty())
+			return CString();               // 풀지 못하면 원래 파일 유지
+	}
+	else
+		enc.swap(data);
 
 	const CString dir = GetImageStoreDir(sub);
 	CString stem = ::PathFindFileNameW(src);
@@ -380,7 +382,7 @@ CString CVideoLibrary::StoreImageCopy(const CString& src, LPCWSTR sub, bool forc
 			st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
 		if (n > 0)
 			name.AppendFormat(L"-%d", n);
-		const CString dst = dir + L"\\" + name + L"_" + stem + ext + L".vmimg";
+		const CString dst = dir + L"\\" + name + L"_" + stem + ext;   // 평문 이미지 (탐색기 · 뷰어로도 열림)
 		HANDLE h = ::CreateFileW(dst, GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);   // 같은 이름이 있으면 실패 → 다음 번호
 		if (h != INVALID_HANDLE_VALUE)
 		{
@@ -435,18 +437,19 @@ bool CVideoLibrary::IsEncryptedFile(const CString& path)
 	return ok && DbCrypt::IsEncrypted(head, read);
 }
 
-bool CVideoLibrary::EncryptImageStore(std::vector<CString>& plainFiles)
+bool CVideoLibrary::DecryptImageStore()
 {
+	// 예전 암호화 사본(.vmimg)을 평문 사본으로 풀고 연결을 바꿈 - 원래 .vmimg 파일은 지우지 않음
+	//  (연결이 끊긴 .vmimg 은 CleanupImageStore 가 휴지통으로 옮김 → 필요하면 되살릴 수 있음)
 	bool changed = false;
 	auto fix = [&](CString& path, LPCWSTR sub)
 	{
-		if (path.IsEmpty() || !IsInImageStore(path) || !::PathFileExistsW(path) || IsEncryptedFile(path))
+		if (path.IsEmpty() || !IsInImageStore(path) || !::PathFileExistsW(path) || !IsEncryptedFile(path))
 			return;
-		const CString enc = StoreImageCopy(path, sub, true);   // 보관소 안 평문 → 암호화 사본 (.vmimg)
-		if (enc.IsEmpty())
-			return;
-		plainFiles.push_back(path);   // 평문은 저장이 끝난 뒤 지움
-		path = enc;
+		const CString plain = StoreImageCopy(path, sub, true);   // 암호화 사본 → 평문 사본
+		if (plain.IsEmpty())
+			return;   // 풀지 못하면 그대로 (기존 이미지 유지)
+		path = plain;
 		changed = true;
 	};
 	for (ActorInfo& a : actors)
@@ -492,13 +495,25 @@ int CVideoLibrary::CleanupImageStore() const
 	}
 	if (unused.empty())
 		return 0;
+	// 안전장치: 연결된 이미지가 하나도 없는데 지울 파일만 있으면 (DB 를 제대로 못 읽은 경우 등) 손대지 않음
+	if (used.empty())
+		return 0;
 
-	// 캐시(DB 파일에서 풀어 둔 것)이므로 바로 지움 → 다음 저장 때 DB 파일에서도 빠짐
-	int removed = 0;
+	// 바로 지우지 않고 휴지통으로 (잘못 정리되어도 되살릴 수 있게)
+	std::vector<wchar_t> from;
 	for (const CString& path : unused)
-		if (::DeleteFileW(path))
-			++removed;
-	return removed;
+	{
+		from.insert(from.end(), static_cast<LPCWSTR>(path), static_cast<LPCWSTR>(path) + path.GetLength());
+		from.push_back(L'\0');
+	}
+	from.push_back(L'\0');   // 이중 NULL 종료
+	SHFILEOPSTRUCTW op = {};
+	op.wFunc = FO_DELETE;
+	op.pFrom = from.data();
+	op.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI;
+	if (::SHFileOperationW(&op) != 0 || op.fAnyOperationsAborted)
+		return 0;
+	return static_cast<int>(unused.size());
 }
 
 bool CVideoLibrary::IsVideoFile(LPCWSTR path)

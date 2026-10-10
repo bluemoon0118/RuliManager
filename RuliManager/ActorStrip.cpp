@@ -57,7 +57,10 @@ void CActorStrip::SetCardSize(int w, int h, int gap)
 void CActorStrip::SetCount(int count)
 {
 	if (count != m_count)
+	{
 		m_scroll = 0;
+		m_vscroll = 0;
+	}
 	m_count = (std::max)(0, count);
 	if (m_hot >= m_count)
 	{
@@ -66,8 +69,62 @@ void CActorStrip::SetCount(int count)
 	}
 	m_tipRow = -1;
 	SetScroll(m_scroll);
+	SetVScroll(m_vscroll);
 	if (GetSafeHwnd())
 		Invalidate(FALSE);
+}
+
+bool CActorStrip::NeedVBar() const
+{
+	if (!m_wrap || !GetSafeHwnd() || m_count <= 0)
+		return false;
+	CRect rc;
+	GetClientRect(&rc);
+	return CalcWrapHeight(rc.Width()) > rc.Height() + 1;
+}
+
+int CActorStrip::WrapWidth() const
+{
+	CRect rc;
+	if (GetSafeHwnd()) GetClientRect(&rc);
+	return (std::max)(1, rc.Width() - (NeedVBar() ? m_barH + 3 : 0));
+}
+
+int CActorStrip::MaxVScroll() const
+{
+	if (!NeedVBar())
+		return 0;
+	CRect rc;
+	GetClientRect(&rc);
+	return (std::max)(0, CalcWrapHeight(WrapWidth()) - rc.Height());
+}
+
+void CActorStrip::SetVScroll(int pos)
+{
+	pos = (std::max)(0, (std::min)(pos, MaxVScroll()));
+	if (pos != m_vscroll)
+	{
+		m_vscroll = pos;
+		if (GetSafeHwnd())
+			Invalidate(FALSE);
+	}
+}
+
+bool CActorStrip::VThumbRect(CRect& thumb) const
+{
+	if (!NeedVBar())
+		return false;
+	CRect rc;
+	GetClientRect(&rc);
+	const int content = CalcWrapHeight(WrapWidth());
+	if (content <= rc.Height() || rc.Height() <= 0)
+		return false;
+	const int track = rc.Height();
+	const int th = (std::max)(m_barH * 3, track * rc.Height() / content);
+	const int maxS = content - rc.Height();
+	const int ty = (track - th) * m_vscroll / (std::max)(1, maxS);
+	thumb.SetRect(rc.right - m_barH, ty, rc.right, ty + th);
+	return true;
 }
 
 int CActorStrip::CalcWrapHeight(int width) const
@@ -109,11 +166,9 @@ CRect CActorStrip::CardRect(int i) const
 {
 	if (m_wrap)
 	{
-		CRect rc;
-		if (GetSafeHwnd()) GetClientRect(&rc);
-		const int per = PerRow(rc.Width());
+		const int per = PerRow(WrapWidth());   // 세로 스크롤바 자리 제외
 		const int x = (i % per) * (m_cardW + m_gap);
-		const int y = (i / per) * (m_cardH + m_gap);
+		const int y = (i / per) * (m_cardH + m_gap) - m_vscroll;
 		return CRect(x, y, x + m_cardW, y + m_cardH);
 	}
 	const int x = i * (m_cardW + m_gap) - m_scroll;
@@ -184,10 +239,25 @@ void CActorStrip::OnPaint()
 		for (int i = 0; i < m_count; ++i)
 		{
 			const CRect card = CardRect(i);
-			if (card.right < 0 || card.left > rc.right)
+			if (card.right < 0 || card.left > rc.right || card.bottom < 0 || card.top > rc.bottom)
 				continue;
 			m_onDraw(&mem, i, card, i == m_hot);
 		}
+	}
+
+	CRect vthumb;
+	if (VThumbRect(vthumb))
+	{
+		// 여러 줄 모드: 오른쪽 세로 스크롤바
+		mem.FillSolidRect(CRect(rc.right - m_barH, 0, rc.right, rc.bottom), m_bar);
+		vthumb.DeflateRect(1, 0);
+		CBrush br(m_thumb);
+		CPen pen(PS_SOLID, 1, m_thumb);
+		CBrush* ob = mem.SelectObject(&br);
+		CPen* op = mem.SelectObject(&pen);
+		mem.RoundRect(vthumb, CPoint(vthumb.Width(), vthumb.Width()));
+		mem.SelectObject(ob);
+		mem.SelectObject(op);
 	}
 
 	CRect thumb;
@@ -212,11 +282,20 @@ void CActorStrip::OnSize(UINT nType, int cx, int cy)
 {
 	CWnd::OnSize(nType, cx, cy);
 	SetScroll(m_scroll);
+	SetVScroll(m_vscroll);
 	Invalidate(FALSE);
 }
 
 BOOL CActorStrip::OnMouseWheel(UINT, short zDelta, CPoint)
 {
+	if (m_wrap)
+	{
+		// 여러 줄 모드: 휠 한 칸 = 카드 한 줄
+		if (MaxVScroll() <= 0)
+			return FALSE;
+		SetVScroll(m_vscroll - zDelta * (m_cardH + m_gap) / WHEEL_DELTA);
+		return TRUE;
+	}
 	if (MaxScroll() <= 0)
 		return FALSE;
 	SetScroll(m_scroll - zDelta * (m_cardW + m_gap) / WHEEL_DELTA);
@@ -230,6 +309,18 @@ void CActorStrip::OnMouseHWheel(UINT, short zDelta, CPoint)
 
 void CActorStrip::OnMouseMove(UINT nFlags, CPoint pt)
 {
+	if (m_dragVBar)
+	{
+		CRect rc, thumb;
+		GetClientRect(&rc);
+		if (VThumbRect(thumb))
+		{
+			const int track = rc.Height() - thumb.Height();
+			if (track > 0)
+				SetVScroll(m_dragStartVScroll + (pt.y - m_dragStartY) * MaxVScroll() / track);
+		}
+		return;
+	}
 	if (m_dragBar)
 	{
 		CRect rc, thumb;
@@ -283,6 +374,20 @@ void CActorStrip::OnLButtonDown(UINT nFlags, CPoint pt)
 {
 	CRect rc, thumb;
 	GetClientRect(&rc);
+	if (VThumbRect(thumb) && pt.x >= rc.right - m_barH)
+	{
+		// 세로 스크롤바: 끌기 / 트랙 클릭 (한 화면씩)
+		if (pt.y >= thumb.top && pt.y < thumb.bottom)
+		{
+			m_dragVBar = true;
+			m_dragStartY = pt.y;
+			m_dragStartVScroll = m_vscroll;
+			SetCapture();
+		}
+		else
+			SetVScroll(m_vscroll + (pt.y < thumb.top ? -rc.Height() : rc.Height()));
+		return;
+	}
 	if (ThumbRect(thumb) && pt.y >= rc.bottom - m_barH)
 	{
 		if (thumb.PtInRect(pt) || (pt.x >= thumb.left && pt.x < thumb.right))
@@ -312,9 +417,10 @@ void CActorStrip::OnLButtonDown(UINT nFlags, CPoint pt)
 
 void CActorStrip::OnLButtonUp(UINT nFlags, CPoint pt)
 {
-	if (m_dragBar)
+	if (m_dragBar || m_dragVBar)
 	{
 		m_dragBar = false;
+		m_dragVBar = false;
 		ReleaseCapture();
 	}
 	CWnd::OnLButtonUp(nFlags, pt);
@@ -323,6 +429,7 @@ void CActorStrip::OnLButtonUp(UINT nFlags, CPoint pt)
 void CActorStrip::OnCaptureChanged(CWnd* pWnd)
 {
 	m_dragBar = false;
+	m_dragVBar = false;
 	CWnd::OnCaptureChanged(pWnd);
 }
 
@@ -349,3 +456,65 @@ BOOL CActorStrip::PreTranslateMessage(MSG* pMsg)
 		m_tip.RelayEvent(pMsg);
 	return CWnd::PreTranslateMessage(pMsg);
 }
+
+// ---------------------------------------------------------------------------
+// CCardPopup
+
+BEGIN_MESSAGE_MAP(CCardPopup, CWnd)
+	ON_WM_PAINT()
+	ON_WM_ERASEBKGND()
+	ON_WM_NCHITTEST()
+	ON_WM_MOUSEACTIVATE()
+END_MESSAGE_MAP()
+
+bool CCardPopup::CreatePopup(CWnd* owner)
+{
+	const CString cls = AfxRegisterWndClass(CS_DROPSHADOW, ::LoadCursor(nullptr, IDC_ARROW), nullptr);
+	return CreateEx(WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE, cls, L"", WS_POPUP,
+		CRect(0, 0, 10, 10), owner, 0) != FALSE;
+}
+
+void CCardPopup::ShowNear(const CRect& anchor, CSize size)
+{
+	if (!GetSafeHwnd())
+		return;
+	// 모니터 작업 영역 안에서: 기준 영역 위쪽(가운데 정렬), 공간이 없으면 아래쪽
+	MONITORINFO mi = { sizeof(mi) };
+	CRect work(0, 0, ::GetSystemMetrics(SM_CXSCREEN), ::GetSystemMetrics(SM_CYSCREEN));
+	if (::GetMonitorInfoW(::MonitorFromRect(&anchor, MONITOR_DEFAULTTONEAREST), &mi))
+		work = mi.rcWork;
+	const int gap = 6;
+	int x = anchor.left + (anchor.Width() - size.cx) / 2;
+	int y = anchor.top - gap - size.cy;
+	if (y < work.top)
+		y = anchor.bottom + gap;
+	const int cw = static_cast<int>(size.cx), ch = static_cast<int>(size.cy);   // LONG → int (std::min / max 형 맞춤)
+	x = (std::max)(static_cast<int>(work.left), (std::min)(x, static_cast<int>(work.right) - cw));
+	y = (std::max)(static_cast<int>(work.top), (std::min)(y, static_cast<int>(work.bottom) - ch));
+	SetWindowPos(&CWnd::wndTopMost, x, y, size.cx, size.cy, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+	Invalidate(FALSE);
+}
+
+void CCardPopup::Hide()
+{
+	if (GetSafeHwnd() && IsWindowVisible())
+		ShowWindow(SW_HIDE);
+}
+
+void CCardPopup::OnPaint()
+{
+	CPaintDC paint(this);
+	CRect rc;
+	GetClientRect(&rc);
+	CDC mem;
+	mem.CreateCompatibleDC(&paint);
+	CBitmap bmp;
+	bmp.CreateCompatibleBitmap(&paint, (std::max)(1, rc.Width()), (std::max)(1, rc.Height()));
+	CBitmap* old = mem.SelectObject(&bmp);
+	mem.FillSolidRect(rc, m_back);
+	if (m_onDraw)
+		m_onDraw(&mem, rc);
+	paint.BitBlt(0, 0, rc.Width(), rc.Height(), &mem, 0, 0, SRCCOPY);
+	mem.SelectObject(old);
+}
+

@@ -54,7 +54,37 @@ int CVideoGrid::OnCreate(LPCREATESTRUCT lpcs)
 	dc.SelectObject(old);
 	m_lineH = tm.tmHeight + tm.tmExternalLeading + 1;
 	m_pad = (std::max)(6, m_lineH / 2);
+	if (m_tip.Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX))
+	{
+		m_tip.AddTool(this, L"");
+		m_tip.SetMaxTipWidth(520);   // 긴 제목은 여러 줄로
+		m_tip.SetDelayTime(TTDT_INITIAL, 400);
+		m_tip.SetDelayTime(TTDT_AUTOPOP, 30000);
+		m_tip.Activate(TRUE);
+	}
 	return 0;
+}
+
+BOOL CVideoGrid::PreTranslateMessage(MSG* pMsg)
+{
+	if (m_tip.GetSafeHwnd())
+		m_tip.RelayEvent(pMsg);
+	return CWnd::PreTranslateMessage(pMsg);
+}
+
+void CVideoGrid::UpdateTip(int row, CPoint pt)
+{
+	if (!m_tip.GetSafeHwnd())
+		return;
+	CString text;
+	CRect card;
+	if (row >= 0 && m_owner && m_fixedW > 0 && GetCardRect(row, card))
+		text = m_owner->GridTipText(row, card, pt);
+	if (text == m_tipText)
+		return;
+	m_tipText = text;
+	m_tip.Pop();   // 다른 글자로 바뀌면 일단 닫고 새 글자로
+	m_tip.UpdateTipText(text.IsEmpty() ? L"" : static_cast<LPCWSTR>(text), this);
 }
 
 void CVideoGrid::SetFixedTile(int cardW, int cardH)
@@ -113,8 +143,13 @@ void CVideoGrid::SetScroll(int pos)
 	pos = (std::max)(0, (std::min)(pos, maxPos));
 	if (pos != m_scroll)
 	{
+		const int delta = m_scroll - pos;
 		m_scroll = pos;
-		Invalidate(FALSE);
+		// 이미 그려진 부분은 픽셀을 옮기고 새로 드러난 띠만 다시 그림 (스크롤 중 CPU 사용량 줄임)
+		if (delta != 0 && std::abs(delta) < rc.Height())
+			ScrollWindowEx(0, delta, nullptr, nullptr, nullptr, nullptr, SW_INVALIDATE);
+		else
+			Invalidate(FALSE);
 		UpdateHot();   // 스크롤하면 커서 아래 카드가 바뀜
 	}
 	SetScrollPos(SB_VERT, m_scroll, TRUE);
@@ -145,15 +180,24 @@ void CVideoGrid::UpdateHot()
 
 void CVideoGrid::SetHot(int row, CPoint pt)
 {
-	int part = 0;
+	int part = 0, zone = 0;
 	CRect card;
 	if (row >= 0 && m_owner && m_fixedW > 0 && GetCardRect(row, card))
-		part = m_owner->GridHitPart(row, card, pt);
-	if (row != m_hot || part != m_hotPart)
 	{
+		part = m_owner->GridHitPart(row, card, pt);
+		zone = m_owner->GridHoverZone(row, card, pt);
+	}
+	if (row != m_hot || part != m_hotPart || zone != m_hotZone)
+	{
+		// 바뀐 카드(예전 / 새 마우스 오버)만 다시 그림
+		CRect r;
+		if (m_hot >= 0 && GetTileRect(m_hot, r))
+			InvalidateRect(&r, FALSE);
 		m_hot = row;
 		m_hotPart = part;
-		Invalidate(FALSE);
+		m_hotZone = zone;
+		if (m_hot >= 0 && GetTileRect(m_hot, r))
+			InvalidateRect(&r, FALSE);
 	}
 }
 
@@ -164,7 +208,9 @@ void CVideoGrid::OnMouseMove(UINT nFlags, CPoint point)
 		TRACKMOUSEEVENT tme = { sizeof(tme), TME_LEAVE, GetSafeHwnd(), 0 };
 		m_tracking = ::TrackMouseEvent(&tme) != FALSE;
 	}
-	SetHot(HitTest(point), point);
+	const int row = HitTest(point);
+	SetHot(row, point);
+	UpdateTip(row, point);   // 잘린 제목 등 풍선 도움말
 	CWnd::OnMouseMove(nFlags, point);
 }
 
@@ -172,6 +218,7 @@ LRESULT CVideoGrid::OnMouseLeave(WPARAM, LPARAM)
 {
 	m_tracking = false;
 	SetHot(-1, CPoint(-1, -1));
+	UpdateTip(-1, CPoint(-1, -1));
 	return 0;
 }
 
@@ -320,8 +367,13 @@ void CVideoGrid::OnPaint()
 		mem.DrawText(L"표시할 동영상이 없습니다.", -1, &client, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 	}
 
-	const int firstRow = m_scroll / m_tileH;
-	const int lastRow = (m_scroll + client.Height()) / m_tileH;
+	// 다시 그릴 영역(스크롤로 새로 드러난 띠 등)에 걸친 줄만 그림
+	CRect paintRc = dc.m_ps.rcPaint;
+	paintRc.IntersectRect(&paintRc, &client);
+	if (paintRc.IsRectEmpty())
+		paintRc = client;
+	const int firstRow = (std::max)(0, (m_scroll + static_cast<int>(paintRc.top)) / m_tileH);   // LONG → int (std::max 형 맞춤)
+	const int lastRow = (m_scroll + static_cast<int>(paintRc.bottom)) / m_tileH;
 	for (int r = firstRow; r <= lastRow; ++r)
 	{
 		for (int c = 0; c < m_cols; ++c)
@@ -392,7 +444,7 @@ void CVideoGrid::OnPaint()
 	}
 
 	mem.SelectObject(oldFont);
-	dc.BitBlt(0, 0, client.Width(), client.Height(), &mem, 0, 0, SRCCOPY);
+	dc.BitBlt(paintRc.left, paintRc.top, paintRc.Width(), paintRc.Height(), &mem, paintRc.left, paintRc.top, SRCCOPY);
 	mem.SelectObject(oldBmp);
 }
 
