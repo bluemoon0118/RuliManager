@@ -9,12 +9,18 @@ bool LoadImageFile(CImage& image, const CString& path);
 // 이미지 파일 내용을 메모리 스트림으로 (암호화된 파일은 복호화한 내용), 실패하면 nullptr. 호출한 쪽에서 Release
 IStream* OpenImageFileStream(const CString& path);
 
+// SFW(모자이크) 옵션: 켜면 배우 · 영상 이미지를 읽을 때 메모리에서만 모자이크 처리 (원본 파일은 바꾸지 않음)
+void SetSfwMosaic(bool on);
+bool IsSfwMosaic();
+void ApplyMosaic(CImage& image);                                   // 이미지를 칸 단위 평균색으로 (메모리의 이미지만)
+bool LoadImageFileSfw(CImage& image, const CString& path);         // LoadImageFile + (SFW 켜져 있으면) 모자이크
+
 // 이미지를 비율 유지하여 중앙에 표시하는 정적 컨트롤
 class CImagePreview : public CStatic
 {
 public:
 	// 이미지 파일을 불러와 표시합니다. 빈 문자열이면 이미지를 지웁니다.
-	bool SetImageFile(const CString& path);
+	bool SetImageFile(const CString& path, bool sfw = false);   // sfw: SFW 옵션이 켜져 있으면 모자이크로 (배우 · 영상 이미지)
 	// 이미지가 없을 때 표시할 안내 문구 (이전 이미지는 지움)
 	void SetPlaceholder(const CString& text);
 	// 이미지가 없을 때 직접 그리는 기본 이미지 (예: 사진 없는 배우의 실루엣) - 이전 이미지는 지움

@@ -525,7 +525,7 @@ void CImageSearchDlg::ShowPage()
 					f.Write(data.data(), static_cast<UINT>(data.size()));
 					f.Close();
 					auto img = std::make_shared<CImage>();
-					if (LoadImageFile(*img, file))
+					if (LoadImageFileSfw(*img, file))   // SFW: 검색 결과도 모자이크
 						r.thumb = img;
 					::DeleteFileW(file);
 				}
