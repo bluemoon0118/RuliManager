@@ -1222,6 +1222,17 @@ void CRuliManagerDlg::MoveCtrl(UINT id, int x, int y, int w, int h)
 
 void CRuliManagerDlg::FlushLayoutRedraw()
 {
+	// 직접 그린 스크롤바: 대상(격자 · 목록)이 옮겨지거나 크기가 바뀌면 바로 따라감
+	//  (예전에는 50ms 타이머로만 맞춰서 창 크기를 바꾸는 동안 스크롤바 배경과 썸이 따로 보였음)
+	for (CDarkScrollBar& sb : m_scrollBars)
+	{
+		if (sb.GetSafeHwnd())
+		{
+			sb.Sync();
+			if (sb.IsWindowVisible())
+				sb.RedrawWindow(nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW);
+		}
+	}
 	if (m_layoutDirty.empty())
 		return;
 	CRgn rgn;
@@ -2982,6 +2993,12 @@ void CRuliManagerDlg::OnModeChanged(UINT nID)
 	GetClientRect(&client);
 	LayoutControls(client.Width(), client.Height());
 	ApplyFilter();
+	// 탭을 바꾸면 목록 스크롤은 맨 위부터
+	m_grid.ScrollToTop();
+	m_actorGrid.ScrollToTop();
+	m_catGrid.ScrollToTop();
+	if (m_listCat.GetSafeHwnd() && m_listCat.GetItemCount() > 0)
+		m_listCat.EnsureVisible(0, FALSE);
 }
 
 void CRuliManagerDlg::OnLvnCatItemChanged(NMHDR* pNMHDR, LRESULT* pResult)
@@ -4643,6 +4660,7 @@ void CRuliManagerDlg::DrillIntoActor(int row)
 	ShowDetails(-1);
 	UpdateLeftPane();
 	ApplyFilter();
+	m_grid.ScrollToTop();   // 카드로 들어가면 출연작은 맨 위부터
 	m_grid.SetFocus();
 }
 
@@ -4753,6 +4771,7 @@ void CRuliManagerDlg::DrillIntoCategory(int row)
 	ShowDetails(-1);
 	UpdateLeftPane();
 	ApplyFilter();
+	m_grid.ScrollToTop();   // 카드로 들어가면 영상 목록은 맨 위부터
 	m_grid.SetFocus();
 }
 
