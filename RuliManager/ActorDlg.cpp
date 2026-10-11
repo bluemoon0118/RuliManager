@@ -404,7 +404,7 @@ void CActorDlg::SetPhoto(const CString& path)
 		if (!::PathFileExistsW(path))
 			m_photo.SetPlaceholder(L"사진 파일을 찾을 수 없습니다.");
 		else
-			m_photo.SetImageFile(path);
+			m_photo.SetImageFile(path, true);   // SFW: 모자이크
 		m_staticPhotoPath.SetWindowText(path);
 	}
 }

@@ -324,6 +324,8 @@ BOOL CRuliManagerDlg::OnInitDialog()
 
 	// 창 제목: 프로그램 이름 + 버전 (Version.h 에서 관리, 리소스 CAPTION 에는 버전을 적지 않음)
 	SetWindowText(_T(APP_NAME_STR) _T(" v") _T(APP_VERSION_STR));
+	// SFW: 배우 · 영상 이미지 모자이크 (설정 창) - 이미지를 읽기 전에
+	SetSfwMosaic(AfxGetApp()->GetProfileInt(L"Settings", L"Sfw", 0) != 0);
 
 	SetIcon(m_hIcon, TRUE);
 	SetIcon(m_hIcon, FALSE);
@@ -3279,7 +3281,7 @@ int CRuliManagerDlg::GetThumbIndex(int idx)
 	if (!file.IsEmpty())
 	{
 		CImage src;
-		if (LoadImageFile(src, file))
+		if (LoadImageFileSfw(src, file))   // SFW: 모자이크
 			image = AddThumbnail(&src, nullptr);
 	}
 	m_thumbIndex[key] = image;
@@ -3801,7 +3803,26 @@ void CRuliManagerDlg::OnBnClickedSettings()
 	CSettingsDlg dlg(m_lib, this);
 	dlg.m_onDeleteDb = [this](int mask) { DeleteDb(mask); };
 	dlg.m_cardMedia = m_showCardMedia;
-	if (dlg.DoModal() == IDOK && dlg.m_cardMedia != m_showCardMedia)
+	dlg.m_sfw = IsSfwMosaic();
+	const INT_PTR result = dlg.DoModal();
+	if (result == IDOK && dlg.m_sfw != IsSfwMosaic())
+	{
+		// SFW: 배우 · 영상 이미지 모자이크 켜기/끄기 → 읽어 둔 이미지를 모두 버리고 다시 읽음
+		SetSfwMosaic(dlg.m_sfw);
+		AfxGetApp()->WriteProfileInt(L"Settings", L"Sfw", dlg.m_sfw ? 1 : 0);
+		CWaitCursor wait;
+		ResetThumbnails();   // 영상 카드 이미지 · 썸네일 · 배우 사진 캐시
+		if (m_actorStrip.GetSafeHwnd()) m_actorStrip.Invalidate(FALSE);
+		if (m_labelStrip.GetSafeHwnd()) m_labelStrip.Invalidate(FALSE);
+		// 지금 보이는 미리보기 · 출연작 화면 사진도 다시
+		if (IsActorGridMode())
+			ShowActorInfo(SelectedActorIndex());
+		else if (m_curItem >= 0)
+			UpdatePreview(m_curItem);
+		if (DrillHeaderShown())
+			UpdateDrillHeader();
+	}
+	if (result == IDOK && dlg.m_cardMedia != m_showCardMedia)
 	{
 		m_showCardMedia = dlg.m_cardMedia;
 		AfxGetApp()->WriteProfileInt(L"Settings", L"CardMediaInfo", m_showCardMedia ? 1 : 0);
@@ -4537,7 +4558,7 @@ int CRuliManagerDlg::GetActorThumbIndex(int actorIdx)
 
 	int image = 0;
 	CImage src;
-	if (::PathFileExistsW(a.photo) && LoadImageFile(src, a.photo))
+	if (::PathFileExistsW(a.photo) && LoadImageFileSfw(src, a.photo))   // SFW: 모자이크
 		image = AddThumbnail(&src, nullptr);
 	m_thumbIndex[key] = image;
 	return image;
@@ -4608,7 +4629,7 @@ void CRuliManagerDlg::ShowActorInfo(int actorIdx)
 	m_staticImage.SetWindowText(info);
 
 	m_preview.Clear();
-	if (a.photo.IsEmpty() || !::PathFileExistsW(a.photo) || !m_preview.SetImageFile(a.photo))
+	if (a.photo.IsEmpty() || !::PathFileExistsW(a.photo) || !m_preview.SetImageFile(a.photo, true))
 	{
 		// 사진 없음: 배우 카드와 같은 기본 이미지 (성별 실루엣, 가운데 3:4 칸)
 		const ActorInfo copy = a;
@@ -4723,7 +4744,7 @@ void CRuliManagerDlg::UpdateDrillHeader()
 	auto it = m_actorCounts.find(key);
 	const int count = (it != m_actorCounts.end()) ? it->second : 0;
 	m_drillPanel.SetActor(&a, count, m_lib.FindCodeOnDate(a.name, a.debut));
-	if (a.photo.IsEmpty() || !::PathFileExistsW(a.photo) || !m_drillPhoto.SetImageFile(a.photo))
+	if (a.photo.IsEmpty() || !::PathFileExistsW(a.photo) || !m_drillPhoto.SetImageFile(a.photo, true))
 	{
 		// 사진 없음: 배우 카드와 같은 기본 이미지 (성별 실루엣)
 		const ActorInfo copy = a;
@@ -6435,7 +6456,7 @@ namespace
 	HBITMAP MakeCoverBitmap(const CString& file, int w, int h, COLORREF back)
 	{
 		CImage img;
-		if (file.IsEmpty() || !LoadImageFile(img, file) || img.IsNull())
+		if (file.IsEmpty() || !LoadImageFileSfw(img, file) || img.IsNull())   // SFW: 모자이크 (백그라운드 스레드)
 			return nullptr;
 		BITMAPINFO bi = {};
 		bi.bmiHeader.biSize = sizeof(bi.bmiHeader);
@@ -7178,7 +7199,7 @@ CBitmap* CRuliManagerDlg::GetActorPortrait(int actorIdx, int w, int h)
 
 	std::unique_ptr<CBitmap> bmp;
 	CImage img;
-	if (::PathFileExistsW(a.photo) && LoadImageFile(img, a.photo) && !img.IsNull())
+	if (::PathFileExistsW(a.photo) && LoadImageFileSfw(img, a.photo) && !img.IsNull())   // SFW: 모자이크
 	{
 		CClientDC screen(this);
 		bmp = std::make_unique<CBitmap>();
@@ -7535,9 +7556,9 @@ bool CRuliManagerDlg::SetPendingVideoImage(const CString& path, const CString& l
 	if (!LoadImageFile(test, path))
 		return false;
 	// 저장 전까지는 미리보기만 바꿈 → [저장] 하면 영상 파일 옆에 복사
-	m_pendingImage = path;
+	m_pendingImage = path;   // (미리보기는 SFW 모자이크)
 	m_preview.Clear();
-	m_preview.SetImageFile(path);
+	m_preview.SetImageFile(path, true);
 	m_staticImage.SetWindowText(label);
 	OnDetailsChanged();
 	return true;
@@ -7614,7 +7635,7 @@ void CRuliManagerDlg::OnBnClickedSearchImage()
 	// 저장 전까지는 미리보기만 바꿈 → [저장] 하면 영상 파일 옆에 "영상이름.확장자" 로 복사
 	m_pendingImage = dlg.m_resultPath;
 	m_preview.Clear();
-	m_preview.SetImageFile(m_pendingImage);
+	m_preview.SetImageFile(m_pendingImage, true);
 	m_staticImage.SetWindowText(L"검색한 새 이미지  (저장하면 적용)");
 	OnDetailsChanged();
 }
@@ -7811,7 +7832,7 @@ void CRuliManagerDlg::UpdatePreview(int idx)
 		return;
 	}
 
-	m_preview.SetImageFile(image);
+	m_preview.SetImageFile(image, true);   // 영상 이미지 (SFW: 모자이크)
 	m_staticImage.SetWindowText(L"이미지: " + CString(::PathFindFileNameW(image)));
 }
 

@@ -233,6 +233,7 @@
 #define IDC_STATIC_PAGEINFO         1264
 #define IDC_DRILL_PHOTO             1265
 #define IDC_DRILL_PANEL             1266
+#define IDC_SET_SFW                 1267
 #define IDC_NAMED_MEMO              1233
 #define IDC_ACT_GENDER              1159
 
@@ -248,7 +249,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE    141
 #define _APS_NEXT_COMMAND_VALUE     32824
-#define _APS_NEXT_CONTROL_VALUE     1267
+#define _APS_NEXT_CONTROL_VALUE     1268
 #define _APS_NEXT_SYMED_VALUE       101
 #endif
 #endif

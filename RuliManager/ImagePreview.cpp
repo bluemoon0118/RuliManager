@@ -4,6 +4,7 @@
 #include <wincodec.h>
 #include <shlwapi.h>
 #include "DbCrypt.h"
+#include <atomic>
 #pragma comment(lib, "windowscodecs.lib")
 
 namespace
@@ -134,7 +135,76 @@ BEGIN_MESSAGE_MAP(CImagePreview, CStatic)
 	ON_WM_SIZE()
 END_MESSAGE_MAP()
 
-bool CImagePreview::SetImageFile(const CString& path)
+namespace
+{
+	std::atomic<bool> g_sfwMosaic{ false };   // 백그라운드 이미지 읽기 스레드에서도 읽음
+}
+
+void SetSfwMosaic(bool on) { g_sfwMosaic = on; }
+bool IsSfwMosaic() { return g_sfwMosaic; }
+
+void ApplyMosaic(CImage& image)
+{
+	if (image.IsNull())
+		return;
+	const int w = image.GetWidth(), h = image.GetHeight();
+	if (w <= 0 || h <= 0)
+		return;
+	// 32비트가 아니면 32비트로 바꿔서 처리
+	if (image.GetBPP() != 32)
+	{
+		CImage tmp;
+		if (!tmp.Create(w, h, 32))
+			return;
+		HDC dc = tmp.GetDC();
+		image.BitBlt(dc, 0, 0, SRCCOPY);
+		tmp.ReleaseDC();
+		image.Destroy();
+		image.Attach(tmp.Detach());
+	}
+	// 칸 크기: 이미지 긴 변의 약 1/24 (작은 이미지도 최소 6픽셀)
+	const int block = (std::max)(6, (std::max)(w, h) / 24);
+	BYTE* bits = static_cast<BYTE*>(image.GetBits());
+	const int pitch = image.GetPitch();   // 아래에서 위로 저장된 이미지면 음수 (줄 계산은 그대로 됨)
+	for (int by = 0; by < h; by += block)
+	{
+		const int y1 = (std::min)(h, by + block);
+		for (int bx = 0; bx < w; bx += block)
+		{
+			const int x1 = (std::min)(w, bx + block);
+			unsigned long long sum[4] = {};
+			for (int y = by; y < y1; ++y)
+			{
+				const BYTE* p = bits + static_cast<ptrdiff_t>(y) * pitch + bx * 4;
+				for (int x = bx; x < x1; ++x, p += 4)
+				{
+					sum[0] += p[0]; sum[1] += p[1]; sum[2] += p[2]; sum[3] += p[3];
+				}
+			}
+			const unsigned long long n = static_cast<unsigned long long>(y1 - by) * (x1 - bx);
+			const BYTE c[4] = { static_cast<BYTE>(sum[0] / n), static_cast<BYTE>(sum[1] / n), static_cast<BYTE>(sum[2] / n), static_cast<BYTE>(sum[3] / n) };
+			for (int y = by; y < y1; ++y)
+			{
+				BYTE* p = bits + static_cast<ptrdiff_t>(y) * pitch + bx * 4;
+				for (int x = bx; x < x1; ++x, p += 4)
+				{
+					p[0] = c[0]; p[1] = c[1]; p[2] = c[2]; p[3] = c[3];
+				}
+			}
+		}
+	}
+}
+
+bool LoadImageFileSfw(CImage& image, const CString& path)
+{
+	if (!LoadImageFile(image, path))
+		return false;
+	if (g_sfwMosaic)
+		ApplyMosaic(image);   // 메모리의 이미지만 (원본 파일은 그대로)
+	return true;
+}
+
+bool CImagePreview::SetImageFile(const CString& path, bool sfw)
 {
 	if (!m_image.IsNull())
 		m_image.Destroy();
@@ -145,7 +215,7 @@ bool CImagePreview::SetImageFile(const CString& path)
 	if (!path.IsEmpty())
 	{
 		// 이미지를 메모리로 복사한 뒤 파일을 닫으므로 파일이 잠기지 않습니다.
-		if (LoadImageFile(m_image, path))
+		if (sfw ? LoadImageFileSfw(m_image, path) : LoadImageFile(m_image, path))
 		{
 			m_file = path;
 			ok = true;

@@ -19,6 +19,7 @@ public:
 
 	// [표시] 영상 카드 해상도 · 재생 시간 (DoModal 전에 지금 값, IDOK 후 고른 값)
 	bool m_cardMedia = true;
+	bool m_sfw = false;   // SFW: 배우 · 영상 이미지 모자이크
 
 #ifdef AFX_DESIGN_TIME
 	enum { IDD = IDD_SETTINGS };
