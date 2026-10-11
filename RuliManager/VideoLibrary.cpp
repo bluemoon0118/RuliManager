@@ -4,6 +4,7 @@
 #include "CountryCombo.h"
 #include <cwctype>
 #include <string>
+#include <functional>
 
 namespace
 {
@@ -75,6 +76,13 @@ namespace
 {
 	bool g_readPlainDb = false;   // 마지막으로 읽은 DB 파일이 암호화되지 않은 예전 형식이었는지
 	bool g_decryptFailed = false; // 암호화된 DB 파일을 풀지 못함 (덮어쓰지 않도록)
+	// 이미지 DB(images.vmdb) ↔ 이미지 캐시 폴더 상태
+	bool g_imageDbBroken = false;  // images.vmdb 를 풀지 못함 → 종료 때 덮어쓰지 않고 캐시도 지우지 않음
+	bool g_imageDirty = false;     // 기동 때 캐시가 DB 와 다름 (남은 캐시 · 예전 Image 폴더 · 예전 형식 이미지 합침)
+	bool g_legacyImageDir = false; // 예전 실행 폴더의 Image 폴더를 캐시로 옮겨 옴 → 이미지 DB 저장 성공 후 Image.bak 으로
+	bool g_oldLocalCache = false;  // 예전 캐시 위치(%LOCALAPPDATA%)에 남은 이미지를 합침 → 이미지 DB 저장 성공 후 지움
+	bool g_imageChanged = false;   // 실행 중 캐시 이미지가 바뀜 (등록 · 정리) → [DB 반영] 활성
+	std::wstring g_imageSigLoaded; // 기동 직후 캐시 서명 (종료 때 같으면 다시 쓰지 않음)
 
 	// 예전 형식 DB 텍스트 파일 읽기 (암호화된 파일은 복호화, 평문 UTF-8 파일도 읽음 / 없거나 비었으면 false)
 	bool ReadUtf8File(const CString& path, CString& text)
@@ -136,18 +144,26 @@ CString CVideoLibrary::GetLegacyLibraryPath()
 
 CString CVideoLibrary::GetCacheDir()
 {
-	CString dir;
-	PWSTR p = nullptr;
-	if (SUCCEEDED(::SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p)) && p)
-		dir = p;
-	else
-		dir = GetDataDir();
-	if (p) ::CoTaskMemFree(p);
-	dir += L"\\VideoManager";
-	::CreateDirectoryW(dir, nullptr);
-	dir += L"\\cache";
+	// 실행 폴더(DB 폴더) 아래 cache
+	const CString dir = GetDataDir() + L"\\cache";
 	::CreateDirectoryW(dir, nullptr);
 	return dir;
+}
+
+namespace
+{
+	// 예전 캐시 위치 %LOCALAPPDATA%\VideoManager\cache\images (만들지 않고 경로만)
+	CString OldLocalCacheImageDir()
+	{
+		CString dir;
+		PWSTR p = nullptr;
+		if (SUCCEEDED(::SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p)) && p)
+			dir = p;
+		if (p) ::CoTaskMemFree(p);
+		if (dir.IsEmpty())
+			return CString();
+		return dir + L"\\VideoManager\\cache\\images";
+	}
 }
 
 int CVideoLibrary::PendingCount() const
@@ -308,9 +324,15 @@ namespace
 
 CString CVideoLibrary::GetImageRoot()
 {
-	const CString dir = GetDataDir() + L"\\Image";
+	// 이미지 캐시 폴더: 기동 때 images.vmdb 를 여기에 풀어서 사용, 종료 때 다시 묶고 지움
+	const CString dir = GetCacheDir() + L"\\images";
 	::CreateDirectoryW(dir, nullptr);
 	return dir;
+}
+
+CString CVideoLibrary::GetLegacyImageDir()
+{
+	return GetDataDir() + L"\\Image";
 }
 
 CString CVideoLibrary::GetImageStoreDir(LPCWSTR sub)
@@ -390,7 +412,10 @@ CString CVideoLibrary::StoreImageCopy(const CString& src, LPCWSTR sub, bool forc
 			const bool ok = ::WriteFile(h, enc.data(), static_cast<DWORD>(enc.size()), &written, nullptr) && written == enc.size();
 			::CloseHandle(h);
 			if (ok)
+			{
+				g_imageChanged = true;   // 이미지 DB 에 반영할 변경
 				return dst;
+			}
 			::DeleteFileW(dst);
 			return CString();
 		}
@@ -513,6 +538,7 @@ int CVideoLibrary::CleanupImageStore() const
 	op.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI;
 	if (::SHFileOperationW(&op) != 0 || op.fAnyOperationsAborted)
 		return 0;
+	g_imageChanged = true;
 	return static_cast<int>(unused.size());
 }
 
@@ -694,7 +720,7 @@ namespace
 	}
 
 	// 예전 images 폴더 → 캐시로 복사
-	void CopyTree(const CString& src, const CString& dst)
+	void CopyTree(const CString& src, const CString& dst, bool keepExisting = false)
 	{
 		::CreateDirectoryW(dst, nullptr);
 		WIN32_FIND_DATAW fd = {};
@@ -707,9 +733,9 @@ namespace
 			if (name == L"." || name == L"..")
 				continue;
 			if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-				CopyTree(src + L"\\" + name, dst + L"\\" + name);
+				CopyTree(src + L"\\" + name, dst + L"\\" + name, keepExisting);
 			else
-				::CopyFileW(src + L"\\" + name, dst + L"\\" + name, FALSE);
+				::CopyFileW(src + L"\\" + name, dst + L"\\" + name, keepExisting ? TRUE : FALSE);
 		} while (::FindNextFileW(h, &fd));
 		::FindClose(h);
 	}
@@ -739,7 +765,7 @@ namespace
 	const char kImgMagic[] = "VMDB-IMGS1";
 	const size_t kImgMagicLen = sizeof(kImgMagic) - 1;
 
-	// 예전 이미지 DB(암호화된 이미지 묶음)를 풀어서 실행 폴더의 Image 폴더에 파일로 씀 (이미 있는 파일은 그대로)
+	// 이미지 DB(암호화된 이미지 묶음)를 풀어서 이미지 캐시 폴더에 파일로 씀 (이미 있는 파일은 그대로)
 	bool UnpackImages(const std::vector<BYTE>& sec)
 	{
 		if (sec.empty())
@@ -749,6 +775,7 @@ namespace
 		if (!DbCrypt::Decrypt(sec.data(), sec.size(), plain) || !ParseEntries(plain, imgs))
 			return false;
 		const CString root = CVideoLibrary::GetImageRoot();
+		bool ok = true;
 		for (const Entry& e : imgs)
 		{
 			const CString rel = CString(CA2W(e.name, CP_UTF8));
@@ -757,15 +784,29 @@ namespace
 			const CString dst = root + L"\\" + rel.Mid(7);   // "images\\" 를 뗀 actors\\... 경로
 			if (::PathFileExistsW(dst))
 				continue;
-			CFile f;
-			if (f.Open(dst, CFile::modeCreate | CFile::modeWrite))
+			bool written = false;
+			try
 			{
-				f.Write(plain.data() + e.offset, static_cast<UINT>(e.length));
-				f.Close();
+				CFile f;
+				if (f.Open(dst, CFile::modeCreate | CFile::modeWrite))
+				{
+					f.Write(plain.data() + e.offset, static_cast<UINT>(e.length));
+					f.Close();
+					written = true;
+				}
+			}
+			catch (CException* ex)
+			{
+				ex->Delete();
+			}
+			if (!written)
+			{
+				::DeleteFileW(dst);
+				ok = false;   // 하나라도 못 풀면 실패 → 이미지 DB 를 덮어쓰지 않음 (빠진 채로 다시 묶이지 않게)
 			}
 		}
 		::SecureZeroMemory(plain.data(), plain.size());
-		return true;
+		return ok;
 	}
 }
 
@@ -836,7 +877,8 @@ int CVideoLibrary::BackupDbFiles(int keep)
 
 	int made = 0;
 	const struct { CString src; LPCWSTR prefix; } files[] = {
-		{ GetDataFilePath(), L"library" },   // 이미지는 Image 폴더에 파일로 있으므로 정보 DB 만
+		{ GetDataFilePath(), L"library" },
+		{ GetImagesDbPath(), L"images" },    // 이미지 DB
 	};
 	CString dir;
 	for (const auto& f : files)
@@ -863,6 +905,183 @@ int CVideoLibrary::BackupDbFiles(int keep)
 		}
 	}
 	return made;
+}
+
+namespace
+{
+	// 캐시(Image 루트)에 파일이 하나라도 있는지
+	bool CacheHasImages()
+	{
+		std::vector<CString> names;
+		ListCacheImages(names, nullptr);
+		return !names.empty();
+	}
+
+	// images.vmdb 파일 → 암호화된 묶음 부분 (형식이 아니면 false)
+	bool ReadImageDbSection(const CString& path, std::vector<BYTE>& sec)
+	{
+		std::vector<BYTE> raw;
+		if (!ReadWholeFile(path, raw) || raw.size() < kImgMagicLen + 8 || memcmp(raw.data(), kImgMagic, kImgMagicLen) != 0)
+			return false;
+		UINT64 len = 0;
+		memcpy(&len, raw.data() + kImgMagicLen, 8);
+		if (len > raw.size() - kImgMagicLen - 8)
+			return false;
+		sec.assign(raw.begin() + kImgMagicLen + 8, raw.begin() + kImgMagicLen + 8 + static_cast<size_t>(len));
+		return true;
+	}
+}
+
+void CVideoLibrary::LoadImageDb()
+{
+	g_imageDbBroken = false;
+	g_imageDirty = false;
+	g_legacyImageDir = false;
+	GetImageStoreDir(L"actors");
+	GetImageStoreDir(L"studios");
+
+	// 이전 실행이 비정상 종료되어 캐시가 남아 있으면 지우지 않고 그대로 합침 (DB 에 없는 새 이미지일 수 있음)
+	if (CacheHasImages())
+		g_imageDirty = true;
+
+	const CString db = GetImagesDbPath();
+	if (::GetFileAttributesW(db) != INVALID_FILE_ATTRIBUTES)
+	{
+		std::vector<BYTE> sec;
+		if (!ReadImageDbSection(db, sec) || !UnpackImages(sec))   // 캐시에 이미 있는 파일은 그대로 둠
+			g_imageDbBroken = true;   // 못 풀면 종료 때 images.vmdb 를 덮어쓰지 않음
+	}
+	else
+		g_imageDirty = true;          // 이미지 DB 가 아직 없음 → 종료 때 새로 만듦
+
+	// 예전 실행 폴더의 Image 폴더(평문 / .vmimg 사본) → 캐시로 복사 (이미지 DB 저장에 성공하면 Image.bak 으로)
+	const CString legacy = GetLegacyImageDir();
+	const LPCWSTR subs[] = { L"actors", L"studios" };
+	for (LPCWSTR sub : subs)
+	{
+		const CString src = legacy + L"\\" + sub;
+		if (::GetFileAttributesW(src) == INVALID_FILE_ATTRIBUTES)
+			continue;
+		CopyTree(src, GetImageStoreDir(sub), true);
+		g_legacyImageDir = true;
+		g_imageDirty = true;
+	}
+	// 예전 캐시 위치(%LOCALAPPDATA%)에 남은 이미지(비정상 종료 등) → 새 캐시로 합침 (이미지 DB 저장에 성공하면 지움)
+	g_oldLocalCache = false;
+	const CString oldCache = OldLocalCacheImageDir();
+	if (!oldCache.IsEmpty() && oldCache.CompareNoCase(GetImageRoot()) != 0)
+	{
+		for (LPCWSTR sub : subs)
+		{
+			const CString src = oldCache + L"\\" + sub;
+			if (::GetFileAttributesW(src) == INVALID_FILE_ATTRIBUTES)
+				continue;
+			CopyTree(src, GetImageStoreDir(sub), true);
+			g_oldLocalCache = true;
+			g_imageDirty = true;
+		}
+	}
+	g_imageSigLoaded = static_cast<LPCWSTR>(ImageSignature(nullptr));
+}
+
+bool CVideoLibrary::HasUnsavedImages()
+{
+	return !g_imageDbBroken && (g_imageDirty || g_imageChanged);
+}
+
+int CVideoLibrary::SaveImageDb(CString* error)
+{
+	auto fail = [error](LPCWSTR msg) { if (error) *error = msg; return -1; };
+	if (g_imageDbBroken)
+		return fail(L"기동할 때 이미지 DB(images.vmdb)를 풀지 못해서 덮어쓰지 않았습니다.");
+
+	std::vector<CString> names;
+	const CString sig = ImageSignature(&names);
+	const CString db = GetImagesDbPath();
+	if (!g_imageDirty && g_imageSigLoaded == static_cast<LPCWSTR>(sig) && ::GetFileAttributesW(db) != INVALID_FILE_ATTRIBUTES)
+	{
+		g_imageChanged = false;
+		return 0;   // 바뀐 것 없음
+	}
+
+	// 캐시 이미지 → 묶음 (이름 = images\<sub>\<파일>)
+	const CString root = GetImageRoot();
+	std::vector<BYTE> plain;
+	size_t count = 0;
+	for (const CString& rel : names)
+	{
+		std::vector<BYTE> data;
+		if (!ReadWholeFile(root + L"\\" + rel.Mid(7), data))   // "images\" 를 뗀 actors\... 경로
+			return fail(L"캐시의 이미지 파일을 읽지 못했습니다.");
+		if (plain.size() + data.size() > 0x60000000ULL)
+			return fail(L"이미지 전체 크기가 1.5GB 를 넘어 이미지 DB 로 묶을 수 없습니다.");
+		PutEntry(plain, CStringA(CW2A(rel, CP_UTF8)), data.data(), data.size());
+		++count;
+	}
+	std::vector<BYTE> sec;
+	const bool okEnc = plain.empty() ? true : DbCrypt::Encrypt(plain.data(), plain.size(), sec);
+	std::vector<BYTE>().swap(plain);
+	if (!okEnc)
+		return fail(L"이미지 DB 를 암호화하지 못했습니다.");
+
+	// 임시 파일에 쓰고 → 다시 읽어서 풀어 보고(개수 확인) → 원자적으로 교체
+	const CString tmp = db + L".tmp";
+	try
+	{
+		CFile f;
+		if (!f.Open(tmp, CFile::modeCreate | CFile::modeWrite))
+			return fail(L"이미지 DB 임시 파일을 만들지 못했습니다.");
+		f.Write(kImgMagic, static_cast<UINT>(kImgMagicLen));
+		const UINT64 len = sec.size();
+		f.Write(&len, 8);
+		if (len) f.Write(sec.data(), static_cast<UINT>(sec.size()));
+		f.Flush();
+		f.Close();
+	}
+	catch (CException* e)
+	{
+		e->Delete();
+		::DeleteFileW(tmp);
+		return fail(L"이미지 DB 를 쓰지 못했습니다 (디스크 공간 · 권한 확인).");
+	}
+	std::vector<BYTE>().swap(sec);
+	{
+		std::vector<BYTE> check, dec;
+		std::vector<Entry> entries;
+		const bool ok = ReadImageDbSection(tmp, check) &&
+			(check.empty() ? count == 0 : (DbCrypt::Decrypt(check.data(), check.size(), dec) && ParseEntries(dec, entries) && entries.size() == count));
+		if (!ok)
+		{
+			::DeleteFileW(tmp);
+			return fail(L"저장한 이미지 DB 를 확인하지 못했습니다.");
+		}
+	}
+	if (!::MoveFileExW(tmp, db, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+	{
+		::DeleteFileW(tmp);
+		return fail(L"images.vmdb 를 교체하지 못했습니다 (파일이 사용 중이거나 쓰기 권한 없음).");
+	}
+
+	// 예전 Image 폴더는 이제 필요 없음 → Image.bak 으로 (지우지 않음)
+	if (g_legacyImageDir)
+	{
+		const CString legacy = GetLegacyImageDir();
+		CString bak = legacy + L".bak";
+		for (int n = 2; ::GetFileAttributesW(bak) != INVALID_FILE_ATTRIBUTES && n < 100; ++n)
+			bak.Format(L"%s.bak%d", static_cast<LPCWSTR>(legacy), n);
+		if (::MoveFileExW(legacy, bak, 0))
+			g_legacyImageDir = false;
+	}
+	// 예전 캐시 위치에 남은 이미지는 이제 images.vmdb 에 들어 있음 → 지움
+	if (g_oldLocalCache)
+	{
+		DeleteTree(OldLocalCacheImageDir(), true);
+		g_oldLocalCache = false;
+	}
+	g_imageDirty = false;
+	g_imageChanged = false;
+	g_imageSigLoaded = static_cast<LPCWSTR>(sig);
+	return 1;
 }
 
 bool CVideoLibrary::ReadPackedDb(CString& text, CString& pending)
@@ -906,25 +1125,13 @@ bool CVideoLibrary::ReadPackedDb(CString& text, CString& pending)
 			pending = CString(CA2W(body, CP_UTF8));
 	}
 
-	// 이미지: 이제 실행 폴더의 Image 폴더에 파일로 보관 (이미지 DB 없음)
-	//  - 예전 images.vmdb (또는 예전 한 파일 형식의 이미지 묶음) 가 있으면 Image 폴더로 풀고 images.vmdb 는 .bak 으로
-	GetImageStoreDir(L"actors");
-	GetImageStoreDir(L"studios");
-	std::vector<BYTE> imgRaw;
-	if (ReadWholeFile(GetImagesDbPath(), imgRaw) && imgRaw.size() >= kImgMagicLen + 8 &&
-		memcmp(imgRaw.data(), kImgMagic, kImgMagicLen) == 0)
-	{
-		UINT64 len = 0;
-		memcpy(&len, imgRaw.data() + kImgMagicLen, 8);
-		if (len <= imgRaw.size() - kImgMagicLen - 8)
-		{
-			const std::vector<BYTE> sec(imgRaw.begin() + kImgMagicLen + 8, imgRaw.begin() + kImgMagicLen + 8 + static_cast<size_t>(len));
-			if (UnpackImages(sec))
-				::MoveFileExW(GetImagesDbPath(), GetImagesDbPath() + L".bak", MOVEFILE_REPLACE_EXISTING);
-		}
-	}
+	// 이미지는 images.vmdb (LoadImageDb 가 캐시로 풀어 둠)
+	//  - 예전 한 파일 형식의 이미지 묶음이 있으면 캐시로 풀고 바로 저장해서 묶음 자리를 비움
 	if (!secImgOld.empty() && UnpackImages(secImgOld))
-		g_readPlainDb = true;   // 예전 한 파일 형식 → 바로 저장해서 이미지 묶음 자리를 비움
+	{
+		g_readPlainDb = true;
+		g_imageDirty = true;
+	}
 	return true;
 }
 
@@ -1019,6 +1226,8 @@ bool CVideoLibrary::Load()
 				::MoveFileExW(oldDb, oldDb + L".bak", MOVEFILE_REPLACE_EXISTING);
 		}
 	}
+	// 이미지 DB(images.vmdb) → 이미지 캐시 폴더로 풀기 (이전 실행이 남긴 캐시 · 예전 Image 폴더도 합침)
+	LoadImageDb();
 	// 원본 DB 를 작업 DB(library.work.vmdb)로 복사해서 사용 — 실행 중 저장은 작업 DB 에만, [DB 반영] / 종료 때 원본에 반영
 	if (::GetFileAttributesW(GetDataFilePath()) != INVALID_FILE_ATTRIBUTES)
 		::CopyFileW(GetDataFilePath(), GetWorkDbPath(), FALSE);
@@ -1034,10 +1243,12 @@ bool CVideoLibrary::Load()
 		// 예전 형식: library.tsv + pending.tsv + images 폴더 → 읽고, 첫 저장 때 library.vmdb 로 묶음
 		haveLibrary = ReadUtf8File(GetLegacyLibraryPath(), text);
 		havePending = ReadUtf8File(GetPendingFilePath(), pendingText);
-		ClearImageCache();
 		const CString oldImages = GetAppDataDir() + L"\\images";
 		if (::GetFileAttributesW(oldImages) != INVALID_FILE_ATTRIBUTES)
-			CopyTree(oldImages, GetImageRoot());
+		{
+			CopyTree(oldImages, GetImageRoot(), true);
+			g_imageDirty = true;
+		}
 		if (haveLibrary || havePending)
 			m_legacyToMove = true;
 		g_readPlainDb = g_readPlainDb || m_legacyToMove;   // 바로 저장해서 묶도록

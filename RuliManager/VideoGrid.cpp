@@ -29,7 +29,7 @@ BOOL CVideoGrid::Create(CWnd* parent, UINT id, IVideoGridOwner* owner, CImageLis
 	m_thumbH = thumbH;
 
 	const CString cls = AfxRegisterWndClass(CS_DBLCLKS, ::LoadCursor(nullptr, IDC_ARROW), nullptr, nullptr);
-	return CWnd::CreateEx(WS_EX_CLIENTEDGE, cls, L"", WS_CHILD | WS_VSCROLL | WS_TABSTOP,
+	return CWnd::CreateEx(WS_EX_CLIENTEDGE, cls, L"", WS_CHILD | WS_VSCROLL | WS_TABSTOP | WS_CLIPCHILDREN,   // 도구줄 자식 컨트롤 위는 그리지 않음
 		CRect(0, 0, 10, 10), parent, id);
 }
 
@@ -122,7 +122,7 @@ void CVideoGrid::UpdateLayout()
 
 	const int count = m_owner ? m_owner->GridGetCount() : 0;
 	const int rows = (count + m_cols - 1) / m_cols;
-	const int total = rows * m_tileH;
+	const int total = m_headerH + rows * m_tileH;
 
 	SCROLLINFO si = { sizeof(si) };
 	si.fMask = SIF_RANGE | SIF_PAGE | SIF_DISABLENOSCROLL;
@@ -139,20 +139,74 @@ void CVideoGrid::SetScroll(int pos)
 	GetClientRect(&rc);
 	const int count = m_owner ? m_owner->GridGetCount() : 0;
 	const int rows = (count + m_cols - 1) / m_cols;
-	const int maxPos = (std::max)(0, rows * m_tileH - rc.Height());
+	const int maxPos = (std::max)(0, m_headerH + rows * m_tileH - rc.Height());
 	pos = (std::max)(0, (std::min)(pos, maxPos));
 	if (pos != m_scroll)
 	{
 		const int delta = m_scroll - pos;
 		m_scroll = pos;
 		// 이미 그려진 부분은 픽셀을 옮기고 새로 드러난 띠만 다시 그림 (스크롤 중 CPU 사용량 줄임)
-		if (delta != 0 && std::abs(delta) < rc.Height())
-			ScrollWindowEx(0, delta, nullptr, nullptr, nullptr, nullptr, SW_INVALIDATE);
-		else
+		//  SW_SCROLLCHILDREN: 머리 영역의 도구줄 컨트롤도 같이 움직임
+		ScrollWindowEx(0, delta, nullptr, nullptr, nullptr, nullptr, SW_INVALIDATE | SW_SCROLLCHILDREN);
+		if (std::abs(delta) >= rc.Height())
 			Invalidate(FALSE);
 		UpdateHot();   // 스크롤하면 커서 아래 카드가 바뀜
 	}
 	SetScrollPos(SB_VERT, m_scroll, TRUE);
+}
+
+void CVideoGrid::SetHeaderHeight(int h)
+{
+	h = (std::max)(0, h);
+	if (h == m_headerH)
+		return;
+	m_headerH = h;
+	if (GetSafeHwnd())
+	{
+		UpdateLayout();
+		Invalidate(FALSE);
+	}
+}
+
+LRESULT CVideoGrid::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
+{
+	// 머리 영역에 둔 도구줄 컨트롤(검색 · 콤보 · 버튼 등)의 알림은 원래 부모(메인 창)가 처리하던 것 → 그대로 넘김
+	CWnd* parent = GetParent();
+	if (parent && GetSafeHwnd())
+	{
+		auto mine = [this](HWND h) { return h && ::GetParent(h) == m_hWnd; };
+		switch (message)
+		{
+		case WM_COMMAND:
+			if (mine(reinterpret_cast<HWND>(lParam)))
+				return parent->SendMessage(message, wParam, lParam);
+			break;
+		case WM_CTLCOLOREDIT:
+		case WM_CTLCOLORSTATIC:
+		case WM_CTLCOLORBTN:
+		case WM_CTLCOLORLISTBOX:
+			if (mine(reinterpret_cast<HWND>(lParam)))
+				return parent->SendMessage(message, wParam, lParam);
+			break;
+		case WM_DRAWITEM:
+		{
+			const DRAWITEMSTRUCT* dis = reinterpret_cast<const DRAWITEMSTRUCT*>(lParam);
+			if (dis && dis->CtlType != ODT_MENU && mine(dis->hwndItem))
+				return parent->SendMessage(message, wParam, lParam);
+			break;
+		}
+		case WM_MEASUREITEM:
+		{
+			const MEASUREITEMSTRUCT* mis = reinterpret_cast<const MEASUREITEMSTRUCT*>(lParam);
+			if (mis && mis->CtlType != ODT_MENU && wParam != 0 && ::GetDlgItem(m_hWnd, static_cast<int>(wParam)))
+				return parent->SendMessage(message, wParam, lParam);
+			break;
+		}
+		default:
+			break;
+		}
+	}
+	return CWnd::WindowProc(message, wParam, lParam);
 }
 
 bool CVideoGrid::GetCardRect(int row, CRect& rc) const
@@ -285,16 +339,17 @@ bool CVideoGrid::GetTileRect(int row, CRect& rc) const
 		return false;
 	const int r = row / m_cols;
 	const int c = row % m_cols;
-	rc.SetRect(m_offsetX + c * m_cellW, r * m_tileH - m_scroll, m_offsetX + (c + 1) * m_cellW, (r + 1) * m_tileH - m_scroll);
+	const int y0 = m_headerH + r * m_tileH - m_scroll;
+	rc.SetRect(m_offsetX + c * m_cellW, y0, m_offsetX + (c + 1) * m_cellW, y0 + m_tileH);
 	return true;
 }
 
 int CVideoGrid::HitTest(CPoint pt) const
 {
-	if (pt.x < m_offsetX || pt.y < 0)
-		return -1;
+	if (pt.x < m_offsetX || pt.y < 0 || pt.y + m_scroll < m_headerH)
+		return -1;   // 머리 영역 (도구줄)
 	const int c = (pt.x - m_offsetX) / m_cellW;
-	const int r = (pt.y + m_scroll) / m_tileH;
+	const int r = (pt.y + m_scroll - m_headerH) / m_tileH;
 	if (c >= m_cols)
 		return -1;
 	const int row = r * m_cols + c;
@@ -308,9 +363,11 @@ void CVideoGrid::EnsureVisible(int row)
 		return;
 	CRect client;
 	GetClientRect(&client);
-	const int top = (row / m_cols) * m_tileH;
+	const int top = m_headerH + (row / m_cols) * m_tileH;
 	const int bottom = top + m_tileH;
-	if (top < m_scroll)
+	if (row / m_cols == 0)
+		SetScroll(0);   // 첫 줄이면 머리 영역(도구줄)까지 보이게
+	else if (top < m_scroll)
 		SetScroll(top);
 	else if (bottom > m_scroll + client.Height())
 		SetScroll(bottom - client.Height());
@@ -364,7 +421,9 @@ void CVideoGrid::OnPaint()
 	if (count == 0)
 	{
 		mem.SetTextColor(m_sub);
-		mem.DrawText(L"표시할 동영상이 없습니다.", -1, &client, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+		CRect emptyRc = client;
+		emptyRc.top = (std::max)(emptyRc.top, static_cast<LONG>(m_headerH - m_scroll));
+		mem.DrawText(L"표시할 동영상이 없습니다.", -1, &emptyRc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 	}
 
 	// 다시 그릴 영역(스크롤로 새로 드러난 띠 등)에 걸친 줄만 그림
@@ -372,8 +431,9 @@ void CVideoGrid::OnPaint()
 	paintRc.IntersectRect(&paintRc, &client);
 	if (paintRc.IsRectEmpty())
 		paintRc = client;
-	const int firstRow = (std::max)(0, (m_scroll + static_cast<int>(paintRc.top)) / m_tileH);   // LONG → int (std::max 형 맞춤)
-	const int lastRow = (m_scroll + static_cast<int>(paintRc.bottom)) / m_tileH;
+	const int firstRow = (std::max)(0, m_scroll + static_cast<int>(paintRc.top) - m_headerH) / m_tileH;   // LONG → int (std::max 형 맞춤)
+	const int lastRow = (m_scroll + static_cast<int>(paintRc.bottom) - m_headerH < 0) ? -1
+		: (m_scroll + static_cast<int>(paintRc.bottom) - m_headerH) / m_tileH;   // 머리 영역만 다시 그리면 카드 없음
 	for (int r = firstRow; r <= lastRow; ++r)
 	{
 		for (int c = 0; c < m_cols; ++c)
@@ -446,6 +506,22 @@ void CVideoGrid::OnPaint()
 	mem.SelectObject(oldFont);
 	dc.BitBlt(paintRc.left, paintRc.top, paintRc.Width(), paintRc.Height(), &mem, paintRc.left, paintRc.top, SRCCOPY);
 	mem.SelectObject(oldBmp);
+
+	// 보이는 줄 바로 아래 · 위 한 화면씩 미리 읽기 요청 (아래 먼저 - 보통 아래로 스크롤)
+	if (m_owner && count > 0 && m_tileH > 0)
+	{
+		const int visFirst = (std::max)(0, m_scroll - m_headerH) / m_tileH;
+		const int visLast = (std::max)(0, m_scroll + static_cast<int>(client.Height()) - m_headerH) / m_tileH;
+		const int screenRows = (std::max)(1, visLast - visFirst + 1);
+		const int below0 = (visLast + 1) * m_cols;
+		const int below1 = (std::min)(count - 1, (visLast + screenRows + 1) * m_cols - 1);
+		if (below0 <= below1)
+			m_owner->GridPrefetch(below0, below1);
+		const int above0 = (std::max)(0, (visFirst - screenRows) * m_cols);
+		const int above1 = (std::min)(count - 1, visFirst * m_cols - 1);
+		if (above0 <= above1)
+			m_owner->GridPrefetch(above0, above1);
+	}
 }
 
 void CVideoGrid::OnVScroll(UINT nSBCode, UINT /*nPos*/, CScrollBar* /*pScrollBar*/)

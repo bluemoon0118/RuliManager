@@ -139,6 +139,7 @@ bool CImagePreview::SetImageFile(const CString& path)
 	if (!m_image.IsNull())
 		m_image.Destroy();
 	m_file.Empty();
+	m_drawDefault = nullptr;
 
 	bool ok = false;
 	if (!path.IsEmpty())
@@ -161,9 +162,23 @@ bool CImagePreview::SetImageFile(const CString& path)
 
 void CImagePreview::SetPlaceholder(const CString& text)
 {
+	// 안내 문구 = 이미지 없음 → 이전 이미지가 남지 않게 지움
+	if (!m_image.IsNull())
+		m_image.Destroy();
+	m_file.Empty();
+	m_drawDefault = nullptr;
 	m_text = text;
-	if (m_image.IsNull())
-		Invalidate(FALSE);
+	Invalidate(FALSE);
+}
+
+void CImagePreview::SetDefaultImage(std::function<void(CDC*, const CRect&)> draw)
+{
+	if (!m_image.IsNull())
+		m_image.Destroy();
+	m_file.Empty();
+	m_text.Empty();
+	m_drawDefault = std::move(draw);
+	Invalidate(FALSE);
 }
 
 void CImagePreview::Clear()
@@ -222,6 +237,10 @@ void CImagePreview::OnPaint()
 			::SetBrushOrgEx(mem.GetSafeHdc(), 0, 0, nullptr);
 			m_image.Draw(mem.GetSafeHdc(), CRect(x, y, x + w, y + h));
 		}
+	}
+	else if (m_drawDefault)
+	{
+		m_drawDefault(&mem, rc);   // 기본 이미지 (사진 없는 배우의 실루엣 등)
 	}
 	else
 	{

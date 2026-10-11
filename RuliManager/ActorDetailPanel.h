@@ -29,6 +29,10 @@ public:
 	void SetColors(COLORREF back, COLORREF text, COLORREF label);
 	void SetActor(const ActorInfo* a, int videoCount, const CString& debutCode = CString());   // nullptr = 선택 없음, debutCode = 데뷔일과 같은 날 발매된 출연작 품번
 	int  CalcHeight(int width);                          // 이 폭에서 필요한 높이
+	void SetShowHistory(bool show) { m_showHistory = show; }   // 내역(별칭 변경 이력) 표시 여부 (SetActor 전에)
+	void SetShowMemo(bool show) { m_showMemo = show; }   // 메모 표시 여부 (SetActor 전에)
+	void SetShowCount(bool show) { m_showCount = show; } // 출연 수 줄 표시 여부 (SetActor 전에)
+	void SetMemoRight(bool right) { m_memoRight = right; if (GetSafeHwnd()) Invalidate(FALSE); }   // 메모를 오른쪽 빈 영역에
 
 protected:
 	struct Row { CString label; CString value; int flag = -1; CString symbol; COLORREF symColor = 0; CString badge; std::vector<CString> links; };   // links: 링크 줄 (사이트 아이콘으로, 더블클릭하면 브라우저로 열기)   // badge: 값 오른쪽 테두리 상자 글자 (데뷔작 품번)   // symbol: 값 왼쪽 기호 (성별 ♀ ♂ …)
@@ -38,6 +42,10 @@ protected:
 	int    MemoHeight(CDC& dc, int width);   // 메모가 차지할 높이 (최대 줄 수 제한)
 	std::vector<Row> m_rows;
 	std::vector<CString> m_history;   // 별칭 변경 이력 (별칭 순서 → 마지막이 대표 이름), 괄호 부분은 뺌
+	bool     m_showHistory = true;     // false: 내역(별칭 변경 이력) 표시 안 함
+	bool     m_showMemo = true;         // false: 메모 표시 안 함
+	bool     m_showCount = true;        // false: "출연: N편" 줄 표시 안 함
+	bool     m_memoRight = false;      // true: 메모를 정보 줄 오른쪽 빈 영역에 (정보 줄은 왼쪽 절반)
 	CFont    m_histFont;
 	CFont    m_symFont;    // 성별 기호 (크게, 굵게)
 	// 이력 줄 배치: 항목마다 시작 위치(x, 줄 번호), 반환값 = 줄 수

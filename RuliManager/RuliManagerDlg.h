@@ -49,6 +49,7 @@ protected:
 	CDarkButton m_darkButtons[20];
 	CDarkButton m_btnSettings;      // 오른쪽 위 톱니바퀴 (설정 창)
 	CDarkButton m_modeButtons[4];   // 영상 / 배우 / 스튜디오 / 태그 토글 버튼
+	CDarkButton m_pageButtons[9];   // 페이지: « < 1 2 3 4 5 > »
 	void UpdateModeButtons();
 	static const COLORREF kScrollColor = RGB(0x6C, 0x74, 0x78); // #6C7478 (스크롤바 배경)
 	static const COLORREF kThumbBackColor = RGB(0x2A, 0x35, 0x3D); // #2A353D (격자 이미지 배경)
@@ -59,6 +60,12 @@ protected:
 	CDarkCombo m_comboFilter;
 	CStarRatingCtrl m_starRating;   // 별점 (마우스 오버 미리 보기, 클릭 확정)
 	CActorDetailPanel m_actorPanel;  // 배우 탭 오른쪽 아래: 큰 이름 + ♥ / 별점 / 성별·나이·국적·키 …
+	// 배우 출연작 화면 위쪽 (고정): 왼쪽 배우 사진 + 오른쪽 배우 정보 (배우 카드 더블클릭)
+	CImagePreview     m_drillPhoto;
+	CActorDetailPanel m_drillPanel;
+	int  m_drillActorIdx = -1;
+	bool DrillHeaderShown() const { return m_mode == MODE_ACTOR && !m_drill.IsEmpty() && m_drillActorIdx >= 0; }
+	void UpdateDrillHeader();        // 출연작 화면 위 배우 사진 · 정보 갱신
 	void ToggleActorFavorite(int actorIdx);
 	afx_msg void OnCatDelete();
 	afx_msg void OnCatMerge();
@@ -130,6 +137,53 @@ protected:
 	void UpdateActorPanel(const ActorInfo* a, int count);   // 배우 상세 패널 내용 (높이가 바뀌면 다시 배치)
 	int             m_actorInfoIdx = -1;   // 오른쪽 패널에 표시 중인 배우
 	CDarkCombo m_comboSort;        // 영상 정렬 기준 (격자에는 열 머리글이 없음)
+	CDarkCombo m_comboPageSize;    // 페이지당 개수 (전체 / 50 / 100 / 250 / 500 / 1000)
+	// 페이지 나누기: 목록(영상 · 배우 · 제작사/태그)마다 지금 페이지, 전체 개수
+	int  m_pageSize = 250;         // 지금 탭의 페이지당 개수 (0 = 전체)
+	int  m_pageSizes[4] = { 250, 250, 250, 250 };   // 탭(영상 / 배우 / 제작사 / 태그)마다 따로 (레지스트리 Settings\PageSize0 ~ 3)
+	void ApplyTabPageSize();       // 지금 탭의 페이지당 개수를 m_pageSize 와 콤보에 반영
+	// 배우 출연작 화면(배우 카드 더블클릭)의 필터 값은 따로 저장: 정렬 · 오름/내림 · 별점 · 페이지당 개수
+	//  (레지스트리 Settings\ActorDrillSortColumn / ActorDrillSortAsc / ActorDrillRating / ActorDrillPageSize)
+	//  제작사 탭 영상 화면(제작사 · 레이블 카드 더블클릭)도 같은 방식으로 따로 (Settings\StudioDrill...)
+	bool m_drillFilters = false;   // 지금 출연작 / 제작사 영상 화면 값을 쓰는 중
+	int  m_drillCtx = 1;           // 1 = 배우 출연작 화면, 2 = 제작사 영상 화면
+	int  m_drillPageSizes[3] = { 250, 250, 250 };
+	CString DrillKey(LPCWSTR suffix) const { return CString(m_drillCtx == 2 ? L"StudioDrill" : L"ActorDrill") + suffix; }
+	int  m_mainSortCol = 0, m_mainRating = 0;
+	bool m_mainSortAsc = true;
+	void EnterActorDrillFilters(int ctx = 1); // 출연작(1) / 제작사 영상(2) 화면에 들어갈 때: 영상 탭 값 보관 → 그 화면 값 적용
+	void LeaveActorDrillFilters(); // 나올 때: 출연작 값 저장 → 영상 탭 값 되돌림
+	int  m_pageVideoMain = 0;      // 영상 탭
+	int  m_pageDrill = 0;          // 배우 출연작 · 제작사/태그 영상 화면
+	int  m_pageActor = 0;          // 배우 격자
+	int  m_pageCat = 0;            // 제작사 · 태그 목록
+	int  m_totalVideo = 0, m_totalActor = 0, m_totalCat = 0;
+	ULONGLONG m_totalVideoBytes = 0;   // 필터된 영상 전체 크기
+	int& CurPageRef();             // 지금 보이는 목록의 페이지 번호
+	int  CurTotal() const;         // 지금 보이는 목록의 전체 개수
+	int  PageCount(int total, int size = -1) const { if (size < 0) size = m_pageSize; return (size <= 0 || total <= 0) ? 1 : (total + size - 1) / size; }
+	void SlicePage(int& page, int total, int& first, int& last, int size = -1) const;   // 페이지 범위 [first, last) (size < 0: 지금 탭 값)
+	void ResetCurPage() { CurPageRef() = 0; }
+	void UpdatePager();            // 페이지 버튼 · 개수 요약 갱신
+	int  LayoutListToolbar(int x, int y, int w);   // 목록(격자) 머리 영역의 검색 · 정렬 · 페이지 줄 배치 (격자 클라이언트 좌표, 높이 반환)
+	// 목록 도구줄은 지금 보이는 격자의 자식으로 옮겨 카드와 함께 스크롤 (알림은 격자가 이 창으로 넘김)
+	CVideoGrid* m_toolbarHost = nullptr;
+	void SetToolbarHost(CVideoGrid* host);
+	static const UINT* ToolbarIds(int& count);
+public:
+	// 도구줄 컨트롤은 격자의 자식이라 CWnd 기본 GetDlgItem 으로는 못 찾음 → 격자에서도 찾음
+	CWnd* GetDlgItem(int nID) const
+	{
+		CWnd* w = CDialogEx::GetDlgItem(nID);
+		if (!w && m_toolbarHost && m_toolbarHost->GetSafeHwnd())
+			w = m_toolbarHost->GetDlgItem(nID);
+		return w;
+	}
+	void SetDlgItemText(int nID, LPCTSTR text) { if (CWnd* w = GetDlgItem(nID)) w->SetWindowText(text); }
+	int  GetDlgItemText(int nID, CString& text) const { text.Empty(); if (CWnd* w = GetDlgItem(nID)) w->GetWindowText(text); return text.GetLength(); }
+protected:
+	afx_msg void OnPageButton(UINT nID);
+	afx_msg void OnCbnSelchangePageSize();
 	CEdit      m_editCode;    // 품번 (제목 위)
 	CEdit      m_editSeries;  // 시리즈 이름 (제작사 / 레이블 카드 아래, 품번 시리즈와 별개의 고유 글자 - VideoItem::seriesTitle)
 	CEdit      m_editTitle;
@@ -210,7 +264,13 @@ protected:
 
 	// 격자 확대 (탭마다 4단계, 슬라이더)
 	CZoomSlider m_zoomSlider;
-	int  m_zoom[4] = { 0, 0, 0, 0 };   // 영상 / 배우 / 스튜디오 / 태그
+	int  m_zoom[6] = { 0, 0, 0, 0, 0, 0 };   // 영상 / 배우 / 스튜디오 / 태그 / 배우 출연작 화면 / 제작사 영상 화면 (레지스트리 Settings\Zoom0 ~ 5)
+	int  ZoomSlot() const   // 배우 탭: 배우 격자 / 출연작 화면, 제작사 탭: 제작사 목록 / 영상 화면 따로
+	{
+		if (m_mode == MODE_ACTOR && !m_drill.IsEmpty()) return 4;
+		if (m_mode == MODE_STUDIO && !m_drill.IsEmpty()) return 5;
+		return (m_mode >= MODE_VIDEO && m_mode <= MODE_TAG) ? m_mode : MODE_VIDEO;
+	}
 	double ZoomFactor() const;
 	void OnZoomChanged(int pos);
 	void DrawActorCard(CDC* dc, int row, const CRect& card, bool selected, bool focused);
@@ -286,7 +346,10 @@ protected:
 	// 내부 기능
 	int  DX(int dlu);
 	int  DY(int dlu);
-	void MoveCtrl(UINT id, int x, int y, int w, int h);
+	void MoveCtrl(UINT id, int x, int y, int w, int h);   // 위치 · 크기가 바뀐 컨트롤만 옮기고 다시 그릴 영역에 모음
+	std::map<UINT, CRect> m_ctrlRects;     // MoveCtrl 로 마지막에 정한 위치 (같으면 건너뜀)
+	std::vector<CRect> m_layoutDirty;      // 옮긴 컨트롤의 예전 · 새 영역 (부모 클라이언트 좌표)
+	void FlushLayoutRedraw();              // 모은 영역만 다시 그림 (전체를 지우고 다시 그리면 버튼이 깜빡임)
 	void LayoutControls(int cx, int cy);
 	int  LeftPaneWidth(int cx);      // 왼쪽 격자 영역 폭 (오른쪽 상세 폭은 고정)
 
@@ -362,7 +425,10 @@ protected:
 	// 영상 카드 (가로 이미지 / 제목 / 발매일(또는 ● 임시) / 메모 3줄 / 태그 수 · 배우 수)
 	int   m_vcardW = 255, m_vcardImgH = 143, m_vcardH = 330;
 	std::map<CString, std::unique_ptr<CBitmap>> m_videoCovers;   // 카드용 이미지 (크기에 맞게 잘라 둔 것)
-	CBitmap* GetVideoCover(int itemIdx, int w, int h);
+	std::map<CString, UINT64> m_coverUse;                        // 마지막으로 쓴 순번 (많아지면 오래 안 쓴 것부터 지움)
+	UINT64 m_coverTick = 0;
+	CBitmap* GetVideoCover(int itemIdx, int w, int h, bool* loading = nullptr, bool prefetch = false);   // 없으면 백그라운드 읽기 요청 (*loading = 읽는 중, prefetch = 미리 읽기 - 나중 순서)
+	void GridPrefetch(int first, int last) override;
 	// 스튜디오 로고 (영상 카드 오른쪽 위에 반투명으로), 이미지 경로(소문자) → GDI+ 이미지
 	std::map<CString, std::unique_ptr<Gdiplus::Bitmap>> m_studioLogos;
 	std::map<CString, std::unique_ptr<Gdiplus::Bitmap>> m_logoMarks;   // 영상 카드 오른쪽 위 로고: 카드 크기로 줄이고 75% 불투명을 미리 적용한 사본 (경로|폭x높이)
@@ -454,9 +520,27 @@ protected:
 	void StopCardMediaThread();
 	afx_msg void OnDestroy();
 	std::map<CString, CMediaInfoLabel::Info> m_cardMedia;        // 경로(소문자) → 해상도 · 재생 시간
+	bool m_showCardMedia = true;                                 // 설정: 영상 카드에 해상도 · 재생 시간 표시 (레지스트리 Settings\CardMediaInfo)
 	std::set<CString> m_cardMediaRequested;                      // 읽기를 요청한 경로 (다시 요청하지 않음)
 	const CMediaInfoLabel::Info* CardMediaInfo(const CString& path);   // 있으면 정보, 없으면 백그라운드 읽기 요청 후 nullptr
 	afx_msg LRESULT OnCardMediaReady(WPARAM wParam, LPARAM lParam);
+	// 영상 카드 이미지: 백그라운드 스레드에서 이미지 파일을 찾아 읽고 카드 크기로 줄여 둠 (읽는 동안 카드에 "불러오는 중" 표시)
+	struct CoverJob { CString key; CString videoPath; int w = 0; int h = 0; UINT gen = 0; int item = -1; };
+	struct CoverQueue
+	{
+		std::mutex mx;
+		std::condition_variable cv;
+		std::deque<CoverJob> q;   // 뒤에서 꺼냄 (최근에 그린 = 지금 보이는 카드 먼저)
+		HWND hwnd = nullptr;
+		bool stop = false;
+	};
+	std::shared_ptr<CoverQueue> m_coverQ;
+	std::vector<std::thread> m_coverThreads;
+	std::set<CString> m_coverPending;                            // 읽는 중인 카드 이미지 키
+	UINT m_coverGen = 1;                                         // 캐시를 비울 때마다 증가 (그 전 요청의 결과는 버림)
+	void ClearVideoCovers();                                     // 카드 이미지 캐시 · 대기열 비우기
+	void StopCoverThreads();
+	afx_msg LRESULT OnCoverReady(WPARAM wParam, LPARAM lParam);
 
 	DECLARE_MESSAGE_MAP()
 };

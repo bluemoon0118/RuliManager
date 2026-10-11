@@ -44,9 +44,24 @@ namespace
 		return d;
 	}
 
+	// 파비콘 보관 폴더: <실행 폴더>\cache\favicons (종료 때 지우는 cache\images 와 별개라 남아 있음)
+	CString FaviconDir()
+	{
+		static CString dir;
+		if (dir.IsEmpty())
+		{
+			dir = CVideoLibrary::GetCacheDir() + L"\\favicons";
+			// 예전 위치 <DB 폴더>\favicons 가 있으면 한 번 옮김 (새 폴더가 아직 없을 때만)
+			const CString old = CVideoLibrary::GetDataDir() + L"\\favicons";
+			if (::GetFileAttributesW(old) != INVALID_FILE_ATTRIBUTES && ::GetFileAttributesW(dir) == INVALID_FILE_ATTRIBUTES)
+				::MoveFileExW(old, dir, 0);
+		}
+		return dir;
+	}
+
 	CString FaviconFile(const CString& domain)
 	{
-		return CVideoLibrary::GetImageRoot() + L"\\favicons\\" + domain + L".png";
+		return FaviconDir() + L"\\" + domain + L".png";
 	}
 
 	// Microsoft Edge 실행 파일 경로 (App Paths 레지스트리 → 기본 설치 위치), 없으면 빈 문자열
@@ -579,9 +594,12 @@ void CActorDetailPanel::SetActor(const ActorInfo* a, int videoCount, const CStri
 				m_rows.push_back({ L"활동기간:", period });
 			}
 		}
-		CString cnt;
-		cnt.Format(L"%d편", videoCount);
-		m_rows.push_back({ L"출연:", cnt });
+		if (m_showCount)   // 출연 수 (배우 출연작 화면 위 정보에서는 뺌)
+		{
+			CString cnt;
+			cnt.Format(L"%d편", videoCount);
+			m_rows.push_back({ L"출연:", cnt });
+		}
 		{
 			// 링크: 한 줄에 사이트 아이콘(파비콘)들을 나란히, 더블클릭하면 그 주소로
 			const std::vector<CString> urls = CVideoLibrary::SplitUrls(a->urls);
@@ -615,8 +633,10 @@ void CActorDetailPanel::SetActor(const ActorInfo* a, int videoCount, const CStri
 			if (m_history.size() < 2)   // 서로 다른 이름이 2개 이상일 때만 이력 표시
 				m_history.clear();
 		}
+		if (!m_showHistory)
+			m_history.clear();   // 내역(별칭 변경 이력)을 표시하지 않는 패널 (배우 출연작 화면 위)
 
-		m_memo = a->memo;
+		m_memo = m_showMemo ? a->memo : CString();   // 메모를 표시하지 않는 패널 (배우 출연작 화면 위)
 		m_memo.Trim();
 		m_memo.Replace(L"\r\n", L"\n");
 		m_memo.Replace(L"\n", L"\r\n");
@@ -653,7 +673,7 @@ int CActorDetailPanel::CalcHeight(int width)
 		const int lines = LayoutHistory(dc, (std::max)(50, width), nullptr);
 		h += 8 + lines * HistLineHeight();   // 별칭 변경 이력
 	}
-	if (m_has && !m_memo.IsEmpty())
+	if (m_has && !m_memo.IsEmpty() && !m_memoRight)   // 오른쪽 메모 모드는 아래에 높이를 더하지 않음
 	{
 		if (width <= 0)
 		{
@@ -762,13 +782,17 @@ void CActorDetailPanel::OnPaint()
 		mem.SelectObject(InfoFont());
 		const int labelW = LabelWidth();
 		int y = nameH + 4 + StarRowHeight() + 6;
+		// 메모를 오른쪽에 두는 모드: 정보 줄은 왼쪽 절반까지
+		const bool memoRight = m_memoRight && !m_memo.IsEmpty();
+		const int splitX = memoRight ? static_cast<int>(rc.Width()) / 2 : static_cast<int>(rc.right);
+		const int rowRight = memoRight ? splitX - 12 : static_cast<int>(rc.right);
 		for (const Row& r : m_rows)
 		{
 			const int rh = r.links.empty() ? rowH : LinkRowHeight(rowH);   // 이 줄 높이 (링크 줄은 아이콘 크기만큼)
 			mem.SetTextColor(m_label);
 			mem.DrawText(r.label, CRect(0, y, labelW, y + rh), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 			mem.SetTextColor(m_text);
-			CRect vr(labelW, y, rc.right, y + rh);
+			CRect vr(labelW, y, rowRight, y + rh);
 			if (!r.symbol.IsEmpty())
 			{
 				// 값 왼쪽 기호 (성별): 기호 색으로, 글꼴에 없으면 대체 글꼴
@@ -802,7 +826,7 @@ void CActorDetailPanel::OnPaint()
 				for (const CString& u : r.links)
 				{
 					const int need = (firstIcon ? 0 : sepGap * 2 + 1) + sz;
-					if (ix + need > rc.right)
+					if (ix + need > rowRight)
 						break;
 					if (!firstIcon)
 					{
@@ -829,7 +853,7 @@ void CActorDetailPanel::OnPaint()
 				const int bh = (std::min)(static_cast<int>(rowH) - 2, static_cast<int>(btm.tmHeight) + 4);
 				const int bx = vr.left + tw + 8;
 				const int by = y + (rowH - bh) / 2;
-				if (bx + bw <= rc.right)
+				if (bx + bw <= rowRight)
 				{
 					m_badgeRect = CRect(bx, by, bx + bw, by + bh);   // 더블클릭 판정용
 					CPen pen(PS_SOLID, 1, RGB(0x8A, 0x9B, 0xA8));
@@ -883,8 +907,17 @@ void CActorDetailPanel::OnPaint()
 			y = top + lines * histH;
 		}
 
+		// 메모를 오른쪽 빈 영역에 (별점 줄 높이부터 패널 아래까지, 넘치면 …)
+		if (m_memoRight && !m_memo.IsEmpty())
+		{
+			const int sx = static_cast<int>(rc.Width()) / 2;
+			mem.SelectObject(InfoFont());
+			mem.SetTextColor(RGB(0xCE, 0xD9, 0xE0));
+			CRect mr(sx, nameH + 4, rc.right, rc.bottom);
+			mem.DrawText(m_memo, mr, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL | DT_END_ELLIPSIS | DT_NOPREFIX);
+		}
 		// 메모 (여러 줄, 넘치면 마지막 줄 …)
-		if (!m_memo.IsEmpty())
+		else if (!m_memo.IsEmpty())
 		{
 			const int mh = MemoHeight(mem, (std::max)(50, static_cast<int>(rc.Width())));
 			mem.SelectObject(InfoFont());
@@ -928,7 +961,7 @@ void CLinkBar::SetUrls(const std::vector<CString>& urls)
 
 Gdiplus::Bitmap* CLinkBar::Favicon(const CString& domain)
 {
-	// 배우 상세와 같은 방식: Image\favicons\<도메인>.png, 없으면 백그라운드로 받기
+	// 배우 상세와 같은 방식: <실행 폴더>\cache\favicons\<도메인>.png, 없으면 백그라운드로 받기
 	if (domain.IsEmpty())
 		return nullptr;
 	auto it = m_favicons.find(domain);
