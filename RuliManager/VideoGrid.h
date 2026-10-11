@@ -53,6 +53,7 @@ public:
 	void SetHeaderHeight(int h);
 	int  HeaderHeight() const { return m_headerH; }
 	int  ScrollY() const { return m_scroll; }
+	void ScrollToTop() { if (GetSafeHwnd()) SetScroll(0); }   // 맨 위로 (탭 전환 · 카드로 들어갈 때)
 
 protected:
 	IVideoGridOwner* m_owner = nullptr;
