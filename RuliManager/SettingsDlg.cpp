@@ -25,6 +25,7 @@ BOOL CSettingsDlg::OnInitDialog()
 	CDialogEx::OnInitDialog();
 	m_theme.Apply(this, { IDC_SET_DEL_BTN });   // 삭제 버튼은 빨간색
 	UpdateCounts();
+	CheckDlgButton(IDC_SET_CARD_MEDIA, m_cardMedia ? BST_CHECKED : BST_UNCHECKED);
 
 	return TRUE;
 }
@@ -102,6 +103,7 @@ void CSettingsDlg::OnBnClickedDeleteDb()
 
 void CSettingsDlg::OnOK()
 {
+	m_cardMedia = IsDlgButtonChecked(IDC_SET_CARD_MEDIA) == BST_CHECKED;
 	CDialogEx::OnOK();
 }
 

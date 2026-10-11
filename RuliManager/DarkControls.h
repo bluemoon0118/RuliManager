@@ -31,10 +31,15 @@ protected:
 	int   m_dragStartMouse = 0;
 	int   m_dragStartPos = 0;
 	bool  m_hot = false;
-	int   m_repeatCode = -1;      // 트랙을 누르고 있을 때 반복할 SB_PAGEUP/SB_PAGEDOWN
+	int   m_repeatCode = -1;      // 누르고 있을 때 반복할 SB_PAGEUP/SB_PAGEDOWN (트랙) · SB_LINEUP/SB_LINEDOWN (양 끝 버튼)
+	int   m_hotArrow = 0;         // 마우스가 올라간 끝 버튼 (0 없음, 1 위/왼쪽, 2 아래/오른쪽)
 
+	// 양 끝 화살표 버튼 (▲ / ▼): 길이 = 스크롤바 두께 (스크롤바가 짧으면 없음)
+	int   ArrowLen() const;
+	CRect ArrowRect(int which) const;   // 1 = 위/왼쪽, 2 = 아래/오른쪽
+	CRect TrackRect() const;            // 화살표 버튼을 뺀 트랙 영역 (썸이 움직이는 곳)
 	bool GetThumbRect(CRect& rc) const;
-	int  TrackLength() const { return m_vert ? m_barRect.Height() : m_barRect.Width(); }
+	int  TrackLength() const { const CRect t = TrackRect(); return m_vert ? t.Height() : t.Width(); }
 	int  MinThumb() const;
 	void ScrollTargetTo(int pos);
 	void SendScroll(int code);

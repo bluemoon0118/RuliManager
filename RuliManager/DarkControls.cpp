@@ -763,6 +763,36 @@ void CDarkScrollBar::Sync()
 	}
 }
 
+int CDarkScrollBar::ArrowLen() const
+{
+	const int thick = m_vert ? m_barRect.Width() : m_barRect.Height();
+	const int len = m_vert ? m_barRect.Height() : m_barRect.Width();
+	if (thick <= 0 || len < thick * 3)
+		return 0;   // 너무 짧으면 버튼 없이 트랙만
+	return thick;
+}
+
+CRect CDarkScrollBar::ArrowRect(int which) const
+{
+	const int a = ArrowLen();
+	if (a <= 0)
+		return CRect();
+	if (m_vert)
+		return (which == 1) ? CRect(m_barRect.left, m_barRect.top, m_barRect.right, m_barRect.top + a)
+		                    : CRect(m_barRect.left, m_barRect.bottom - a, m_barRect.right, m_barRect.bottom);
+	return (which == 1) ? CRect(m_barRect.left, m_barRect.top, m_barRect.left + a, m_barRect.bottom)
+	                    : CRect(m_barRect.right - a, m_barRect.top, m_barRect.right, m_barRect.bottom);
+}
+
+CRect CDarkScrollBar::TrackRect() const
+{
+	CRect t = m_barRect;
+	const int a = ArrowLen();
+	if (m_vert) { t.top += a; t.bottom -= a; }
+	else        { t.left += a; t.right -= a; }
+	return t;
+}
+
 bool CDarkScrollBar::GetThumbRect(CRect& rc) const
 {
 	if (!m_enabled)
@@ -779,10 +809,11 @@ bool CDarkScrollBar::GetThumbRect(CRect& rc) const
 	const int pos = (std::max)(0, (std::min)(maxPos, m_si.nPos - m_si.nMin));
 	const int off = MulDiv(trackLen - thumbLen, pos, maxPos);
 
+	const CRect tr = TrackRect();
 	if (m_vert)
-		rc.SetRect(m_barRect.left, m_barRect.top + off, m_barRect.right, m_barRect.top + off + thumbLen);
+		rc.SetRect(tr.left, tr.top + off, tr.right, tr.top + off + thumbLen);
 	else
-		rc.SetRect(m_barRect.left + off, m_barRect.top, m_barRect.left + off + thumbLen, m_barRect.bottom);
+		rc.SetRect(tr.left + off, tr.top, tr.left + off + thumbLen, tr.bottom);
 	return true;
 }
 
@@ -838,9 +869,15 @@ BOOL CDarkScrollBar::OnEraseBkgnd(CDC* /*pDC*/)
 
 void CDarkScrollBar::OnPaint()
 {
-	CPaintDC dc(this);
+	CPaintDC paintDC(this);
 	CRect rc;
 	GetClientRect(&rc);
+	// 메모리에 그린 뒤 한 번에 복사 (끌 때 깜빡임 방지)
+	CDC dc;
+	dc.CreateCompatibleDC(&paintDC);
+	CBitmap buf;
+	buf.CreateCompatibleBitmap(&paintDC, (std::max)(1, rc.Width()), (std::max)(1, rc.Height()));
+	CBitmap* oldBuf = dc.SelectObject(&buf);
 
 	dc.FillSolidRect(&rc, m_track);
 
@@ -858,6 +895,41 @@ void CDarkScrollBar::OnPaint()
 		dc.SelectObject(oldBrush);
 		dc.SelectObject(oldPen);
 	}
+	// 양 끝 화살표 버튼 (▲ ▼ / ◀ ▶): 마우스를 올리거나 누르면 밝게
+	for (int which = 1; which <= 2; ++which)
+	{
+		const CRect ar = ArrowRect(which);
+		if (ar.IsRectEmpty())
+			continue;
+		const bool pressed = (which == 1 && m_repeatCode == SB_LINEUP) || (which == 2 && m_repeatCode == SB_LINEDOWN);
+		const COLORREF c = !m_enabled ? m_track : ((pressed || m_hotArrow == which) ? m_thumbHot : m_thumb);
+		const int s = (std::max)(3, (std::min)(ar.Width(), ar.Height()) / 4);   // 삼각형 반 너비
+		const CPoint mid = ar.CenterPoint();
+		POINT pts[3];
+		if (m_vert)
+		{
+			const int dir = (which == 1) ? -1 : 1;   // 위 / 아래
+			pts[0] = { mid.x - s, mid.y - dir * s / 2 };
+			pts[1] = { mid.x + s, mid.y - dir * s / 2 };
+			pts[2] = { mid.x, mid.y + dir * (s - s / 2) + dir };
+		}
+		else
+		{
+			const int dir = (which == 1) ? -1 : 1;   // 왼쪽 / 오른쪽
+			pts[0] = { mid.x - dir * s / 2, mid.y - s };
+			pts[1] = { mid.x - dir * s / 2, mid.y + s };
+			pts[2] = { mid.x + dir * (s - s / 2) + dir, mid.y };
+		}
+		CBrush brush(c);
+		CPen pen(PS_SOLID, 1, c);
+		CBrush* ob = dc.SelectObject(&brush);
+		CPen* op = dc.SelectObject(&pen);
+		dc.Polygon(pts, 3);
+		dc.SelectObject(ob);
+		dc.SelectObject(op);
+	}
+	paintDC.BitBlt(0, 0, rc.Width(), rc.Height(), &dc, 0, 0, SRCCOPY);
+	dc.SelectObject(oldBuf);
 }
 
 void CDarkScrollBar::OnTimer(UINT_PTR nIDEvent)
@@ -877,6 +949,14 @@ void CDarkScrollBar::OnTimer(UINT_PTR nIDEvent)
 		CPoint pt;
 		::GetCursorPos(&pt);
 		ScreenToClient(&pt);
+		if (m_repeatCode == SB_LINEUP || m_repeatCode == SB_LINEDOWN)
+		{
+			// 화살표 버튼 위에 있는 동안 계속 한 줄씩
+			if (ArrowRect(m_repeatCode == SB_LINEUP ? 1 : 2).PtInRect(pt))
+				SendScroll(m_repeatCode);
+			SetTimer(kRepeatTimer, 50, nullptr);
+			return;
+		}
 		CRect thumb;
 		if (GetThumbRect(thumb) && m_barRect.PtInRect(pt))
 		{
@@ -896,6 +976,22 @@ void CDarkScrollBar::OnLButtonDown(UINT /*nFlags*/, CPoint point)
 {
 	if (!m_barRect.PtInRect(point))
 		return;   // 모서리 칸
+
+	// 양 끝 화살표 버튼: 한 줄씩, 누르고 있으면 반복
+	for (int which = 1; which <= 2; ++which)
+	{
+		if (ArrowRect(which).PtInRect(point))
+		{
+			if (!m_enabled)
+				return;
+			m_repeatCode = (which == 1) ? SB_LINEUP : SB_LINEDOWN;
+			SendScroll(m_repeatCode);
+			SetCapture();
+			SetTimer(kRepeatTimer, 300, nullptr);
+			Invalidate(FALSE);
+			return;
+		}
+	}
 
 	CRect thumb;
 	if (!GetThumbRect(thumb))
@@ -975,6 +1071,13 @@ void CDarkScrollBar::OnMouseMove(UINT nFlags, CPoint point)
 		m_hot = hot;
 		Invalidate(FALSE);
 	}
+	// 화살표 버튼 위
+	const int hotArrow = ArrowRect(1).PtInRect(point) ? 1 : (ArrowRect(2).PtInRect(point) ? 2 : 0);
+	if (hotArrow != m_hotArrow)
+	{
+		m_hotArrow = hotArrow;
+		Invalidate(FALSE);
+	}
 	TRACKMOUSEEVENT tme = { sizeof(tme), TME_LEAVE, m_hWnd, 0 };
 	::TrackMouseEvent(&tme);
 	CWnd::OnMouseMove(nFlags, point);
@@ -982,9 +1085,10 @@ void CDarkScrollBar::OnMouseMove(UINT nFlags, CPoint point)
 
 void CDarkScrollBar::OnMouseLeave()
 {
-	if (m_hot)
+	if (m_hot || m_hotArrow)
 	{
 		m_hot = false;
+		m_hotArrow = 0;
 		Invalidate(FALSE);
 	}
 	CWnd::OnMouseLeave();

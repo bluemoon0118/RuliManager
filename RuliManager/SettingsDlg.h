@@ -17,6 +17,9 @@ public:
 	// [선택한 DB 삭제] 확인 후 호출 (메인 창이 실제로 지우고 화면 갱신)
 	std::function<void(int mask)> m_onDeleteDb;
 
+	// [표시] 영상 카드 해상도 · 재생 시간 (DoModal 전에 지금 값, IDOK 후 고른 값)
+	bool m_cardMedia = true;
+
 #ifdef AFX_DESIGN_TIME
 	enum { IDD = IDD_SETTINGS };
 #endif

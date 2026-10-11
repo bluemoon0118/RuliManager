@@ -194,20 +194,27 @@ public:
 	static void    DiscardWorkDb();        // 남은 작업 DB 버리기
 	static bool    ApplyLeftoverWorkDb();  // 남은 작업 DB 를 원본에 반영
 	static CString GetDataFilePath();      // <실행 파일 폴더>\library.vmdb (정보 + 임시 목록)
-	static CString GetImagesDbPath();      // <실행 파일 폴더>\images.vmdb (예전 이미지 DB, 처음 실행 때 Image 폴더로 풀고 .bak)
-	static CString GetImageRoot();         // <실행 파일 폴더>\Image (배우 사진 · 스튜디오 이미지 보관, actors / studios — 태그는 이미지 없음)
+	static CString GetImagesDbPath();      // <실행 파일 폴더>\images.vmdb (이미지 DB: 배우 사진 · 스튜디오 이미지 전체를 암호화해서 한 파일로)
+	static CString GetImageRoot();         // 이미지 캐시 폴더 <실행 파일 폴더>\cache\images (actors / studios — 기동 때 풀고 종료 때 지움)
 	static CString GetBackupDir();         // <DB 폴더>\backup (없으면 만듦)
 	// 프로그램 시작 시 DB 백업: library.vmdb 를 backup 폴더에 날짜·시각 이름으로 복사
 	//  - 가장 최근 백업과 내용이 같으면 그 파일은 건너뜀, 파일마다 최근 keep 개만 남김
 	//  - 반환: 새로 만든 백업 파일 수
 	static int     BackupDbFiles(int keep = 10);
+	// 이미지 DB(images.vmdb) ↔ 이미지 캐시 폴더
+	//  - LoadImageDb: 기동(Load) 때 images.vmdb 를 캐시로 풀기 (남은 캐시 · 예전 Image 폴더도 합침)
+	//  - SaveImageDb: 캐시 이미지를 images.vmdb 하나로 묶어 저장 (바뀐 것이 없으면 0, 저장 1, 실패 -1 → 캐시를 지우면 안 됨)
+	static void    LoadImageDb();
+	static int     SaveImageDb(CString* error = nullptr);
+	static bool    HasUnsavedImages();     // 이미지 DB 에 저장 안 한 캐시 변경이 있음 ([DB 반영] 활성)
+	static CString GetLegacyImageDir();    // 예전 이미지 폴더 <실행 파일 폴더>\Image (기동 때 캐시로 옮기고 저장 성공 후 Image.bak)
 	static CString GetLegacyLibraryPath(); // 예전 정보 파일 library.tsv (처음 한 번 옮겨 오고 .bak 으로 바꿈)
 	static CString GetPendingFilePath();   // 예전 임시 목록 pending.tsv
-	static CString GetCacheDir();          // 실행 중 이미지를 풀어 두는 폴더
-	static void    ClearImageCache();      // 캐시 이미지 지우기 (종료 시)
+	static CString GetCacheDir();          // <실행 파일 폴더>\cache (실행 중 이미지를 풀어 두는 폴더)
+	static void    ClearImageCache();      // 이미지 캐시 지우기 (종료 시, SaveImageDb 가 성공했을 때만)
 	int  PendingCount() const;
 
-	// 등록 이미지 보관소: <실행 폴더>\Image\<sub> (배우 사진 · 스튜디오 이미지의 암호화 사본 .vmimg)
+	// 등록 이미지 보관소: <이미지 캐시>\<sub> (배우 사진 · 스튜디오 이미지 평문 사본, 종료 때 images.vmdb 로 묶음)
 	static CString GetImageStoreDir(LPCWSTR sub = nullptr);
 	static bool    IsInImageStore(const CString& path);
 	// 이미지를 보관소로 복사하고 복사본 경로를 반환 (이미 보관소 안이면 그대로, 실패하면 빈 문자열)

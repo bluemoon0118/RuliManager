@@ -219,6 +219,20 @@
 #define IDC_NL_JA_LBL               1250
 #define IDC_NL_JA                   1251
 #define IDC_TI_PASTE_COMPACT        1252
+#define IDC_SET_CARD_MEDIA          1253
+#define IDC_COMBO_PAGESIZE          1254
+#define IDC_PAGE_FIRST              1255
+#define IDC_PAGE_PREV               1256
+#define IDC_PAGE_N1                 1257
+#define IDC_PAGE_N2                 1258
+#define IDC_PAGE_N3                 1259
+#define IDC_PAGE_N4                 1260
+#define IDC_PAGE_N5                 1261
+#define IDC_PAGE_NEXT               1262
+#define IDC_PAGE_LAST               1263
+#define IDC_STATIC_PAGEINFO         1264
+#define IDC_DRILL_PHOTO             1265
+#define IDC_DRILL_PANEL             1266
 #define IDC_NAMED_MEMO              1233
 #define IDC_ACT_GENDER              1159
 
@@ -234,7 +248,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE    141
 #define _APS_NEXT_COMMAND_VALUE     32824
-#define _APS_NEXT_CONTROL_VALUE     1253
+#define _APS_NEXT_CONTROL_VALUE     1267
 #define _APS_NEXT_SYMED_VALUE       101
 #endif
 #endif

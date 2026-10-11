@@ -22,6 +22,8 @@ public:
 	virtual int  GridHoverZone(int /*row*/, const CRect& /*card*/, CPoint /*pt*/) { return 0; }
 	// 마우스 위치의 풍선 도움말 글자 (비우면 표시 안 함 - 예: 영상 카드에서 잘린 제목 전체)
 	virtual CString GridTipText(int /*row*/, const CRect& /*card*/, CPoint /*pt*/) { return CString(); }
+	// 화면 바로 위 · 아래(한 화면씩)의 카드 범위 [first, last] - 이미지를 미리 읽어 두기용 (스크롤할 때 "불러오는 중" 깜빡임 줄임)
+	virtual void GridPrefetch(int /*first*/, int /*last*/) {}
 };
 
 // 썸네일 + 파일명 + 발매일 + 메모를 카드 형태로 바둑판 배열하는 컨트롤
@@ -46,6 +48,12 @@ public:
 	// 고정 카드의 카드 영역 (클라이언트 좌표)
 	bool GetCardRect(int row, CRect& rc) const;
 
+	// 카드 위쪽 머리 영역 (목록 도구줄 자리): 카드는 이 높이 아래부터, 함께 스크롤됨
+	//  - 머리 영역에 둔 자식 컨트롤(도구줄)은 스크롤할 때 같이 움직이고, 알림(WM_COMMAND · 그리기 · 색)은 부모 창으로 넘김
+	void SetHeaderHeight(int h);
+	int  HeaderHeight() const { return m_headerH; }
+	int  ScrollY() const { return m_scroll; }
+
 protected:
 	IVideoGridOwner* m_owner = nullptr;
 	CImageList* m_images = nullptr;
@@ -67,6 +75,7 @@ protected:
 	int  m_cellW = 176;
 	int  m_tileH = 220;
 	int  m_scroll = 0;
+	int  m_headerH = 0;      // 카드 위 머리 영역 높이 (도구줄)
 	int  m_fixedW = 0;       // 고정 카드 크기 (배우 카드)
 	int  m_fixedH = 0;
 	int  m_offsetX = 0;      // 고정 카드일 때 가운데 정렬 여백
@@ -103,5 +112,6 @@ protected:
 	afx_msg void OnSetFocus(CWnd* pOldWnd);
 	afx_msg void OnKillFocus(CWnd* pNewWnd);
 	afx_msg LRESULT OnDarkScrollSetPos(WPARAM wParam, LPARAM lParam);
+	virtual LRESULT WindowProc(UINT message, WPARAM wParam, LPARAM lParam);   // 도구줄 자식 컨트롤 알림 → 부모 창
 	DECLARE_MESSAGE_MAP()
 };
