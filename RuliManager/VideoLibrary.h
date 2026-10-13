@@ -82,6 +82,11 @@ class CVideoLibrary
 public:
 	std::vector<VideoItem> items;
 	std::vector<CString>   folders;
+	// 이동식 디스크(USB · 외장 하드)로 등록한 폴더: 키 = MakeKey(폴더), 볼륨 일련번호로 같은 디스크인지 확인
+	//  - 디스크가 연결되지 않았으면(또는 다른 디스크면) 그 폴더의 영상 정보를 지우지도 다시 스캔하지도 않음
+	//  - 드라이브 문자가 바뀌어도 일련번호로 찾아 폴더 · 영상 경로를 새 문자로 바꿈
+	struct RemovableInfo { DWORD serial = 0; CString label; bool online = false; };
+	std::map<CString, RemovableInfo> removableFolders;
 	std::vector<ActorInfo> actors;
 	std::vector<NamedInfo> studios;
 	std::vector<NamedInfo> tagInfos;
@@ -97,7 +102,12 @@ public:
 	std::function<void()> m_onSaved;                            // 작업 DB 에 저장할 때마다 (버튼 상태 갱신용)                 // 암호화된 DB 를 풀지 못함 (저장 안 함)
 
 	// 폴더를 등록하고 하위 폴더까지 스캔합니다. 새로 추가된 개수를 반환.
-	int  AddFolder(const CString& folder);
+	int  AddFolder(const CString& folder, bool removable = false);   // removable: 이동식 디스크 폴더로 등록
+	bool IsRemovableFolder(const CString& folder) const;
+	bool IsRemovableItem(const CString& path, bool* online = nullptr) const;   // 이동식 폴더의 영상인지 (online: 지금 연결됨)
+	bool RemovableConnected(const CString& folder) const;   // 이동식 폴더의 디스크가 지금 연결되어 있는지 (같은 일련번호)
+	int  RemapRemovableDrives();       // 드라이브 문자가 바뀐 이동식 디스크를 찾아 폴더 · 영상 경로를 바꿈 (반환: 바꾼 폴더 수)
+	void UpdateRemovableState();       // 이동식 폴더별 연결 상태 갱신 (화면 표시용)
 	// 등록 폴더를 제거하고, 다른 등록 폴더에 속하지 않는 항목을 목록에서 제거합니다.
 	void RemoveFolder(size_t index);
 	// 모든 등록 폴더를 다시 스캔합니다.

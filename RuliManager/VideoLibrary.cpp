@@ -1203,6 +1203,7 @@ bool CVideoLibrary::Load()
 {
 	items.clear();
 	folders.clear();
+	removableFolders.clear();
 	actors.clear();
 	studios.clear();
 	tagInfos.clear();
@@ -1271,6 +1272,16 @@ bool CVideoLibrary::Load()
 		if (fields[0] == L"F" && fields.size() >= 2)
 		{
 			folders.push_back(Unescape(fields[1]));
+			// 이동식 디스크 폴더: F \t 경로 \t R \t 볼륨 일련번호(16진) \t 볼륨 이름
+			if (fields.size() >= 3 && fields[2] == L"R")
+			{
+				RemovableInfo ri;
+				if (fields.size() >= 4)
+					ri.serial = static_cast<DWORD>(wcstoul(fields[3], nullptr, 16));
+				if (fields.size() >= 5)
+					ri.label = Unescape(fields[4]);
+				removableFolders[MakeKey(folders.back())] = ri;
+			}
 		}
 		else if ((fields[0] == L"S" || fields[0] == L"T") && fields.size() >= 2)
 		{
@@ -1440,6 +1451,13 @@ bool CVideoLibrary::Save() const
 	{
 		text += L"F\t";
 		text += Escape(f);
+		auto ri = removableFolders.find(MakeKey(f));
+		if (ri != removableFolders.end())
+		{
+			CString extra;
+			extra.Format(L"\tR\t%08X\t", ri->second.serial);   // 이동식 디스크 + 볼륨 일련번호
+			text += extra + Escape(ri->second.label);
+		}
 		text += L"\n";
 	}
 	auto RatingField = [](int r) { CString t; if (r > 0) t.Format(L"%d", r); return t; };
@@ -1882,7 +1900,119 @@ int CVideoLibrary::MergeScanned(const std::vector<VideoItem>& scanned)
 	return added;
 }
 
-int CVideoLibrary::AddFolder(const CString& folder)
+namespace
+{
+	// 경로가 있는 볼륨의 일련번호 · 이름 (실패하면 false)
+	bool VolumeSerialOf(const CString& path, DWORD& serial, CString* label)
+	{
+		wchar_t root[MAX_PATH] = {};
+		wcsncpy_s(root, path, _TRUNCATE);
+		if (!::PathStripToRootW(root))
+			return false;
+		CString r = root;
+		if (r.Right(1) != L"\\")
+			r += L"\\";
+		wchar_t name[MAX_PATH + 1] = {};
+		DWORD sn = 0;
+		const UINT oldMode = ::SetErrorMode(SEM_FAILCRITICALERRORS);   // 빈 드라이브 "디스크를 넣으세요" 창 방지
+		const BOOL ok = ::GetVolumeInformationW(r, name, MAX_PATH, &sn, nullptr, nullptr, nullptr, 0);
+		::SetErrorMode(oldMode);
+		if (!ok)
+			return false;
+		serial = sn;
+		if (label)
+			*label = name;
+		return true;
+	}
+}
+
+bool CVideoLibrary::IsRemovableFolder(const CString& folder) const
+{
+	return removableFolders.count(MakeKey(folder)) != 0;
+}
+
+bool CVideoLibrary::RemovableConnected(const CString& folder) const
+{
+	auto it = removableFolders.find(MakeKey(folder));
+	if (it == removableFolders.end())
+		return ::GetFileAttributesW(folder) != INVALID_FILE_ATTRIBUTES;
+	const UINT oldMode = ::SetErrorMode(SEM_FAILCRITICALERRORS);
+	const bool exists = ::GetFileAttributesW(folder) != INVALID_FILE_ATTRIBUTES;
+	::SetErrorMode(oldMode);
+	if (!exists)
+		return false;
+	if (it->second.serial == 0)
+		return true;
+	DWORD sn = 0;
+	return VolumeSerialOf(folder, sn, nullptr) && sn == it->second.serial;   // 같은 문자에 다른 디스크면 연결 안 된 것으로
+}
+
+bool CVideoLibrary::IsRemovableItem(const CString& path, bool* online) const
+{
+	for (const CString& f : folders)
+	{
+		auto it = removableFolders.find(MakeKey(f));
+		if (it != removableFolders.end() && IsUnder(path, f))
+		{
+			if (online)
+				*online = it->second.online;
+			return true;
+		}
+	}
+	return false;
+}
+
+void CVideoLibrary::UpdateRemovableState()
+{
+	for (const CString& f : folders)
+	{
+		auto it = removableFolders.find(MakeKey(f));
+		if (it != removableFolders.end())
+			it->second.online = RemovableConnected(f);
+	}
+}
+
+int CVideoLibrary::RemapRemovableDrives()
+{
+	int remapped = 0;
+	wchar_t drives[512] = {};
+	const DWORD len = ::GetLogicalDriveStringsW(_countof(drives) - 1, drives);
+	for (size_t i = 0; i < folders.size(); ++i)
+	{
+		const CString oldFolder = folders[i];
+		auto it = removableFolders.find(MakeKey(oldFolder));
+		if (it == removableFolders.end() || it->second.serial == 0 || RemovableConnected(oldFolder))
+			continue;
+		if (oldFolder.GetLength() < 3 || oldFolder[1] != L':')
+			continue;   // 드라이브 문자 경로만 (네트워크 경로는 그대로)
+		const CString rest = oldFolder.Mid(2);   // "\폴더..." (드라이브 문자 뒤)
+		for (const wchar_t* d = drives; len && *d; d += wcslen(d) + 1)
+		{
+			DWORD sn = 0;
+			if (!VolumeSerialOf(d, sn, nullptr) || sn != it->second.serial)
+				continue;
+			const CString newFolder = CString(d).Left(2) + rest;   // 같은 디스크가 다른 문자로 연결됨
+			if (newFolder.CompareNoCase(oldFolder) == 0 || ::GetFileAttributesW(newFolder) == INVALID_FILE_ATTRIBUTES)
+				continue;
+			// 폴더 · 영상 경로의 드라이브 문자 바꿈
+			const CString oldDrive = oldFolder.Left(2), newDrive = newFolder.Left(2);
+			for (VideoItem& v : items)
+				if (IsUnder(v.path, oldFolder))
+					v.path = newDrive + v.path.Mid(2);
+			RemovableInfo ri = it->second;
+			removableFolders.erase(it);
+			folders[i] = newFolder;
+			removableFolders[MakeKey(newFolder)] = ri;
+			(void)oldDrive;
+			++remapped;
+			break;
+		}
+	}
+	UpdateRemovableState();
+	return remapped;
+}
+
+int CVideoLibrary::AddFolder(const CString& folder, bool removable)
 {
 	CString f = folder;
 	f.TrimRight(L"\\");
@@ -1896,6 +2026,16 @@ int CVideoLibrary::AddFolder(const CString& folder)
 	}
 	if (!exists)
 		folders.push_back(f);
+	// 이동식 디스크 지정 (이미 등록된 폴더도 다시 등록하면 바뀜)
+	if (removable)
+	{
+		RemovableInfo ri;
+		VolumeSerialOf(f, ri.serial, &ri.label);
+		ri.online = true;
+		removableFolders[MakeKey(f)] = ri;
+	}
+	else
+		removableFolders.erase(MakeKey(f));
 
 	std::vector<VideoItem> scanned;
 	ScanFolder(f, scanned, 0);
@@ -1910,6 +2050,7 @@ void CVideoLibrary::RemoveFolder(size_t index)
 
 	const CString removed = folders[index];
 	folders.erase(folders.begin() + index);
+	removableFolders.erase(MakeKey(removed));
 
 	items.erase(std::remove_if(items.begin(), items.end(),
 		[&](const VideoItem& v)
@@ -1952,7 +2093,12 @@ int CVideoLibrary::RelinkMoved(const std::vector<VideoItem>& scanned)
 			if (v.pending != (pass == 1))
 				continue;
 			if (found.count(MakeKey(v.path)) == 0 && ::GetFileAttributesW(v.path) == INVALID_FILE_ATTRIBUTES)
+			{
+				bool online = false;
+				if (IsRemovableItem(v.path, &online) && !online)
+					continue;   // 연결 안 된 이동식 디스크의 영상: 다른 파일에 다시 연결하지 않음 (디스크를 다시 꽂으면 그대로)
 				missing.push_back(i);
+			}
 		}
 
 	int relinked = 0;
@@ -1989,24 +2135,28 @@ int CVideoLibrary::RelinkMoved(const std::vector<VideoItem>& scanned)
 
 int CVideoLibrary::RelinkOnStartup()
 {
+	// 이동식 디스크: 드라이브 문자가 바뀌었으면 먼저 새 문자로 맞춤
+	const int remapped = RemapRemovableDrives();
 	bool anyMissing = false;
 	for (const VideoItem& v : items)
 		if (::GetFileAttributesW(v.path) == INVALID_FILE_ATTRIBUTES) { anyMissing = true; break; }
 	if (!anyMissing)
-		return 0;   // 모두 제자리면 스캔하지 않음 (시작 속도)
+		return remapped;   // 모두 제자리면 스캔하지 않음 (시작 속도)
 
 	std::vector<VideoItem> scanned;
 	for (const CString& f : folders)
-		if (::GetFileAttributesW(f) != INVALID_FILE_ATTRIBUTES)
+		if (RemovableConnected(f))   // 연결 안 된(또는 다른) 이동식 디스크는 스캔하지 않음
 			ScanFolder(f, scanned, 0);
-	return RelinkMoved(scanned);
+	return remapped + RelinkMoved(scanned);
 }
 
 void CVideoLibrary::Refresh(int& added, int& removed, int* relinked)
 {
+	RemapRemovableDrives();   // 이동식 디스크 드라이브 문자 변경 반영 + 연결 상태 갱신
 	std::vector<VideoItem> scanned;
 	for (const CString& f : folders)
-		ScanFolder(f, scanned, 0);
+		if (RemovableConnected(f))   // 연결 안 된(또는 같은 문자의 다른) 이동식 디스크는 스캔하지 않음
+			ScanFolder(f, scanned, 0);
 
 	// 옮겨지거나 이름이 바뀐 파일은 기존 항목에 다시 연결 (지우고 새로 추가하지 않음)
 	const int moved = RelinkMoved(scanned);
@@ -2026,6 +2176,10 @@ void CVideoLibrary::Refresh(int& added, int& removed, int* relinked)
 			// 등록 폴더 자체에 접근할 수 없으면(외장 드라이브 분리 등) 지우지 않음
 			for (const CString& f : folders)
 				if (IsUnder(v.path, f) && ::GetFileAttributesW(f) == INVALID_FILE_ATTRIBUTES)
+					return false;
+			// 이동식 디스크 폴더: 그 디스크(같은 일련번호)가 연결되어 있을 때만 정말 없어진 파일로 봄
+			for (const CString& f : folders)
+				if (IsUnder(v.path, f) && IsRemovableFolder(f) && !RemovableConnected(f))
 					return false;
 			return true;
 		}), items.end());

@@ -439,6 +439,7 @@ protected:
 
 	// 메시지 처리기
 	afx_msg void OnSize(UINT nType, int cx, int cy);
+	afx_msg BOOL OnDeviceChange(UINT nEventType, DWORD_PTR dwData);   // 이동식 디스크 연결 / 분리 → 연결 상태 · 드라이브 문자 다시 확인
 	afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
 	afx_msg void OnClose();
 	void SaveWindowPlacement();      // 창 위치/크기/최대화 상태 저장 (다음 실행 때 복원)

@@ -7,6 +7,7 @@
 #include <thread>
 #include "SettingsDlg.h"
 #include "Version.h"
+#include <dbt.h>
 #include "ImageSearchDlg.h"
 #include "NameListDlg.h"
 #include "SeriesDlg.h"
@@ -229,6 +230,7 @@ void CRuliManagerDlg::DoDataExchange(CDataExchange* pDX)
 
 BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_WM_SIZE()
+	ON_WM_DEVICECHANGE()
 	ON_WM_DROPFILES()
 	ON_WM_MOVE()
 	ON_WM_GETMINMAXINFO()
@@ -1860,6 +1862,28 @@ void CRuliManagerDlg::OnMove(int x, int y)
 	CDialogEx::OnMove(x, y);
 	if (m_layoutReady)
 		HideSuggestions();   // 창을 옮기면 후보 목록이 따로 떠 있지 않도록 닫음
+}
+
+BOOL CRuliManagerDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
+{
+	// USB · 외장 하드를 꽂거나 빼면: 이동식 디스크 폴더의 연결 상태와 드라이브 문자를 다시 확인
+	if ((nEventType == DBT_DEVICEARRIVAL || nEventType == DBT_DEVICEREMOVECOMPLETE) && dwData &&
+		reinterpret_cast<const DEV_BROADCAST_HDR*>(dwData)->dbch_devicetype == DBT_DEVTYP_VOLUME && !m_lib.removableFolders.empty())
+	{
+		CommitDetails();
+		const int keepIdx = m_curItem;   // 항목 순서는 그대로, 경로만 바뀜
+		if (m_lib.RemapRemovableDrives() > 0)   // 다른 문자로 연결됨 → 경로 바뀜
+		{
+			m_lib.Save();
+			ResetThumbnails();
+			ApplyFilter();
+			if (keepIdx >= 0 && keepIdx < static_cast<int>(m_lib.items.size()))
+				SelectPath(m_lib.items[keepIdx].path);
+		}
+		if (m_grid.GetSafeHwnd())
+			m_grid.Invalidate(FALSE);   // 카드의 "이동식 디스크 (연결 안 됨)" 표시
+	}
+	return CDialogEx::OnDeviceChange(nEventType, dwData);
 }
 
 void CRuliManagerDlg::OnSize(UINT nType, int cx, int cy)
@@ -6948,6 +6972,30 @@ void CRuliManagerDlg::DrawVideoCard(CDC* dc, int row, const CRect& rc, bool sele
 		// 별점: 이미지 왼쪽 위 대각선 리본 (배우 카드와 같은 모양/색)
 		DrawRatingRibbon(d, rcX, imgX, radius, v.rating, GetFont());
 
+		// 이동식 디스크에서 등록한 영상: 이미지 왼쪽 아래에 "이동식 디스크" (연결 안 됐으면 "(연결 안 됨)")
+		{
+			bool online = false;
+			if (m_lib.IsRemovableItem(v.path, &online))
+			{
+				const CString text = online ? CString(L"이동식 디스크") : CString(L"이동식 디스크 (연결 안 됨)");
+				CFont* prev = d->SelectObject(&m_vcardSubFont);   // 굵은 글꼴
+				const int margin = DX(4);
+				const int bh = m_vcardSubLine + DX(1);
+				const int tw = d->GetTextExtent(text).cx;
+				const CRect box(imgX.left + margin, imgX.bottom - margin - bh, (std::min)(static_cast<int>(imgX.right) - margin, static_cast<int>(imgX.left) + margin + tw + 1), imgX.bottom - margin);
+				d->SetBkMode(TRANSPARENT);
+				const UINT fmt = DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS;
+				CRect sr = box;
+				sr.OffsetRect(1, 1);
+				d->SetTextColor(RGB(0, 0, 0));
+				d->DrawText(text, sr, fmt);   // 그림자 (밝은 이미지에서도 보이게)
+				CRect tr = box;
+				d->SetTextColor(online ? RGB(0xFF, 0xC4, 0x5C) : RGB(0xB8, 0xC0, 0xC6));   // 연결됨: 주황 / 연결 안 됨: 회색
+				d->DrawText(text, tr, fmt);
+				d->SelectObject(prev);
+			}
+		}
+
 		// 이미지 오른쪽 아래: 해상도(굵게) + 재생 시간(시:분:초)  예) 1080p 2:03:15 - 바탕 없이, 글자 뒤에 어두운 그림자 (밝은 이미지에서도 보이게)
 		//  (설정에서 끄면 읽지도 그리지도 않음 - 파일이 많을 때 처음 로딩 부담)
 		if (const CMediaInfoLabel::Info* mi = m_showCardMedia ? CardMediaInfo(v.path) : nullptr)
@@ -7850,6 +7898,25 @@ void CRuliManagerDlg::OnBnClickedAddFolder()
 	if (folder.IsEmpty())
 		return;
 
+	// 이동식 디스크 지정: 디스크를 뺀 채로 실행 · 새로고침해도 영상 정보를 지우지 않고, 드라이브 문자가 바뀌어도 다시 연결
+	bool removable = false;
+	{
+		wchar_t root[MAX_PATH] = {};
+		wcsncpy_s(root, folder, _TRUNCATE);
+		::PathStripToRootW(root);
+		const bool looksRemovable = (::GetDriveTypeW(root) == DRIVE_REMOVABLE) || m_lib.IsRemovableFolder(folder);
+		const int r = AfxMessageBox(L"이 폴더가 이동식 디스크(USB 메모리 · 외장 하드 등)에 있습니까?\n\n"
+			L"[예] 이동식 디스크로 등록\n"
+			L"  · 디스크를 뺀 채로 프로그램을 켜거나 새로고침해도 그 영상 정보가 지워지지 않음\n"
+			L"  · 드라이브 문자가 바뀌어도(E: → F:) 같은 디스크를 찾아 다시 연결\n"
+			L"  · 영상 카드 이미지에 \"이동식 디스크\" 표시\n"
+			L"[아니요] 일반 폴더로 등록",
+			MB_YESNOCANCEL | MB_ICONQUESTION | (looksRemovable ? MB_DEFBUTTON1 : MB_DEFBUTTON2));
+		if (r == IDCANCEL)
+			return;
+		removable = (r == IDYES);
+	}
+
 	CommitDetails();
 	const CString keep = (m_curItem >= 0) ? m_lib.items[m_curItem].path : CString();
 
@@ -7857,7 +7924,7 @@ void CRuliManagerDlg::OnBnClickedAddFolder()
 	{
 		CWaitCursor wait;
 		BeginLibraryChange();
-		added = m_lib.AddFolder(folder);
+		added = m_lib.AddFolder(folder, removable);
 		m_lib.SyncActorsFromVideos();   // 폴더 구조로 찾은 배우/스튜디오를 목록에 추가
 		m_lib.SyncNamedFromVideos();
 		m_lib.Save();
@@ -7881,7 +7948,12 @@ void CRuliManagerDlg::OnBnClickedRemoveFolder()
 	CMenu menu;
 	menu.CreatePopupMenu();
 	for (size_t i = 0; i < m_lib.folders.size(); ++i)
-		menu.AppendMenu(MF_STRING, static_cast<UINT_PTR>(i + 1), m_lib.folders[i]);
+	{
+		CString item = m_lib.folders[i];
+		if (m_lib.IsRemovableFolder(item))
+			item += m_lib.RemovableConnected(item) ? L"   [이동식 디스크]" : L"   [이동식 디스크 - 연결 안 됨]";
+		menu.AppendMenu(MF_STRING, static_cast<UINT_PTR>(i + 1), item);
+	}
 
 	CRect rc;
 	GetDlgItem(IDC_BTN_REMOVEFOLDER)->GetWindowRect(&rc);
