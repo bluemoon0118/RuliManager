@@ -70,6 +70,7 @@
 #define ID_VIDEO_TEXTINFO           32815
 #define ID_ACTOR_TEXTINFO           32816
 #define ID_VIDEO_PASTEINFO          32817
+#define ID_VIDEO_SCREENSHOT         32824
 #define ID_MANAGE_ACTORS            32810
 #define ID_MANAGE_STUDIOS           32811
 #define ID_MANAGE_TAGS              32812
@@ -234,6 +235,12 @@
 #define IDC_DRILL_PHOTO             1265
 #define IDC_DRILL_PANEL             1266
 #define IDC_SET_SFW                 1267
+#define IDC_SET_THEME               1268
+#define IDC_SET_STRIP_ACTORS        1269
+#define IDC_SET_STRIP_SHOTS         1270
+#define IDC_SHOT_STRIP              1271
+#define IDC_SET_SHOT_COLS           1272
+#define IDC_SET_SHOT_COLS_SPIN      1273
 #define IDC_NAMED_MEMO              1233
 #define IDC_ACT_GENDER              1159
 
@@ -248,8 +255,8 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE    141
-#define _APS_NEXT_COMMAND_VALUE     32824
-#define _APS_NEXT_CONTROL_VALUE     1268
+#define _APS_NEXT_COMMAND_VALUE     32825
+#define _APS_NEXT_CONTROL_VALUE     1274
 #define _APS_NEXT_SYMED_VALUE       101
 #endif
 #endif

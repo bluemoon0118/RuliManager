@@ -293,11 +293,11 @@ void CVideoGrid::SetBackColor(COLORREF bg)
 		auto lighten = [&](int d) { return RGB((std::min)(255, GetRValue(bg) + d), (std::min)(255, GetGValue(bg) + d), (std::min)(255, GetBValue(bg) + d)); };
 		m_card    = lighten(10);
 		m_border  = lighten(30);
-		m_selFill = RGB(38, 79, 120);
-		m_selFillNoFocus = RGB(45, 62, 78);
-		m_text    = RGB(232, 238, 242);
-		m_accent  = RGB(110, 180, 255);
-		m_sub     = RGB(150, 165, 178);
+		m_selFill = TCOL(TC_SEL);
+		m_selFillNoFocus = TCOL(TC_SELNOFOCUS);
+		m_text    = TCOL(TC_TEXT);
+		m_accent  = TCOL(TC_ACCENTTEXT);
+		m_sub     = TCOL(TC_GRIDSUB);
 	}
 	else
 	{
@@ -576,6 +576,8 @@ void CVideoGrid::OnLButtonDblClk(UINT /*nFlags*/, CPoint point)
 	{
 		m_owner->GridSetSel(row);
 		CRect card;
+		if (m_fixedW > 0 && GetCardRect(row, card) && m_owner->GridDblClick(row, card, point))
+			return;   // 주인이 처리함 (예: 스크린샷 추출 멈춤)
 		if (m_fixedW > 0 && GetCardRect(row, card) && m_owner->GridHitPart(row, card, point) != 0)
 			return;   // 카드 위 버튼을 빠르게 두 번 누름 → 첫 클릭만 처리, 열지 않음 (정렬이 바뀌어 다른 카드가 와도 안전)
 		m_owner->GridActivate(row);

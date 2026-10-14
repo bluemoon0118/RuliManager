@@ -103,6 +103,9 @@
     <ClInclude Include="DarkTheme.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="ImagePreview.h" />
+    <ClInclude Include="ImageViewerWnd.h" />
+    <ClInclude Include="Theme.h" />
+    <ClInclude Include="ScreenshotExtractor.h" />
     <ClInclude Include="BulkNameDlg.h" />
     <ClInclude Include="TextInfoDlg.h" />
     <ClInclude Include="NameListDlg.h" />
@@ -145,6 +148,12 @@
     <ClCompile Include="DarkControls.cpp" />
     <ClCompile Include="DarkTheme.cpp" />
     <ClCompile Include="ImagePreview.cpp" />
+    <ClCompile Include="ImageViewerWnd.cpp" />
+    <ClCompile Include="Theme.cpp" />
+    <ClCompile Include="ScreenshotExtractor.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
     <ClCompile Include="SuggestEdit.cpp" />
     <ClCompile Include="TagChipCtrl.cpp" />
     <ClCompile Include="TextDraw.cpp" />

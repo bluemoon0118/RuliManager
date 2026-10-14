@@ -133,6 +133,7 @@ BEGIN_MESSAGE_MAP(CImagePreview, CStatic)
 	ON_WM_PAINT()
 	ON_WM_ERASEBKGND()
 	ON_WM_SIZE()
+	ON_WM_LBUTTONDBLCLK()
 END_MESSAGE_MAP()
 
 namespace
@@ -209,6 +210,7 @@ bool CImagePreview::SetImageFile(const CString& path, bool sfw)
 	if (!m_image.IsNull())
 		m_image.Destroy();
 	m_file.Empty();
+	m_alpha = 255;   // 반투명은 다시 SetDimmed 로 지정할 때만
 	m_drawDefault = nullptr;
 
 	bool ok = false;
@@ -236,6 +238,7 @@ void CImagePreview::SetPlaceholder(const CString& text)
 	if (!m_image.IsNull())
 		m_image.Destroy();
 	m_file.Empty();
+	m_alpha = 255;   // 반투명은 다시 SetDimmed 로 지정할 때만
 	m_drawDefault = nullptr;
 	m_text = text;
 	Invalidate(FALSE);
@@ -246,6 +249,7 @@ void CImagePreview::SetDefaultImage(std::function<void(CDC*, const CRect&)> draw
 	if (!m_image.IsNull())
 		m_image.Destroy();
 	m_file.Empty();
+	m_alpha = 255;   // 반투명은 다시 SetDimmed 로 지정할 때만
 	m_text.Empty();
 	m_drawDefault = std::move(draw);
 	Invalidate(FALSE);
@@ -256,6 +260,7 @@ void CImagePreview::Clear()
 	if (!m_image.IsNull())
 		m_image.Destroy();
 	m_file.Empty();
+	m_alpha = 255;   // 반투명은 다시 SetDimmed 로 지정할 때만
 	Invalidate(FALSE);
 }
 
@@ -268,6 +273,14 @@ void CImagePreview::OnSize(UINT nType, int cx, int cy)
 {
 	CStatic::OnSize(nType, cx, cy);
 	Invalidate(FALSE);
+}
+
+void CImagePreview::OnLButtonDblClk(UINT nFlags, CPoint point)
+{
+	if (m_onDblClick)
+		m_onDblClick();
+	else
+		CStatic::OnLButtonDblClk(nFlags, point);
 }
 
 void CImagePreview::OnPaint()
@@ -303,9 +316,28 @@ void CImagePreview::OnPaint()
 			const int x = rc.left + (rc.Width() - w) / 2;
 			const int y = rc.top + (rc.Height() - h) / 2;
 
-			mem.SetStretchBltMode(HALFTONE);
-			::SetBrushOrgEx(mem.GetSafeHdc(), 0, 0, nullptr);
-			m_image.Draw(mem.GetSafeHdc(), CRect(x, y, x + w, y + h));
+			if (m_alpha < 255)
+			{
+				// 반투명 (연결 안 된 이동식 디스크 영상): 축소한 이미지를 임시 DC 에 그린 뒤 배경 위에 섞음
+				CDC tmp;
+				tmp.CreateCompatibleDC(&dc);
+				CBitmap tbmp;
+				tbmp.CreateCompatibleBitmap(&dc, w, h);
+				CBitmap* ob = tmp.SelectObject(&tbmp);
+				tmp.FillSolidRect(0, 0, w, h, m_bk);
+				tmp.SetStretchBltMode(HALFTONE);
+				::SetBrushOrgEx(tmp.GetSafeHdc(), 0, 0, nullptr);
+				m_image.Draw(tmp.GetSafeHdc(), CRect(0, 0, w, h));
+				BLENDFUNCTION bf = { AC_SRC_OVER, 0, m_alpha, 0 };
+				::AlphaBlend(mem.GetSafeHdc(), x, y, w, h, tmp.GetSafeHdc(), 0, 0, w, h, bf);
+				tmp.SelectObject(ob);
+			}
+			else
+			{
+				mem.SetStretchBltMode(HALFTONE);
+				::SetBrushOrgEx(mem.GetSafeHdc(), 0, 0, nullptr);
+				m_image.Draw(mem.GetSafeHdc(), CRect(x, y, x + w, y + h));
+			}
 		}
 	}
 	else if (m_drawDefault)

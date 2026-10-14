@@ -328,8 +328,8 @@ void CTagChipCtrl::OnPaint()
 	for (size_t i = 0; i < m_tags.size() && i < m_chipRects.size(); ++i)
 	{
 		const CRect& r = m_chipRects[i];
-		CBrush br(enabled ? m_chipBack : RGB(0x5C, 0x70, 0x80));
-		CPen pen(PS_SOLID, 1, enabled ? m_chipBack : RGB(0x5C, 0x70, 0x80));
+		CBrush br(enabled ? m_chipBack : TCOL(TC_BORDER));
+		CPen pen(PS_SOLID, 1, enabled ? m_chipBack : TCOL(TC_BORDER));
 		CBrush* ob = mem.SelectObject(&br);
 		CPen* op = mem.SelectObject(&pen);
 		mem.RoundRect(r, CPoint(6, 6));
@@ -352,7 +352,7 @@ void CTagChipCtrl::OnPaint()
 				tr.left = ir.right + 4;
 			}
 		}
-		mem.SetTextColor(enabled ? m_chipText : RGB(0x1B, 0x25, 0x2C));
+		mem.SetTextColor(enabled ? m_chipText : TCOL(TC_EDIT));
 		const CString shown = DisplayOf(m_tags[i]);
 		TextFB::Draw(&mem, shown, tr, DT_LEFT, true);   // 글꼴 대체 (凪 등 일본어 한자도 표시)
 		if (m_subText)
@@ -364,7 +364,7 @@ void CTagChipCtrl::OnPaint()
 			{
 				CRect sr = tr;
 				sr.left += nameW;
-				mem.SetTextColor(enabled ? m_subColor : RGB(0x1B, 0x25, 0x2C));
+				mem.SetTextColor(enabled ? m_subColor : TCOL(TC_EDIT));
 				TextFB::Draw(&mem, L" (" + sub + L")", sr, DT_LEFT, false);
 			}
 		}

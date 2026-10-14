@@ -11,11 +11,11 @@
 namespace
 {
 	const int kCols = 5, kRows = 2;
-	const COLORREF kBack   = RGB(0x20, 0x2B, 0x33);
-	const COLORREF kCell   = RGB(0x30, 0x40, 0x4D);
-	const COLORREF kSel    = RGB(0x13, 0x7C, 0xBD);
-	const COLORREF kHover  = RGB(0x5C, 0x70, 0x80);
-	const COLORREF kText   = RGB(0xA7, 0xB6, 0xC2);
+	const COLORREF& kBack  = TCOL(TC_BACK);
+	const COLORREF& kCell  = TCOL(TC_CARD);
+	const COLORREF& kSel   = TCOL(TC_ACCENT);
+	const COLORREF& kHover = TCOL(TC_BORDER);
+	const COLORREF& kText  = TCOL(TC_SUB);
 }
 
 // ===========================================================================
@@ -125,7 +125,7 @@ void CThumbPickGrid::OnPaint()
 		{
 			const int ih = InfoHeight(mem);
 			CRect ir(cell.left + 2, cell.bottom - ih - 2, cell.right - 2, cell.bottom - 2);
-			mem.SetTextColor(RGB(0xCE, 0xD9, 0xE0));
+			mem.SetTextColor(TCOL(TC_LIGHT));
 			mem.DrawText(m_items[i].info, ir, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
 		}
 		if (i == m_sel || i == m_hover)

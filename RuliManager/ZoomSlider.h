@@ -18,10 +18,10 @@ protected:
 	int  m_steps = 4;
 	int  m_pos = 0;
 	bool m_dragging = false;
-	COLORREF m_back = RGB(0x20, 0x2B, 0x33);
-	COLORREF m_track = RGB(0x13, 0x7C, 0xBD);
-	COLORREF m_thumb = RGB(0x5C, 0x70, 0x80);
-	COLORREF m_thumbBorder = RGB(0x8A, 0x9B, 0xA8);
+	COLORREF m_back = TCOL(TC_BACK);
+	COLORREF m_track = TCOL(TC_ACCENT);
+	COLORREF m_thumb = TCOL(TC_BORDER);
+	COLORREF m_thumbBorder = TCOL(TC_SUB2);
 
 	int  ThumbRadius() const;
 	int  PosToX(int pos) const;

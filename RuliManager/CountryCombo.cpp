@@ -222,7 +222,7 @@ void CCountryCombo::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		CRect tr = rc;
 		tr.left = fx + kFlagW + 6;
 		dc.SetBkMode(TRANSPARENT);
-		dc.SetTextColor(disabled ? RGB(120, 135, 148) : m_text);
+		dc.SetTextColor(disabled ? TCOL(TC_DISABLED) : m_text);
 		dc.DrawText(text.IsEmpty() ? CString(L"(미지정)") : text, tr, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS);
 	}
 	if ((lpDIS->itemState & ODS_FOCUS) && !(lpDIS->itemState & ODS_NOFOCUSRECT))

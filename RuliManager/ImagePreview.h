@@ -27,6 +27,8 @@ public:
 	void SetDefaultImage(std::function<void(CDC*, const CRect&)> draw);
 	void Clear();
 	void SetBackColor(COLORREF bg) { m_bk = bg; if (GetSafeHwnd()) Invalidate(FALSE); }
+	// 이미지를 반투명으로 (연결 안 된 이동식 디스크 영상) - 이미지를 바꾸면(SetImageFile 등) 다시 불투명
+	void SetDimmed(bool dim) { const BYTE a = dim ? 100 : 255; if (a != m_alpha) { m_alpha = a; if (GetSafeHwnd()) Invalidate(FALSE); } }
 
 	const CString& GetImageFile() const { return m_file; }
 
@@ -35,10 +37,15 @@ protected:
 	CString m_file;
 	CString m_text;
 	COLORREF m_bk = RGB(30, 30, 30);
+	BYTE    m_alpha = 255;   // 이미지 불투명도 (100 = 반투명)
 	std::function<void(CDC*, const CRect&)> m_drawDefault;   // 기본 이미지 (있으면 안내 문구 대신)
+public:
+	std::function<void()> m_onDblClick;   // 더블클릭 (SS_NOTIFY 스타일이 있어야 마우스를 받음)
+protected:
 
 	afx_msg void OnPaint();
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnSize(UINT nType, int cx, int cy);
+	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
 	DECLARE_MESSAGE_MAP()
 };

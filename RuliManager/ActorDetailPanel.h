@@ -53,16 +53,17 @@ protected:
 	CStarRatingCtrl m_star;
 	CHeartToggle    m_heart;
 	CFont    m_nameFont;
-	COLORREF m_back = RGB(0x20, 0x2B, 0x33);
-	COLORREF m_text = RGB(232, 238, 242);
-	COLORREF m_label = RGB(0x8A, 0x9B, 0xA8);
+	COLORREF m_back = TCOL(TC_BACK);
+	COLORREF m_text = TCOL(TC_TEXT);
+	COLORREF m_label = TCOL(TC_SUB2);
 
 	CFont* BaseFont() const;
 	CFont* InfoFont();      // 별점 아래 글자(정보 줄 · 이력 · 메모): 기본 글꼴 + 2pt
 	CFont  m_infoFont;
 	void   EnsureFonts();
 	int    NameHeight();
-	int    RowHeight();        // 정보 줄 높이 (여백 4pt 줄임)
+	int    RowHeight();        // 정보 줄 높이 (여백 4pt 줄임) - 링크 줄 아이콘 크기 기준
+	int    InfoRowHeight();    // 성별 ~ 출연 줄 높이 (RowHeight 보다 1pt + 1px 낮음)
 	int    StarRowHeight();    // 별점 줄 높이 (예전 줄 높이 그대로)
 	int    LabelWidth();
 	int    HistLineHeight();
@@ -81,6 +82,7 @@ protected:
 	afx_msg LRESULT OnFaviconReady(WPARAM, LPARAM);
 	CToolTipCtrl m_tip;   // 링크 아이콘 위에서 주소 표시
 	std::vector<std::pair<CRect, CString>> m_tipRects;   // 풍선 도움말을 만든 기준 (바뀌면 다시 만듦)
+	std::vector<std::pair<CRect, CString>> m_textTips;   // 잘려서 그린 이름 · 메모 영역 → 전체 글자 (마우스를 올리면 풍선 도움말)
 	BOOL PreTranslateMessage(MSG* pMsg) override;
 	void UpdateLinkTips();   // 마지막으로 그린 데뷔작 품번 상자 (없으면 빈 사각형)
 	afx_msg BOOL OnEraseBkgnd(CDC*) { return TRUE; }
@@ -101,8 +103,8 @@ public:
 
 protected:
 	std::vector<CString> m_urls;
-	COLORREF m_back = RGB(0x20, 0x2B, 0x33);
-	COLORREF m_label = RGB(0x8A, 0x9B, 0xA8);
+	COLORREF m_back = TCOL(TC_BACK);
+	COLORREF m_label = TCOL(TC_SUB2);
 	std::vector<std::pair<CRect, CString>> m_linkRects;   // 마지막으로 그린 아이콘 영역 → URL
 	std::vector<std::pair<CRect, CString>> m_tipRects;
 	std::map<CString, std::unique_ptr<Gdiplus::Bitmap>> m_favicons;

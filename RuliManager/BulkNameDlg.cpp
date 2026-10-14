@@ -144,11 +144,11 @@ void CBulkNameDlg::OnNmCustomDrawList(NMHDR* pNMHDR, LRESULT* pResult)
 		{
 			// 상태 글자색: 신규 = 초록, 이미 있음 = 회색, 입력 중복 = 주황
 			cd->clrText = (state == ST_NEW) ? RGB(0x3D, 0xCC, 0x91)
-				: (state == ST_EXISTS) ? RGB(0x8A, 0x9B, 0xA8) : RGB(0xFF, 0xB3, 0x66);
+				: (state == ST_EXISTS) ? TCOL(TC_SUB2) : RGB(0xFF, 0xB3, 0x66);
 		}
 		else
 		{
-			cd->clrText = (state == ST_NEW) ? RGB(0xF5, 0xF8, 0xFA) : RGB(0x8A, 0x9B, 0xA8);
+			cd->clrText = (state == ST_NEW) ? TCOL(TC_BRIGHT) : TCOL(TC_SUB2);
 		}
 		*pResult = CDRF_DODEFAULT;
 		break;

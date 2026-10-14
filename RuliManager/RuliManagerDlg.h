@@ -3,6 +3,7 @@
 #include <memory>
 #include "VideoLibrary.h"
 #include "ImagePreview.h"
+#include "ImageViewerWnd.h"
 #include "VideoGrid.h"
 #include "DarkControls.h"
 #include "SuggestEdit.h"
@@ -16,7 +17,9 @@
 #include <condition_variable>
 #include <deque>
 #include <thread>
+#include <atomic>
 #include "DropCounter.h"
+#include "ScreenshotExtractor.h"
 
 class CRuliManagerDlg : public CDialogEx, public IVideoGridOwner
 {
@@ -37,22 +40,22 @@ protected:
 	HICON      m_hIcon;
 	CBrush     m_bgBrush;                       // 배경색 브러시
 	CBrush     m_editBrush;                     // 에디트 배경색 브러시
-	static const COLORREF kBackColor = RGB(0x20, 0x2B, 0x33);   // #202B33
-	static const COLORREF kTextColor = RGB(232, 238, 242);
-	static const COLORREF kEditColor = RGB(0x1B, 0x25, 0x2C);   // #1B252C (에디트 배경)
-	static const COLORREF kDisabledText = RGB(120, 135, 148);
-	static const COLORREF kComboColor = RGB(0x39, 0x4B, 0x59);  // #394B59 (콤보박스 배경)
-	static const COLORREF kDateColor  = RGB(0x1B, 0x25, 0x2C);  // #1B252C (날짜 컨트롤 배경)
-	static const COLORREF kButtonColor = RGB(0x13, 0x7C, 0xBD); // #137CBD (버튼 배경)
-	static const COLORREF kSaveColor = RGB(0x0F, 0x99, 0x60);   // #0F9960 (저장 버튼 배경)
-	static const COLORREF kDangerColor = RGB(0xDB, 0x37, 0x37); // #DB3737 (삭제/제거 버튼 배경)
+	static inline const COLORREF& kBackColor = TCOL(TC_BACK);   // #202B33
+	static inline const COLORREF& kTextColor = TCOL(TC_TEXT);
+	static inline const COLORREF& kEditColor = TCOL(TC_EDIT);   // #1B252C (에디트 배경)
+	static inline const COLORREF& kDisabledText = TCOL(TC_DISABLED);
+	static inline const COLORREF& kComboColor = TCOL(TC_COMBO);  // #394B59 (콤보박스 배경)
+	static inline const COLORREF& kDateColor  = TCOL(TC_EDIT);  // #1B252C (날짜 컨트롤 배경)
+	static inline const COLORREF& kButtonColor = TCOL(TC_ACCENT); // #137CBD (버튼 배경)
+	static inline const COLORREF& kSaveColor = TCOL(TC_SAVE);   // #0F9960 (저장 버튼 배경)
+	static inline const COLORREF& kDangerColor = TCOL(TC_DANGER); // #DB3737 (삭제/제거 버튼 배경)
 	CDarkButton m_darkButtons[20];
 	CDarkButton m_btnSettings;      // 오른쪽 위 톱니바퀴 (설정 창)
 	CDarkButton m_modeButtons[4];   // 영상 / 배우 / 스튜디오 / 태그 토글 버튼
 	CDarkButton m_pageButtons[9];   // 페이지: « < 1 2 3 4 5 > »
 	void UpdateModeButtons();
-	static const COLORREF kScrollColor = RGB(0x6C, 0x74, 0x78); // #6C7478 (스크롤바 배경)
-	static const COLORREF kThumbBackColor = RGB(0x2A, 0x35, 0x3D); // #2A353D (격자 이미지 배경)
+	static inline const COLORREF& kScrollColor = TCOL(TC_SCROLL); // #6C7478 (스크롤바 배경)
+	static inline const COLORREF& kThumbBackColor = TCOL(TC_THUMB); // #2A353D (격자 이미지 배경)
 	CDarkScrollBar m_scrollBars[8];
 	void CreateScrollBars();
 	CListCtrl  m_list;
@@ -87,6 +90,17 @@ protected:
 	CDropCounter m_dropCounter;      // 영상 상세 정보: 별점 오른쪽 물방울 카운트
 	CMediaInfoLabel m_mediaInfo;     // 영상 상세 정보: [이미지 변경] 위 "fps: 29.97 | 1080p"
 	CActorStrip m_actorStrip;        // 영상 상세 정보 메모 아래: 출연 배우 카드 (가로 한 줄)
+	// 영상 상세 태그 아래 영역: 0 = 출연 배우 카드 (기본), 1 = 영상 스크린샷 (영상 폴더의 Screenshot 폴더 이미지 격자) - 설정 창, 레지스트리 Settings\DetailStrip
+	int         m_detailStripMode = 0;
+	CActorStrip m_shotStrip;         // 영상 스크린샷 격자 (여러 줄, 넘치면 세로 스크롤)
+	std::vector<CString> m_shotFiles;   // 스크린샷 파일 (이름 순)
+	CString     m_shotVideo;         // 스크린샷 격자에 표시 중인 영상 경로 (바뀌면 스크롤을 맨 위로)
+	std::map<CString, std::unique_ptr<CBitmap>> m_shotThumbs;   // "경로|폭|높이" → 축소 이미지 (nullptr = 못 읽음)
+	int         m_shotCardW = 0, m_shotCardH = 0;
+	int         m_shotCols = 3;      // 스크린샷 가로 배치 수 (설정 창, 레지스트리 Settings\ShotCols, 기본 3)
+	bool ShotStripShown() const { return VideoStripShown() && m_detailStripMode == 1; }
+	void RefreshShotStrip();         // 지금 영상의 스크린샷 목록 다시 읽기
+	void DrawShotCard(CDC* dc, int i, const CRect& rc, bool hot);
 	CLinkBar    m_namedLinks;        // 제작사 탭 상세: 제작사 / 레이블 링크 (사이트 아이콘, 정보 줄 아래 - 링크가 있을 때만)
 	CActorStrip m_labelStrip;        // 제작사 탭 상세: 선택한 제작사의 하위 레이블 카드 (여러 줄)
 	std::vector<int> m_stripLabels;  // 카드: 0 이상 = labelInfos 인덱스 (하위 레이블), 음수 = -(studios 인덱스 + 1) (레이블의 상위 제작사)
@@ -197,6 +211,8 @@ protected:
 	CTagChipCtrl m_tagChips;        // 태그 칩 입력 ([태그 ×] ... × ⌄)
 	CCardPopup   m_tagPopup;        // 태그 칩에 마우스를 올리면 그 태그 카드 (태그 탭 카드 모양)
 	CString      m_tagPopupName;
+	CCardPopup   m_actorPopup;      // 영상 상세 배우 칩에 마우스를 올리면 그 배우 카드 (배우 탭 카드 모양)
+	int          m_actorPopupIdx = -1;
 	void DrawTagPopupCard(CDC* dc, const CRect& rc, const CString& tag);
 	CFont        m_detailFont;      // 영상 상세 글자 컨트롤 글꼴 (기본 + 1pt)
 	int          m_detailTmH = 0;   // m_detailFont 글자 높이 (픽셀)
@@ -223,6 +239,7 @@ protected:
 	CStatic    m_staticStatus;
 	CStatic    m_staticImage;
 	CImagePreview m_preview;     // 동영상과 같은 이름의 이미지 표시
+	CImageViewerWnd m_imageViewer;   // 원본 이미지 보기 창 (영상 · 배우 상세 이미지 더블클릭)
 	CVideoGrid m_grid;           // 격자 보기 (이미지 + 파일명 + 발매일 + 메모)
 	CVideoGrid m_actorGrid;      // 배우 보기 (사진 + 이름 + 생년월일/출연 수 + 별칭/메모)
 
@@ -274,6 +291,8 @@ protected:
 	double ZoomFactor() const;
 	void OnZoomChanged(int pos);
 	void DrawActorCard(CDC* dc, int row, const CRect& card, bool selected, bool focused);
+	void DrawActorCardFor(CDC* dc, int idx, const CRect& card, bool selected, bool focused, bool heartHot, bool showCounts = true);   // 배우 번호로 (배우 탭 카드 모양, showCounts = 아래 구분선 + ▶ 출연 수)
+	int  ActorCardCountsH() const { return 1 + m_cardPad + m_cardLine + m_cardPad; }   // 배우 카드 아래 출연 수 영역 높이
 	CBitmap* GetActorPortrait(int actorIdx, int w, int h);
 
 	// 스튜디오/태그 격자 (m_listCat 와 같은 행을 카드로 표시, 선택은 m_listCat 이 관리)
@@ -362,11 +381,14 @@ protected:
 
 	int  GetSelectedRow() const;
 	int  GetSelectedItem() const;
+	bool IsItemOffline(int idx) const;   // 연결 안 된 이동식 디스크의 영상 (수정 불가)
 
 	void ShowDetails(int idx);
 	void CommitDetails();
 
 	void UpdatePreview(int idx);
+	void OpenImageViewer();       // 상세 이미지(영상 / 배우) → 원본 이미지 보기 창
+	void OpenImageViewerFile(const CString& path, const CString& caption);
 
 	static std::vector<CString> GetCategoryValues(const VideoItem& v, int mode);
 	void RebuildCategories();
@@ -414,6 +436,8 @@ protected:
 	void GridKey(UINT vk) override;
 	bool GridDrawCard(CDC* dc, int row, const CRect& card, bool selected, bool focused) override;   // 영상 카드
 	int  GridHoverZone(int row, const CRect& card, CPoint pt) override;   // 1 = 영상 카드 이미지 위 (이미지만 표시)
+	bool GridDblClick(int row, const CRect& card, CPoint pt) override;    // 스크린샷 추출 진행 표시 더블클릭 → 멈춤
+	bool ShotBadgeRect(int row, const CRect& card, CRect& out, CString* text = nullptr, int* queuePos = nullptr);   // 영상 카드 왼쪽 아래 "(3/15)" / "(대기 2)" 영역 (추출 중 · 대기 중인 영상만, queuePos 0 = 추출 중)
 	CString GridTipText(int row, const CRect& card, CPoint pt) override;   // 영상 카드 제목 3줄 칸: 잘렸으면 제목 전체
 	// 영상 카드 덧그림(로고 · 별점 리본 · 해상도 / 재생 시간) 페이드: 행 → 지금 불투명도 (0 ~ 255, 바뀌는 중인 카드만)
 	std::map<int, int> m_overlayFade;
@@ -519,6 +543,7 @@ protected:
 	std::shared_ptr<MediaQueue> m_mediaQ;                        // 읽을 경로 대기열 (스레드와 공유)
 	std::thread m_mediaThread;                                   // 읽기 스레드 (창을 닫을 때 끝날 때까지 기다림 - 메모리 누수 방지)
 	void StopCardMediaThread();
+	void ForgetFailedMediaInfo();   // 읽지 못한 해상도 · 재생 시간 기억을 지움 (이동식 디스크를 꽂으면 다시 읽음)
 	afx_msg void OnDestroy();
 	std::map<CString, CMediaInfoLabel::Info> m_cardMedia;        // 경로(소문자) → 해상도 · 재생 시간
 	bool m_showCardMedia = true;                                 // 설정: 영상 카드에 해상도 · 재생 시간 표시 (레지스트리 Settings\CardMediaInfo)
@@ -542,6 +567,22 @@ protected:
 	void ClearVideoCovers();                                     // 카드 이미지 캐시 · 대기열 비우기
 	void StopCoverThreads();
 	afx_msg LRESULT OnCoverReady(WPARAM wParam, LPARAM lParam);
+	// 영상 스크린샷 추출 (오른쪽 클릭 [스크린샷 추출...]) - 백그라운드 스레드 하나, 진행은 창 제목에
+	std::thread       m_shotThread;
+	std::atomic<bool> m_shotCancel{ false };
+	bool              m_shotBusy = false;
+	CString           m_shotTitleBase;   // 추출 전 창 제목 (끝나면 되돌림)
+	CString           m_shotVideoPath;   // 추출 중인 영상 (그 영상 카드에 진행 표시)
+	int               m_shotDone = 0, m_shotTotal = 0;
+	// 대기열: 추출 중에 더 넣은 영상 (넣은 순서대로 하나씩, 프로그램을 닫으면 버림)
+	struct ShotJob { CString path; int count = 0; };
+	std::deque<ShotJob> m_shotQueue;
+	void StartNextShot();          // 대기열 맨 앞 작업 시작 (비었으면 끝 - 창 제목 되돌림)
+	void UpdateShotTitle();        // 창 제목: "스크린샷 추출 중 (3 / 15) · 대기 2"
+	int  ShotQueuePos(const CString& path) const;   // 대기열 순번 (1부터, 없으면 0)
+	afx_msg void OnVideoScreenshot();
+	afx_msg LRESULT OnShotProgress(WPARAM wParam, LPARAM lParam);
+	afx_msg LRESULT OnShotDone(WPARAM wParam, LPARAM lParam);
 
 	DECLARE_MESSAGE_MAP()
 };

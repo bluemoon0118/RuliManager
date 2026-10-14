@@ -87,7 +87,7 @@ BOOL CNameListDlg::OnInitDialog()
 		if (kindBtns[i]->Attach(kindIds[i], this))
 		{
 			kindBtns[i]->SetColors(DarkColors::Button, RGB(255, 255, 255), DarkColors::Back);
-			kindBtns[i]->SetToggle(DarkColors::Combo, RGB(190, 200, 208));
+			kindBtns[i]->SetToggle(DarkColors::Combo, TCOL(TC_TOGGLETEXT));
 		}
 	}
 	m_theme.Apply(this, { IDC_NL_DELETE });   // 메인 창과 같은 색상 (삭제 버튼은 빨간색)
@@ -105,8 +105,8 @@ BOOL CNameListDlg::OnInitDialog()
 		for (int i = 0; i < 1; ++i)
 		{
 			chips[i]->Create(this, ids[i]);
-			chips[i]->SetColors(DarkColors::Edit, RGB(0xCE, 0xD9, 0xE0), RGB(0x18, 0x20, 0x26), RGB(0xA7, 0xB6, 0xC2), DarkColors::Text);
-			chips[i]->m_edit.SetColors(DarkColors::Edit, DarkColors::Text, DarkColors::Button, RGB(140, 155, 168));
+			chips[i]->SetColors(DarkColors::Edit, TCOL(TC_LIGHT), TCOL(TC_DARK), TCOL(TC_SUB), DarkColors::Text);
+			chips[i]->m_edit.SetColors(DarkColors::Edit, DarkColors::Text, DarkColors::Button, TCOL(TC_HINT));
 			chips[i]->MoveWindow(&area);
 			chips[i]->SetWindowPos(GetDlgItem(IDC_NL_CHIPS_AREA), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);   // 탭 순서: 상위 칸 다음
 			chips[i]->m_onChanged = [this]() { OnFieldChanged(); };
@@ -127,8 +127,8 @@ BOOL CNameListDlg::OnInitDialog()
 		ScreenToClient(&m_chipsLblRect);
 		GetDlgItem(IDC_NL_PARENT)->ShowWindow(SW_HIDE);
 		m_parentChips.Create(this, IDC_NL_PARENT_CHIPS);
-		m_parentChips.SetColors(DarkColors::Edit, RGB(0xCE, 0xD9, 0xE0), RGB(0x18, 0x20, 0x26), RGB(0xA7, 0xB6, 0xC2), DarkColors::Text);
-		m_parentChips.m_edit.SetColors(DarkColors::Edit, DarkColors::Text, DarkColors::Button, RGB(140, 155, 168));
+		m_parentChips.SetColors(DarkColors::Edit, TCOL(TC_LIGHT), TCOL(TC_DARK), TCOL(TC_SUB), DarkColors::Text);
+		m_parentChips.m_edit.SetColors(DarkColors::Edit, DarkColors::Text, DarkColors::Button, TCOL(TC_HINT));
 		m_parentChips.m_edit.SetCueBanner(L"상위 제작사 (비우면 없음, ↓ 목록)");
 		m_parentChips.MoveWindow(&prc);
 		m_parentChips.SetWindowPos(GetDlgItem(IDC_NL_PARENT), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);

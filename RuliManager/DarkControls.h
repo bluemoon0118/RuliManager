@@ -20,9 +20,9 @@ protected:
 	CWnd*      m_target = nullptr;
 	bool       m_vert = true;
 	TargetType m_type = TARGET_LISTVIEW;
-	COLORREF   m_track    = RGB(0x6C, 0x74, 0x78);
-	COLORREF   m_thumb    = RGB(0xB5, 0xBC, 0xC0);
-	COLORREF   m_thumbHot = RGB(0xDD, 0xE2, 0xE5);
+	COLORREF   m_track    = TCOL(TC_SCROLL);
+	COLORREF   m_thumb    = TCOL(TC_SCROLLTHUMB);
+	COLORREF   m_thumbHot = TCOL(TC_SCROLLTHUMBHOT);
 
 	SCROLLINFO m_si = {};
 	bool  m_enabled = true;
@@ -70,9 +70,9 @@ public:
 	virtual void MeasureItem(LPMEASUREITEMSTRUCT lpMIS);
 
 protected:
-	COLORREF m_bg    = RGB(0x39, 0x4B, 0x59);
-	COLORREF m_text  = RGB(232, 238, 242);
-	COLORREF m_selBg = RGB(38, 79, 120);
+	COLORREF m_bg    = TCOL(TC_COMBO);
+	COLORREF m_text  = TCOL(TC_TEXT);
+	COLORREF m_selBg = TCOL(TC_SEL);
 	CBrush   m_brush;
 
 	afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
@@ -102,11 +102,11 @@ public:
 protected:
 	bool     m_toggle   = false;
 	bool     m_checked  = false;
-	COLORREF m_offBg    = RGB(0x39, 0x4B, 0x59);
-	COLORREF m_offText  = RGB(190, 200, 208);
-	COLORREF m_bg       = RGB(0x13, 0x7C, 0xBD);
+	COLORREF m_offBg    = TCOL(TC_COMBO);
+	COLORREF m_offText  = TCOL(TC_TOGGLETEXT);
+	COLORREF m_bg       = TCOL(TC_ACCENT);
 	COLORREF m_text     = RGB(255, 255, 255);
-	COLORREF m_parentBg = RGB(0x20, 0x2B, 0x33);
+	COLORREF m_parentBg = TCOL(TC_BACK);
 	bool     m_hover    = false;
 	int      m_icon     = ICON_NONE;
 
@@ -126,9 +126,9 @@ public:
 	void SetColors(COLORREF bg, COLORREF text, COLORREF border);
 
 protected:
-	COLORREF m_bg     = RGB(0x1B, 0x25, 0x2C);
-	COLORREF m_text   = RGB(232, 238, 242);
-	COLORREF m_border = RGB(70, 85, 98);
+	COLORREF m_bg     = TCOL(TC_EDIT);
+	COLORREF m_text   = TCOL(TC_TEXT);
+	COLORREF m_border = TCOL(TC_EDGE);
 	bool     m_typing = false;   // 직접 입력 중
 	CString  m_typed;            // 입력한 글자 (숫자와 구분자)
 

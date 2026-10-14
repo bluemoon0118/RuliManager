@@ -307,6 +307,19 @@ int CActorDetailPanel::RowHeight()
 	return (std::max)(static_cast<int>(tm.tmHeight) + 1, static_cast<int>(tm.tmHeight * 17 / 10) - less);
 }
 
+int CActorDetailPanel::InfoRowHeight()
+{
+	// 성별 ~ 출연 줄: 줄 사이 간격 1pt + 1px 줄임 (링크 줄은 RowHeight 기준 그대로)
+	CClientDC dc(this);
+	const int dpi = (std::max)(1, dc.GetDeviceCaps(LOGPIXELSY));
+	const int onePt = (std::max)(1, static_cast<int>(std::lround(1.0 * dpi / 72.0)));
+	CFont* old = dc.SelectObject(InfoFont());
+	TEXTMETRIC tm = {};
+	dc.GetTextMetrics(&tm);
+	dc.SelectObject(old);
+	return (std::max)(static_cast<int>(tm.tmHeight) + 1, RowHeight() - onePt - 1);   // 1pt + 1px
+}
+
 int CActorDetailPanel::LabelWidth()
 {
 	CClientDC dc(this);
@@ -406,8 +419,8 @@ void CActorDetailPanel::DrawLinkIcon(CDC& dc, const CString& url, const CRect& r
 	// 사이트 아이콘이 없으면(받기 전 · 실패): Edge 브라우저 아이콘, Edge 도 없으면 둥근 사각형 + 도메인 첫 글자
 	if (DrawEdgeIcon(dc, rc))
 		return;
-	CBrush br(RGB(0x39, 0x4B, 0x59));
-	CPen pen(PS_SOLID, 1, RGB(0x5C, 0x70, 0x80));
+	CBrush br(TCOL(TC_COMBO));
+	CPen pen(PS_SOLID, 1, TCOL(TC_BORDER));
 	CBrush* ob = dc.SelectObject(&br);
 	CPen* op = dc.SelectObject(&pen);
 	dc.RoundRect(rc, CPoint(6, 6));
@@ -434,17 +447,23 @@ BOOL CActorDetailPanel::PreTranslateMessage(MSG* pMsg)
 
 void CActorDetailPanel::UpdateLinkTips()
 {
-	// 링크 아이콘마다 주소 풍선 도움말 (아이콘 위치가 바뀌었을 때만 다시 만듦)
-	if (m_tipRects == m_linkRects && m_tip.GetSafeHwnd())
+	// 풍선 도움말: 링크 아이콘마다 주소 + 잘려서 그린 이름 · 메모는 전체 글자 (영역이나 글자가 바뀌었을 때만 다시 만듦)
+	std::vector<std::pair<CRect, CString>> all;
+	for (const auto& l : m_linkRects)
+		all.push_back({ l.first, l.second + L"  (더블클릭하면 열기)" });
+	for (const auto& t : m_textTips)
+		all.push_back(t);
+	if (m_tipRects == all && m_tip.GetSafeHwnd())
 		return;
-	m_tipRects = m_linkRects;
+	m_tipRects = all;
 	if (m_tip.GetSafeHwnd())
 		m_tip.DestroyWindow();
-	if (m_linkRects.empty() || !m_tip.Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX))
+	if (all.empty() || !m_tip.Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX))
 		return;
-	m_tip.SetMaxTipWidth(600);
-	for (size_t i = 0; i < m_linkRects.size(); ++i)
-		m_tip.AddTool(this, m_linkRects[i].second + L"  (더블클릭하면 열기)", m_linkRects[i].first, static_cast<UINT_PTR>(i + 1));
+	m_tip.SetMaxTipWidth(600);                       // 긴 글자는 여러 줄 (메모의 줄바꿈도 그대로)
+	m_tip.SetDelayTime(TTDT_AUTOPOP, 30000);         // 긴 메모도 읽을 수 있게 30초 동안 표시
+	for (size_t i = 0; i < all.size(); ++i)
+		m_tip.AddTool(this, all[i].second, all[i].first, static_cast<UINT_PTR>(i + 1));
 	m_tip.Activate(TRUE);
 }
 
@@ -656,10 +675,11 @@ int CActorDetailPanel::CalcHeight(int width)
 		return 0;
 	const int nameH = NameHeight();
 	const int rowH = RowHeight();
+	const int infoH = InfoRowHeight();
 	int rowsH = 0;
 	if (m_has)
 		for (const Row& r : m_rows)
-			rowsH += r.links.empty() ? rowH : LinkRowHeight(rowH);   // 링크 줄은 아이콘이 커서 조금 높음
+			rowsH += r.links.empty() ? infoH : LinkRowHeight(rowH);   // 링크 줄은 아이콘이 커서 조금 높음
 	int h = nameH + 4 + StarRowHeight() + 6 + rowsH + 4;   // 이름 + 별 + 줄들
 	if (m_has && m_history.size() >= 2)
 	{
@@ -761,6 +781,7 @@ void CActorDetailPanel::OnPaint()
 	const int nameH = NameHeight();
 	const int rowH = RowHeight();
 	CFont* oldFont = mem.SelectObject(InfoFont());
+	m_textTips.clear();
 
 	if (!m_has)
 	{
@@ -774,7 +795,10 @@ void CActorDetailPanel::OnPaint()
 		const int heartSize = (std::max)(14, nameH * 6 / 10);
 		mem.SelectObject(&m_nameFont);
 		mem.SetTextColor(RGB(255, 255, 255));
-		TextFB::Draw(&mem, m_name, CRect(0, 0, (std::max)(10, static_cast<int>(rc.right) - heartSize - 12), nameH), DT_LEFT, true);
+		const CRect nameRc(0, 0, (std::max)(10, static_cast<int>(rc.right) - heartSize - 12), nameH);
+		TextFB::Draw(&mem, m_name, nameRc, DT_LEFT, true);
+		if (TextFB::Width(&mem, m_name) > nameRc.Width())
+			m_textTips.push_back({ nameRc, m_name });   // 이름이 잘림 → 마우스를 올리면 전체 이름
 
 		// 정보 줄: 라벨(회색) + 값(흰색)
 		m_badgeRect.SetRectEmpty();
@@ -786,9 +810,10 @@ void CActorDetailPanel::OnPaint()
 		const bool memoRight = m_memoRight && !m_memo.IsEmpty();
 		const int splitX = memoRight ? static_cast<int>(rc.Width()) / 2 : static_cast<int>(rc.right);
 		const int rowRight = memoRight ? splitX - 12 : static_cast<int>(rc.right);
+		const int infoH = InfoRowHeight();   // 성별 ~ 출연 줄 (1pt 좁게)
 		for (const Row& r : m_rows)
 		{
-			const int rh = r.links.empty() ? rowH : LinkRowHeight(rowH);   // 이 줄 높이 (링크 줄은 아이콘 크기만큼)
+			const int rh = r.links.empty() ? infoH : LinkRowHeight(rowH);   // 이 줄 높이 (링크 줄은 아이콘 크기만큼)
 			mem.SetTextColor(m_label);
 			mem.DrawText(r.label, CRect(0, y, labelW, y + rh), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 			mem.SetTextColor(m_text);
@@ -799,7 +824,7 @@ void CActorDetailPanel::OnPaint()
 				mem.SetTextColor(r.symColor);
 				CFont* prev = mem.SelectObject(&m_symFont);   // 큰 기호 (줄 높이보다 조금 커도 위아래로 넘쳐 그림)
 				const int sw = TextFB::Width(&mem, r.symbol);
-				TextFB::Draw(&mem, r.symbol, CRect(vr.left, vr.top - rowH / 3, vr.left + sw, vr.bottom + rowH / 3), DT_LEFT, false);
+				TextFB::Draw(&mem, r.symbol, CRect(vr.left, vr.top - rh / 3, vr.left + sw, vr.bottom + rh / 3), DT_LEFT, false);
 				mem.SelectObject(prev);
 				vr.left += sw + 5;
 				mem.SetTextColor(m_text);
@@ -807,9 +832,9 @@ void CActorDetailPanel::OnPaint()
 			if (r.flag >= 0)
 			{
 				// 국기를 나라 이름 왼쪽에: [국기] 일본
-				const int fh = (std::min)(CCountryCombo::kFlagH, rowH);
+				const int fh = (std::min)(CCountryCombo::kFlagH, rh);
 				const int fw = CCountryCombo::kFlagW * fh / (std::max)(1, CCountryCombo::kFlagH);   // 높이에 맞춘 국기 폭
-				CCountryCombo::DrawFlag(&mem, r.flag, vr.left, y + (rowH - fh) / 2, fh);
+				CCountryCombo::DrawFlag(&mem, r.flag, vr.left, y + (rh - fh) / 2, fh);
 				CRect tr = vr;
 				tr.left += fw + 6;
 				mem.DrawText(r.value, tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
@@ -831,7 +856,7 @@ void CActorDetailPanel::OnPaint()
 					if (!firstIcon)
 					{
 						ix += sepGap;
-						mem.FillSolidRect(ix, y + (rh - sepH) / 2, 1, sepH, RGB(0x5C, 0x70, 0x80));   // 구분선
+						mem.FillSolidRect(ix, y + (rh - sepH) / 2, 1, sepH, TCOL(TC_BORDER));   // 구분선
 						ix += 1 + sepGap;
 					}
 					const CRect ir(ix, y + (rh - sz) / 2, ix + sz, y + (rh - sz) / 2 + sz);
@@ -850,19 +875,19 @@ void CActorDetailPanel::OnPaint()
 				const int bw = TextFB::Width(&mem, r.badge) + 10;
 				TEXTMETRIC btm = {};
 				mem.GetTextMetrics(&btm);
-				const int bh = (std::min)(static_cast<int>(rowH) - 2, static_cast<int>(btm.tmHeight) + 4);
+				const int bh = (std::min)(static_cast<int>(rh) - 2, static_cast<int>(btm.tmHeight) + 4);
 				const int bx = vr.left + tw + 8;
-				const int by = y + (rowH - bh) / 2;
+				const int by = y + (rh - bh) / 2;
 				if (bx + bw <= rowRight)
 				{
 					m_badgeRect = CRect(bx, by, bx + bw, by + bh);   // 더블클릭 판정용
-					CPen pen(PS_SOLID, 1, RGB(0x8A, 0x9B, 0xA8));
+					CPen pen(PS_SOLID, 1, TCOL(TC_SUB2));
 					CPen* op = mem.SelectObject(&pen);
 					CBrush* ob = static_cast<CBrush*>(mem.SelectStockObject(NULL_BRUSH));
 					mem.RoundRect(CRect(bx, by, bx + bw, by + bh), CPoint(5, 5));
 					mem.SelectObject(ob);
 					mem.SelectObject(op);
-					mem.SetTextColor(RGB(0xCE, 0xD9, 0xE0));
+					mem.SetTextColor(TCOL(TC_LIGHT));
 					TextFB::Draw(&mem, r.badge, CRect(bx + 5, by, bx + bw - 5, by + bh), DT_LEFT, false);
 					mem.SetTextColor(m_text);
 				}
@@ -912,18 +937,27 @@ void CActorDetailPanel::OnPaint()
 		{
 			const int sx = static_cast<int>(rc.Width()) / 2;
 			mem.SelectObject(InfoFont());
-			mem.SetTextColor(RGB(0xCE, 0xD9, 0xE0));
+			mem.SetTextColor(TCOL(TC_LIGHT));
 			CRect mr(sx, nameH + 4, rc.right, rc.bottom);
 			mem.DrawText(m_memo, mr, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL | DT_END_ELLIPSIS | DT_NOPREFIX);
+			CRect full(mr.left, mr.top, mr.right, mr.top);
+			mem.DrawText(m_memo, full, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL | DT_NOPREFIX | DT_CALCRECT);
+			if (full.Height() > mr.Height())
+				m_textTips.push_back({ mr, m_memo });   // 메모가 잘림 → 마우스를 올리면 전체 메모
 		}
 		// 메모 (여러 줄, 넘치면 마지막 줄 …)
 		else if (!m_memo.IsEmpty())
 		{
 			const int mh = MemoHeight(mem, (std::max)(50, static_cast<int>(rc.Width())));
 			mem.SelectObject(InfoFont());
-			mem.SetTextColor(RGB(0xCE, 0xD9, 0xE0));
+			mem.SetTextColor(TCOL(TC_LIGHT));
 			CRect mr(0, y + 8, rc.right, y + 8 + mh);
 			mem.DrawText(m_memo, mr, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL | DT_END_ELLIPSIS | DT_NOPREFIX);
+			CRect full(mr.left, mr.top, mr.right, mr.top);
+			mem.DrawText(m_memo, full, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL | DT_NOPREFIX | DT_CALCRECT);
+			const int visibleBottom = (std::min)(static_cast<int>(mr.bottom), static_cast<int>(rc.bottom));   // 패널 아래로 넘친 부분도 잘린 것
+			if (full.bottom > visibleBottom)
+				m_textTips.push_back({ CRect(mr.left, mr.top, mr.right, visibleBottom), m_memo });   // 메모가 잘림 → 전체 메모
 		}
 	}
 
@@ -1040,7 +1074,7 @@ void CLinkBar::OnPaint()
 		if (!first)
 		{
 			ix += sepGap;
-			mem.FillSolidRect(ix, (h - sepH) / 2, 1, sepH, RGB(0x5C, 0x70, 0x80));
+			mem.FillSolidRect(ix, (h - sepH) / 2, 1, sepH, TCOL(TC_BORDER));
 			ix += 1 + sepGap;
 		}
 		const CRect ir(ix, (h - sz) / 2, ix + sz, (h - sz) / 2 + sz);
@@ -1056,8 +1090,8 @@ void CLinkBar::OnPaint()
 		else if (!DrawEdgeIcon(mem, ir))
 		{
 			// 사이트 아이콘이 없으면 Edge 아이콘, Edge 도 없으면: 둥근 사각형 + 도메인 첫 글자
-			CBrush br(RGB(0x39, 0x4B, 0x59));
-			CPen pen(PS_SOLID, 1, RGB(0x5C, 0x70, 0x80));
+			CBrush br(TCOL(TC_COMBO));
+			CPen pen(PS_SOLID, 1, TCOL(TC_BORDER));
 			CBrush* obr = mem.SelectObject(&br);
 			CPen* op = mem.SelectObject(&pen);
 			mem.RoundRect(ir, CPoint(6, 6));
