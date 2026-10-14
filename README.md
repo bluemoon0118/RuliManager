@@ -1,6 +1,6 @@
-# RuliManager v0.2 (MFC, Visual Studio 2022)
+# RuliManager v0.3 (MFC, Visual Studio 2022)
 
-- 버전: 0.2 — 창 제목 "RuliManager v0.2", 파일 버전 정보 0.2.0.0 (`RuliManager\Version.h` 에서 관리 — 아래 빌드 3번 참고)
+- 버전: 0.3 — 창 제목 "RuliManager v0.3", 파일 버전 정보 0.3.0.0 (`RuliManager\Version.h` 에서 관리 — 아래 빌드 3번 참고)
 
 ## 빌드
 1. Visual Studio Installer에서 **"C++를 사용한 데스크톱 개발"** + **"최신 v143 빌드 도구용 C++ MFC"** 구성 요소 설치
