@@ -17,7 +17,7 @@ protected:
 	bool m_on = false;
 	bool m_hover = false;
 	bool m_tracking = false;
-	COLORREF m_back = RGB(0x20, 0x2B, 0x33);
+	COLORREF m_back = TCOL(TC_BACK);
 	COLORREF m_onColor = RGB(0xF2, 0x5C, 0x54);
 	COLORREF m_offColor = RGB(0x95, 0x98, 0x9D);
 	COLORREF m_offHover = RGB(0xC8, 0xCC, 0xD0);

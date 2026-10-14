@@ -19,8 +19,8 @@ protected:
 	int  m_count = 0;
 	bool m_hover = false;
 	bool m_tracking = false;
-	COLORREF m_back = RGB(0x20, 0x2B, 0x33);
-	COLORREF m_normal = RGB(0xE8, 0xEE, 0xF2);
+	COLORREF m_back = TCOL(TC_BACK);
+	COLORREF m_normal = TCOL(TC_TEXT);
 	COLORREF m_hoverColor = RGB(0x48, 0xAF, 0xF0);
 	CToolTipCtrl m_tip;
 

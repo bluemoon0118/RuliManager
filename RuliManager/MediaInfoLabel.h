@@ -18,19 +18,22 @@ public:
 	bool Create(CWnd* parent, UINT id);
 	void SetColors(COLORREF back, COLORREF sub, COLORREF text);
 	void SetFile(const CString& path);   // 빈 문자열 = 표시 없음
+	void ForgetFailed();                 // 읽지 못한 경로의 기억을 지움 (다음 SetFile 때 다시 읽음)
 	int  NeededWidth();                  // 지금 내용을 그리는 데 필요한 폭 (픽셀, 내용 없으면 0)
 
 	static Info    ReadInfo(const CString& path);               // 속성에서 읽기 (캐시 없음)
 	static CString ResolutionText(UINT width, UINT height);     // 1920x1080 → "1080p", 3840x2160 → "2160p"
+	// 해상도 마크: 반환 = 등급 "SD" / "HD" / "FHD" / "QHD" / "UHD", resText = 큰 글자 "480p" / "720p" / "1080p" / "1440p" / "4K" / "8K"
+	static CString GradeText(UINT width, UINT height, CString* resText = nullptr, COLORREF* color = nullptr);
 	static CString FpsText(double fps);                         // 29.97 / 30 / 23.976 → "23.98"
 	static CString DurationText(ULONGLONG duration100ns);       // 총 재생 시간 → "123분" (반올림, 1분 미만은 "1분")
 
 protected:
 	Info     m_info;
 	CString  m_path;
-	COLORREF m_back = RGB(0x20, 0x2B, 0x33);
-	COLORREF m_sub = RGB(0xA7, 0xB6, 0xC2);
-	COLORREF m_text = RGB(0xF5, 0xF8, 0xFA);
+	COLORREF m_back = TCOL(TC_BACK);
+	COLORREF m_sub = TCOL(TC_SUB);
+	COLORREF m_text = TCOL(TC_BRIGHT);
 	CFont    m_bold;
 	std::map<CString, Info> m_cache;   // 경로(소문자) → 정보
 

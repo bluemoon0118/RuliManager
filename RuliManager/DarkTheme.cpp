@@ -29,8 +29,8 @@ void CDarkHeader::OnPaint()
 	CFont* font = GetFont();
 	CFont* oldFont = font ? mem.SelectObject(font) : nullptr;
 
-	const COLORREF back = RGB(0x2A, 0x35, 0x3D);
-	const COLORREF line = RGB(0x39, 0x4B, 0x59);
+	const COLORREF back = TCOL(TC_THUMB);
+	const COLORREF line = TCOL(TC_COMBO);
 	mem.FillSolidRect(client, back);
 	mem.SetBkMode(TRANSPARENT);
 	mem.SetTextColor(RGB(255, 255, 255));   // 머리글 글자: 흰색

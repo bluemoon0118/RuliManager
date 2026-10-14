@@ -21,7 +21,7 @@ protected:
 	int  m_rating = 0;
 	int  m_hover = -1;                       // 마우스가 올라간 별 수 (-1: 없음)
 	bool m_tracking = false;
-	COLORREF m_back = RGB(0x20, 0x2B, 0x33);
+	COLORREF m_back = TCOL(TC_BACK);
 	COLORREF m_star = RGB(0xFF, 0xC8, 0x1E);
 	COLORREF m_empty = RGB(0xE6, 0xEA, 0xEE);
 	COLORREF m_text = RGB(0xFF, 0xFF, 0xFF);

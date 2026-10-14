@@ -39,12 +39,12 @@ protected:
 	std::vector<CRect>   m_xRects;
 	CRect m_clearRect, m_dropRect;
 	int   m_lastHeight = 0;
-	COLORREF m_back = RGB(0x1B, 0x25, 0x2C);
-	COLORREF m_chipBack = RGB(0xCE, 0xD9, 0xE0);
-	COLORREF m_chipText = RGB(0x18, 0x20, 0x26);
-	COLORREF m_icon = RGB(0xA7, 0xB6, 0xC2);
-	COLORREF m_text = RGB(232, 238, 242);
-	COLORREF m_subColor = RGB(0x5C, 0x70, 0x80);   // 칩 안 회색 글자
+	COLORREF m_back = TCOL(TC_EDIT);
+	COLORREF m_chipBack = TCOL(TC_LIGHT);
+	COLORREF m_chipText = TCOL(TC_DARK);
+	COLORREF m_icon = TCOL(TC_SUB);
+	COLORREF m_text = TCOL(TC_TEXT);
+	COLORREF m_subColor = TCOL(TC_BORDER);   // 칩 안 회색 글자
 	CBrush   m_backBrush;
 
 	int  DoLayout(int width, bool apply);

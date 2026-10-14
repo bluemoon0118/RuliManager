@@ -174,6 +174,37 @@ CString CMediaInfoLabel::ResolutionText(UINT width, UINT height)
 	return t;
 }
 
+CString CMediaInfoLabel::GradeText(UINT width, UINT height, CString* resText, COLORREF* color)
+{
+	if (width == 0 || height == 0)
+		return CString();
+	if (height > width)
+		std::swap(width, height);   // 세로 영상은 가로 기준으로
+	// ResolutionText 와 같은 기준 높이 (가로가 넓은 1920x800 등도 FHD), 약간의 오차 허용
+	const UINT eff = (std::max)(height, width * 9 / 16);
+	struct Grade { UINT minEff; const wchar_t* text; const wchar_t* res; COLORREF color; };
+	static const Grade kGrades[] = {
+		{ 4000, L"UHD", L"8K",    RGB(0xF2, 0xC1, 0x4E) },   // 4320p
+		{ 2000, L"UHD", L"4K",    RGB(0xF2, 0xC1, 0x4E) },   // 2160p
+		{ 1330, L"QHD", L"1440p", RGB(0xB3, 0x8C, 0xFF) },   // 1440p
+		{ 1000, L"FHD", L"1080p", RGB(0x5A, 0xA9, 0xFF) },   // 1080p
+		{  660, L"HD",  L"720p",  RGB(0x4F, 0xC3, 0xB5) },   // 720p
+		{    0, L"SD",  nullptr,  RGB(0x9A, 0xA5, 0xAE) },   // 720p 미만 (큰 글자는 480p 등 실제 기준 높이)
+	};
+	for (const Grade& g : kGrades)
+	{
+		if (eff >= g.minEff)
+		{
+			if (color)
+				*color = g.color;
+			if (resText)
+				*resText = g.res ? CString(g.res) : ResolutionText(width, height);
+			return g.text;
+		}
+	}
+	return CString();
+}
+
 CString CMediaInfoLabel::FpsText(double fps)
 {
 	if (fps <= 0)
@@ -225,6 +256,19 @@ void CMediaInfoLabel::SetFile(const CString& path)
 	}
 	if (GetSafeHwnd())
 		Invalidate(FALSE);
+}
+
+void CMediaInfoLabel::ForgetFailed()
+{
+	for (auto it = m_cache.begin(); it != m_cache.end();)
+	{
+		if (!it->second.ok)
+			it = m_cache.erase(it);
+		else
+			++it;
+	}
+	if (!m_info.ok)
+		m_path.Empty();   // 같은 경로로 SetFile 해도 다시 읽게
 }
 
 CFont* CMediaInfoLabel::BaseFont()

@@ -20,6 +20,9 @@ public:
 	// [표시] 영상 카드 해상도 · 재생 시간 (DoModal 전에 지금 값, IDOK 후 고른 값)
 	bool m_cardMedia = true;
 	bool m_sfw = false;   // SFW: 배우 · 영상 이미지 모자이크
+	int  m_detailStrip = 0;  // [영상 상세 태그 아래] 0 = 출연 배우 카드, 1 = 영상 스크린샷
+	int  m_shotCols = 3;     // 영상 스크린샷 가로 배치 수 (1 ~ 10)
+	int  m_themeIndex = 0;   // [테마] 고른 테마 번호 (Theme::Name, 다시 시작하면 적용)
 
 #ifdef AFX_DESIGN_TIME
 	enum { IDD = IDD_SETTINGS };

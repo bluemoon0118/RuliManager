@@ -63,12 +63,21 @@ BOOL CRuliManagerApp::InitInstance()
 	}
 
 	SetRegistryKey(_T("VideoManager"));   // 예전 이름 그대로 (기존 설정 유지)
+	Theme::LoadFromSettings();   // 테마 색상 (창을 만들기 전에 한 번 정함, 기본 "Stash")
 
 	CRuliManagerDlg dlg;
 	m_pMainWnd = &dlg;
 	dlg.DoModal();
 	if (singleMutex)
 		::CloseHandle(singleMutex);   // 다음 실행 허용
+
+	if (m_restart)
+	{
+		// 설정 창에서 테마를 바꾸고 [다시 시작]: 같은 실행 파일을 새로 띄움 (하나만 실행 잠금을 푼 뒤)
+		wchar_t exe[MAX_PATH] = {};
+		if (::GetModuleFileNameW(nullptr, exe, MAX_PATH))
+			::ShellExecuteW(nullptr, L"open", exe, nullptr, nullptr, SW_SHOWNORMAL);
+	}
 
 	// 대화 상자가 닫혔으므로 애플리케이션을 종료합니다.
 	return FALSE;

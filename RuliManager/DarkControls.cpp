@@ -215,93 +215,24 @@ void CDarkButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		TEXTMETRIC tm = {};
 		dc.GetTextMetrics(&tm);
 		const int d = (std::max)(8, (std::min)(tr.Height() - 4, static_cast<int>(tm.tmAscent) * 95 / 100));   // 아이콘 높이
-		const int iconW = (m_icon == ICON_CAMERA) ? d * 135 / 100 : d;   // 카메라만 가로로 넓게
+		const int iconW = ((m_icon == ICON_CAMERA) ? d * 125 / 100 : d) * 120 / 100;   // 카메라만 가로로 넓게 (24x24 설계에서 세로가 낮은 모양), 아이콘 20% 크게
 		const int gap = (std::max)(4, d * 45 / 100);
 		const int textW = dc.GetTextExtent(text).cx;
 		const int total = iconW + gap + textW;
 		const int left = tr.left + (tr.Width() - total) / 2;
 		const int top = tr.top + (tr.Height() - d) / 2;
 
-		CBrush iconBrush(iconColor);
-		CPen iconPen(PS_SOLID, 1, iconColor);
-		CBrush* ob = dc.SelectObject(&iconBrush);
-		CPen* op = dc.SelectObject(&iconPen);
-
+		// 각 탭 카드의 기본 이미지와 같은 벡터 아이콘 (구멍은 뚫려 있어 버튼 색이 비침)
+		const int cy = top + d / 2;
+		const CRect sq(left, cy - iconW / 2, left + iconW, cy - iconW / 2 + iconW);   // 아이콘 칸 (정사각형, 세로 가운데)
 		if (m_icon == ICON_PLAY)
-		{
-			// 원(글자색) 안에 재생 삼각형(버튼 색)
-			dc.Ellipse(left, top, left + d, top + d);
-
-			CBrush triBrush(fill);
-			CPen triPen(PS_SOLID, 1, fill);
-			dc.SelectObject(&triBrush);
-			dc.SelectObject(&triPen);
-			const int cx = left + d / 2 + (std::max)(1, d / 12);   // 시각적으로 가운데 보이도록 살짝 오른쪽
-			const int cy = top + d / 2;
-			const int h = (std::max)(2, d * 22 / 100);
-			POINT tri[3] = { { cx - h * 8 / 10, cy - h }, { cx - h * 8 / 10, cy + h }, { cx + h, cy } };
-			dc.Polygon(tri, 3);
-			dc.SelectObject(&iconBrush);
-			dc.SelectObject(&iconPen);
-		}
+			VectorIcon::Movie(&dc, sq, iconColor, 1.0);    // 영상: 원 + 재생 (영상 기본 이미지)
 		else if (m_icon == ICON_PERSON)
-		{
-			// 사람: 머리(원) + 어깨(아래가 잘린 타원)
-			const int headD = (std::max)(4, d * 46 / 100);
-			const int hx = left + (d - headD) / 2;
-			dc.Ellipse(hx, top, hx + headD, top + headD);
-
-			const int bodyW = (std::max)(6, d * 90 / 100);
-			const int bx = left + (d - bodyW) / 2;
-			const int bodyTop = top + headD + (std::max)(1, d / 12);
-			const int saved = dc.SaveDC();
-			dc.IntersectClipRect(left, bodyTop, left + d, top + d);   // 아래쪽은 잘라서 어깨 모양
-			dc.Ellipse(bx, bodyTop, bx + bodyW, bodyTop + (top + d - bodyTop) * 2);
-			dc.RestoreDC(saved);
-		}
+			VectorIcon::User(&dc, sq, iconColor, 1.0);     // 배우: 사람 (성별 미지정 배우 기본 이미지)
 		else if (m_icon == ICON_CAMERA)
-		{
-			// 비디오 카메라: 둥근 사각형 몸체 + 오른쪽 렌즈(삼각형)
-			const int bodyH = (std::max)(5, d * 76 / 100);
-			const int bodyW = (std::max)(6, iconW * 64 / 100);
-			const int by = top + (d - bodyH) / 2;
-			const int r = (std::max)(2, bodyH / 4);
-			dc.RoundRect(left, by, left + bodyW, by + bodyH, r, r);
-
-			const int cy = top + d / 2;
-			const int lensX = left + bodyW - 1;
-			const int lensH = bodyH;
-			POINT lens[3] = { { lensX, cy }, { left + iconW, cy - lensH / 2 }, { left + iconW, cy + lensH / 2 } };
-			dc.Polygon(lens, 3);
-		}
+			VectorIcon::Camera(&dc, sq, iconColor, 1.0);   // 제작사: 비디오 카메라 (제작사 기본 이미지)
 		else if (m_icon == ICON_TAG)
-		{
-			// 꼬리표: 오른쪽 아래를 향한 태그 모양(45도 회전) + 왼쪽 위 구멍(버튼 색)
-			const double cxF = left + d / 2.0, cyF = top + d / 2.0;
-			const double s = d * 0.92;   // 회전한 모양이 아이콘 높이 안에 들어오도록
-			const double c45 = 0.70710678;
-			auto rot = [&](double x, double y) -> POINT
-			{
-				// 45도 회전 (화면 좌표: 오른쪽 아래 방향)
-				const double rx = (x - y) * c45, ry = (x + y) * c45;
-				return { static_cast<LONG>(cxF + rx * s + 0.5), static_cast<LONG>(cyF + ry * s + 0.5) };
-			};
-			POINT tag[5] = { rot(-0.48, -0.26), rot(0.18, -0.26), rot(0.48, 0.0), rot(0.18, 0.26), rot(-0.48, 0.26) };
-			dc.Polygon(tag, 5);
-
-			CBrush holeBrush(fill);
-			CPen holePen(PS_SOLID, 1, fill);
-			dc.SelectObject(&holeBrush);
-			dc.SelectObject(&holePen);
-			const POINT hc = rot(-0.28, 0.0);
-			const int hr = (std::max)(1, d * 9 / 100);
-			dc.Ellipse(hc.x - hr, hc.y - hr, hc.x + hr + 1, hc.y + hr + 1);
-			dc.SelectObject(&iconBrush);
-			dc.SelectObject(&iconPen);
-		}
-
-		dc.SelectObject(ob);
-		dc.SelectObject(op);
+			VectorIcon::Tag(&dc, sq, iconColor, 1.0);      // 태그: 꼬리표 (태그 기본 이미지)
 
 		CRect textRc(left + iconW + gap, tr.top, tr.right, tr.bottom);
 		dc.DrawText(text, &textRc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
@@ -629,7 +560,7 @@ void CDarkDateTime::OnPaint()
 	{
 		const int tw = mem.GetTextExtent(text).cx;
 		CRect hl(tr.left - 2, 3, (std::min)(static_cast<int>(tr.left) + tw + 2, static_cast<int>(tr.right)), rc.bottom - 3);   // CRect 는 LONG
-		mem.FillSolidRect(&hl, RGB(0x45, 0x52, 0x5C));
+		mem.FillSolidRect(&hl, TCOL(TC_HILITE));
 	}
 	mem.DrawText(text, &tr, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
 

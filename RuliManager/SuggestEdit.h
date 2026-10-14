@@ -17,10 +17,10 @@ class CSuggestList : public CListBox
 public:
 	CSuggestEdit* m_edit = nullptr;
 	std::vector<SuggestItem> m_items;
-	COLORREF m_back = RGB(0x1B, 0x25, 0x2C);
-	COLORREF m_text = RGB(232, 238, 242);
-	COLORREF m_sel = RGB(0x13, 0x7C, 0xBD);
-	COLORREF m_hint = RGB(140, 155, 168);
+	COLORREF m_back = TCOL(TC_EDIT);
+	COLORREF m_text = TCOL(TC_TEXT);
+	COLORREF m_sel = TCOL(TC_ACCENT);
+	COLORREF m_hint = TCOL(TC_HINT);
 
 protected:
 	void DrawItem(LPDRAWITEMSTRUCT lpDIS) override;

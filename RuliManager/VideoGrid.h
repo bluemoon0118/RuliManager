@@ -20,6 +20,8 @@ public:
 	virtual int  GridHitPart(int /*row*/, const CRect& /*card*/, CPoint /*pt*/) { return 0; }
 	// 마우스가 카드의 어느 영역 위에 있는지 (그리기용, 클릭 · 더블클릭에는 영향 없음 - 예: 영상 카드 이미지 위) - 바뀔 때만 다시 그림
 	virtual int  GridHoverZone(int /*row*/, const CRect& /*card*/, CPoint /*pt*/) { return 0; }
+	// 카드 위 특정 영역 더블클릭을 주인이 처리했으면 true (열기 동작 안 함) - 예: 스크린샷 추출 진행 표시 → 멈춤
+	virtual bool GridDblClick(int /*row*/, const CRect& /*card*/, CPoint /*pt*/) { return false; }
 	// 마우스 위치의 풍선 도움말 글자 (비우면 표시 안 함 - 예: 영상 카드에서 잘린 제목 전체)
 	virtual CString GridTipText(int /*row*/, const CRect& /*card*/, CPoint /*pt*/) { return CString(); }
 	// 화면 바로 위 · 아래(한 화면씩)의 카드 범위 [first, last] - 이미지를 미리 읽어 두기용 (스크롤할 때 "불러오는 중" 깜빡임 줄임)

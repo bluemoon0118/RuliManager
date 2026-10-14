@@ -19,6 +19,7 @@ public:
 	void SetColors(COLORREF back, COLORREF text, COLORREF bar, COLORREF thumb);
 	void SetCardSize(int w, int h, int gap);
 	void SetCount(int count);            // 카드 수 (바뀌면 맨 앞으로 스크롤)
+	void ScrollToStart() { m_scroll = 0; m_vscroll = 0; if (GetSafeHwnd()) Invalidate(FALSE); }   // 가로 · 세로 스크롤을 맨 앞(위)으로
 	void SetEmptyText(const CString& text) { m_empty = text; Invalidate(FALSE); }
 	int  BarHeight() const { return m_barH; }
 	int  CalcHeight() const { return m_cardH + m_barH + 2; }   // 카드 + 스크롤바 자리
@@ -48,10 +49,10 @@ protected:
 	bool m_tracking = false;
 	bool m_dragBar = false;
 	int  m_dragStartX = 0, m_dragStartScroll = 0;
-	COLORREF m_back = RGB(0x20, 0x2B, 0x33);
-	COLORREF m_text = RGB(0x8A, 0x9B, 0xA8);
-	COLORREF m_bar = RGB(0x2A, 0x35, 0x3D);
-	COLORREF m_thumb = RGB(0x6C, 0x74, 0x78);
+	COLORREF m_back = TCOL(TC_BACK);
+	COLORREF m_text = TCOL(TC_SUB2);
+	COLORREF m_bar = TCOL(TC_THUMB);
+	COLORREF m_thumb = TCOL(TC_SCROLL);
 	CString m_empty;
 	CToolTipCtrl m_tip;
 	int m_tipRow = -1;
@@ -88,7 +89,7 @@ public:
 	bool CreatePopup(CWnd* owner);
 	void ShowNear(const CRect& anchorScreen, CSize size);   // 기준 영역 위(공간이 없으면 아래)에 표시
 	void Hide();
-	COLORREF m_back = RGB(0x20, 0x2B, 0x33);
+	COLORREF m_back = TCOL(TC_BACK);
 
 protected:
 	afx_msg void OnPaint();

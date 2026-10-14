@@ -72,7 +72,7 @@ void CDropCounter::OnPaint()
 	mem.FillSolidRect(rc, m_back);
 
 	const bool enabled = IsWindowEnabled() != FALSE;
-	const COLORREF col = !enabled ? RGB(0x6C, 0x74, 0x78) : (m_hover ? m_hoverColor : m_normal);
+	const COLORREF col = !enabled ? TCOL(TC_SCROLL) : (m_hover ? m_hoverColor : m_normal);
 
 	// 아이콘: 왼쪽 정사각형 (높이에 맞춤)
 	const int side = rc.Height();

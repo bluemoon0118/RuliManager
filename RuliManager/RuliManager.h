@@ -13,6 +13,8 @@ public:
 
 	virtual BOOL InitInstance();
 
+	bool m_restart = false;   // 창을 닫은 뒤 프로그램을 다시 시작 (설정 창에서 테마를 바꿈)
+
 	DECLARE_MESSAGE_MAP()
 };
 

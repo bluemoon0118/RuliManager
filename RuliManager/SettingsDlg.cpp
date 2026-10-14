@@ -1,6 +1,8 @@
 ﻿#include "pch.h"
 #include "RuliManager.h"
 #include "SettingsDlg.h"
+#include <uxtheme.h>
+#pragma comment(lib, "uxtheme.lib")
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -27,6 +29,23 @@ BOOL CSettingsDlg::OnInitDialog()
 	UpdateCounts();
 	CheckDlgButton(IDC_SET_CARD_MEDIA, m_cardMedia ? BST_CHECKED : BST_UNCHECKED);
 	CheckDlgButton(IDC_SET_SFW, m_sfw ? BST_CHECKED : BST_UNCHECKED);
+	CheckRadioButton(IDC_SET_STRIP_ACTORS, IDC_SET_STRIP_SHOTS, m_detailStrip == 1 ? IDC_SET_STRIP_SHOTS : IDC_SET_STRIP_ACTORS);
+	SetDlgItemInt(IDC_SET_SHOT_COLS, static_cast<UINT>(m_shotCols), FALSE);
+	if (CEdit* e = static_cast<CEdit*>(GetDlgItem(IDC_SET_SHOT_COLS)))
+		e->SetLimitText(2);
+	if (CWnd* spin = GetDlgItem(IDC_SET_SHOT_COLS_SPIN))
+	{
+		// 가로 배치 수 스핀 버튼 (▲▼ · 위아래 화살표 키로 1 ~ 10)
+		spin->SendMessage(UDM_SETRANGE32, 1, 10);
+		spin->SendMessage(UDM_SETPOS32, 0, m_shotCols);
+		::SetWindowTheme(spin->GetSafeHwnd(), L"DarkMode_Explorer", nullptr);   // 어두운 테마 (지원하는 Windows 만)
+	}
+	if (CComboBox* combo = static_cast<CComboBox*>(GetDlgItem(IDC_SET_THEME)))
+	{
+		for (int i = 0; i < Theme::Count(); ++i)
+			combo->AddString(Theme::Name(i));
+		combo->SetCurSel((m_themeIndex >= 0 && m_themeIndex < Theme::Count()) ? m_themeIndex : 0);
+	}
 
 	return TRUE;
 }
@@ -106,6 +125,21 @@ void CSettingsDlg::OnOK()
 {
 	m_cardMedia = IsDlgButtonChecked(IDC_SET_CARD_MEDIA) == BST_CHECKED;
 	m_sfw = IsDlgButtonChecked(IDC_SET_SFW) == BST_CHECKED;
+	m_detailStrip = (IsDlgButtonChecked(IDC_SET_STRIP_SHOTS) == BST_CHECKED) ? 1 : 0;
+	{
+		BOOL ok = FALSE;
+		const int cols = static_cast<int>(GetDlgItemInt(IDC_SET_SHOT_COLS, &ok, FALSE));
+		if (!ok || cols < 1 || cols > 10)
+		{
+			AfxMessageBox(L"스크린샷 가로 배치 수는 1 ~ 10 사이로 입력하세요.", MB_ICONWARNING);
+			GetDlgItem(IDC_SET_SHOT_COLS)->SetFocus();
+			return;
+		}
+		m_shotCols = cols;
+	}
+	if (CComboBox* combo = static_cast<CComboBox*>(GetDlgItem(IDC_SET_THEME)))
+		if (combo->GetCurSel() >= 0)
+			m_themeIndex = combo->GetCurSel();
 	CDialogEx::OnOK();
 }
 

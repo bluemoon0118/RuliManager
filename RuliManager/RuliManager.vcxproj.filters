@@ -22,6 +22,9 @@
     <ClInclude Include="DarkTheme.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="framework.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="ImagePreview.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="ImageViewerWnd.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="Theme.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="ScreenshotExtractor.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="BulkNameDlg.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="TextInfoDlg.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="NameListDlg.h"><Filter>헤더 파일</Filter></ClInclude>
@@ -62,6 +65,9 @@
     <ClCompile Include="ActorDlg.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="AliasCombo.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="ImagePreview.cpp"><Filter>소스 파일</Filter></ClCompile>
+    <ClCompile Include="ImageViewerWnd.cpp"><Filter>소스 파일</Filter></ClCompile>
+    <ClCompile Include="Theme.cpp"><Filter>소스 파일</Filter></ClCompile>
+    <ClCompile Include="ScreenshotExtractor.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="SuggestEdit.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="TagChipCtrl.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="TextDraw.cpp"><Filter>소스 파일</Filter></ClCompile>
