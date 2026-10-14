@@ -6600,7 +6600,16 @@ CBitmap* CRuliManagerDlg::GetVideoCover(int itemIdx, int w, int h, bool* loading
 					r->key = job.key;
 					r->gen = job.gen;
 					r->item = job.item;
-					r->bmp = MakeCoverBitmap(FindImageFor(job.videoPath), job.w, job.h, kThumbBackColor);
+					const CString file = FindImageFor(job.videoPath);
+					if (!file.IsEmpty())
+					{
+						r->bmp = MakeCoverBitmap(file, job.w, job.h, kThumbBackColor);
+						// 이동식 디스크 영상: 커버를 캐시에 보관 (디스크를 빼도 표시)
+						if (r->bmp && !job.cacheFile.IsEmpty() && !::PathFileExistsW(job.cacheFile))
+							CVideoLibrary::SaveCoverCache(file, job.cacheFile);
+					}
+					else if (!job.cacheFile.IsEmpty() && ::PathFileExistsW(job.cacheFile))
+						r->bmp = MakeCoverBitmap(job.cacheFile, job.w, job.h, kThumbBackColor);   // 디스크 연결 안 됨 → 캐시의 커버
 					if (!::IsWindow(q->hwnd) || !::PostMessageW(q->hwnd, WM_APP_COVER_READY, 0, reinterpret_cast<LPARAM>(r)))
 					{
 						if (r->bmp) ::DeleteObject(r->bmp);
@@ -6622,6 +6631,7 @@ CBitmap* CRuliManagerDlg::GetVideoCover(int itemIdx, int w, int h, bool* loading
 		job.h = h;
 		job.gen = m_coverGen;
 		job.item = itemIdx;
+		job.cacheFile = m_lib.CoverCacheFile(job.videoPath);   // 이동식 디스크 영상이면 커버 캐시 파일
 		if (prefetch)
 			m_coverQ->q.push_front(job);   // 미리 읽기: 보이는 카드 다음에
 		else
@@ -6925,7 +6935,16 @@ void CRuliManagerDlg::DrawVideoCard(CDC* dc, int row, const CRect& rc, bool sele
 			CDC mem;
 			mem.CreateCompatibleDC(dc);
 			CBitmap* old = mem.SelectObject(bmp);
-			dc->BitBlt(img.left, img.top, img.Width(), img.Height(), &mem, 0, 0, SRCCOPY);
+			bool online = true;
+			if (m_lib.IsRemovableItem(v.path, &online) && !online)
+			{
+				// 이동식 디스크 연결 안 됨: 캐시의 커버를 반투명으로
+				dc->FillSolidRect(img, kThumbBackColor);
+				BLENDFUNCTION bf = { AC_SRC_OVER, 0, 100, 0 };
+				::AlphaBlend(dc->GetSafeHdc(), img.left, img.top, img.Width(), img.Height(), mem.GetSafeHdc(), 0, 0, img.Width(), img.Height(), bf);
+			}
+			else
+				dc->BitBlt(img.left, img.top, img.Width(), img.Height(), &mem, 0, 0, SRCCOPY);
 			mem.SelectObject(old);
 		}
 		else if (coverLoading)
@@ -7870,6 +7889,14 @@ void CRuliManagerDlg::UpdatePreview(int idx)
 	const CString image = FindImageFor(v.path);
 	if (image.IsEmpty())
 	{
+		// 이동식 디스크 연결 안 됨: 커버 캐시가 있으면 그것을
+		const CString cached = m_lib.CoverCacheFile(v.path);
+		if (!cached.IsEmpty() && ::PathFileExistsW(cached))
+		{
+			m_preview.SetImageFile(cached, true);
+			m_staticImage.SetWindowText(L"이미지: 커버 캐시 (이동식 디스크 연결 안 됨)");
+			return;
+		}
 		m_preview.Clear();
 		CString stem = v.FileName();
 		::PathRemoveExtensionW(stem.GetBuffer());
@@ -8910,10 +8937,24 @@ void CRuliManagerDlg::OnClose()
 			MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES)
 			return;
 	}
+	// 이동식 디스크 영상의 커버 캐시 → 커버 DB(covers.vmdb), 성공했을 때만 캐시 삭제
+	StopCoverThreads();   // 캐시에 쓰는 중인 커버가 없게
+	bool coversSaved = false;
+	{
+		CWaitCursor wait;
+		CString err;
+		coversSaved = m_lib.SaveCoverDb(&err) >= 0;
+		if (!coversSaved && AfxMessageBox(L"커버 DB 를 저장하지 못했습니다.\n" + err +
+			L"\n\n커버 캐시는 지우지 않고 남겨 둡니다.\n그래도 종료할까요?",
+			MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES)
+			return;
+	}
 	SaveWindowPlacement();
 	m_preview.Clear();
 	if (imagesSaved)
 		CVideoLibrary::ClearImageCache();
+	if (coversSaved)
+		CVideoLibrary::ClearCoverCache();
 	EndDialog(IDCANCEL);
 }
 
@@ -9314,6 +9355,18 @@ void CRuliManagerDlg::OnBnClickedApplyDb()
 		{
 			failed = true;
 			AfxMessageBox(L"이미지 DB 를 저장하지 못했습니다.\n" + err, MB_ICONWARNING);
+		}
+	}
+	// 이동식 디스크 영상의 커버 캐시도 covers.vmdb 에 (새 커버가 있을 때만, 캐시는 종료 때 지움)
+	{
+		CString err;
+		const int r = m_lib.SaveCoverDb(&err);
+		if (r > 0)
+			msg += msg.IsEmpty() ? L"커버 DB" : L" · 커버 DB";
+		else if (r < 0)
+		{
+			failed = true;
+			AfxMessageBox(L"커버 DB 를 저장하지 못했습니다.\n" + err, MB_ICONWARNING);
 		}
 	}
 	if (!msg.IsEmpty())

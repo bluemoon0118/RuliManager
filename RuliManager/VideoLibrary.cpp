@@ -5,6 +5,8 @@
 #include <cwctype>
 #include <string>
 #include <functional>
+#include <atomic>
+#include "ImagePreview.h"   // LoadImageFile (커버 캐시)
 
 namespace
 {
@@ -984,6 +986,214 @@ void CVideoLibrary::LoadImageDb()
 	g_imageSigLoaded = static_cast<LPCWSTR>(ImageSignature(nullptr));
 }
 
+// ---------------------------------------------------------------------------
+// 이동식 디스크 영상의 커버 이미지 캐시 / 커버 DB (covers.vmdb)
+
+namespace
+{
+	const char kCoverMagic[] = "VMDB-CVRS1";
+	const size_t kCoverMagicLen = sizeof(kCoverMagic) - 1;
+	std::atomic<bool> g_coverDirty{ false };   // 캐시에 새 커버를 썼음 (백그라운드 스레드에서도)
+	bool g_coverDbBroken = false;              // covers.vmdb 를 풀지 못함 → 덮어쓰지 않음
+}
+
+CString CVideoLibrary::GetCoverCacheDir()
+{
+	const CString dir = GetCacheDir() + L"\\covers";
+	::CreateDirectoryW(dir, nullptr);
+	return dir;
+}
+
+CString CVideoLibrary::GetCoversDbPath()
+{
+	return GetDataDir() + L"\\covers.vmdb";
+}
+
+CString CVideoLibrary::CoverCacheFile(const CString& videoPath) const
+{
+	for (const CString& f : folders)
+	{
+		auto it = removableFolders.find(MakeKey(f));
+		if (it == removableFolders.end() || !IsUnder(videoPath, f))
+			continue;
+		// 키: 볼륨 일련번호 + 드라이브 문자를 뺀 경로 (소문자) → FNV-1a 64비트
+		CString rel = (videoPath.GetLength() > 2 && videoPath[1] == L':') ? videoPath.Mid(2) : videoPath;
+		rel.MakeLower();
+		CString key;
+		key.Format(L"%08X%s", it->second.serial, static_cast<LPCWSTR>(rel));
+		unsigned long long h = 1469598103934665603ULL;
+		for (int i = 0; i < key.GetLength(); ++i)
+			h = (h ^ static_cast<unsigned long long>(key[i])) * 1099511628211ULL;
+		CString name;
+		name.Format(L"%016llx.jpg", h);
+		return GetCoverCacheDir() + L"\\" + name;
+	}
+	return CString();
+}
+
+bool CVideoLibrary::SaveCoverCache(const CString& srcImage, const CString& cacheFile)
+{
+	if (srcImage.IsEmpty() || cacheFile.IsEmpty())
+		return false;
+	CImage src;
+	if (!LoadImageFile(src, srcImage) || src.IsNull())
+		return false;
+	const int iw = src.GetWidth(), ih = src.GetHeight();
+	if (iw <= 0 || ih <= 0)
+		return false;
+	const double scale = (std::min)(1.0, 640.0 / (std::max)(iw, ih));   // 긴 변 640px 이하
+	const int w = (std::max)(1, static_cast<int>(iw * scale + 0.5));
+	const int h = (std::max)(1, static_cast<int>(ih * scale + 0.5));
+	CImage dst;
+	if (!dst.Create(w, h, 24))
+		return false;
+	HDC dc = dst.GetDC();
+	::SetStretchBltMode(dc, HALFTONE);
+	::SetBrushOrgEx(dc, 0, 0, nullptr);
+	src.StretchBlt(dc, 0, 0, w, h, 0, 0, iw, ih, SRCCOPY);
+	dst.ReleaseDC();
+	const CString tmp = cacheFile + L".tmp";
+	if (FAILED(dst.Save(tmp, Gdiplus::ImageFormatJPEG)))
+	{
+		::DeleteFileW(tmp);
+		return false;
+	}
+	if (!::MoveFileExW(tmp, cacheFile, MOVEFILE_REPLACE_EXISTING))
+	{
+		::DeleteFileW(tmp);
+		return false;
+	}
+	g_coverDirty = true;
+	return true;
+}
+
+void CVideoLibrary::LoadCoverDb()
+{
+	g_coverDbBroken = false;
+	g_coverDirty = false;
+	const CString dir = GetCoverCacheDir();
+	const CString db = GetCoversDbPath();
+	if (::GetFileAttributesW(db) == INVALID_FILE_ATTRIBUTES)
+		return;
+	std::vector<BYTE> raw, plain;
+	std::vector<Entry> entries;
+	bool ok = ReadWholeFile(db, raw) && raw.size() >= kCoverMagicLen + 8 && memcmp(raw.data(), kCoverMagic, kCoverMagicLen) == 0;
+	if (ok)
+	{
+		UINT64 len = 0;
+		memcpy(&len, raw.data() + kCoverMagicLen, 8);
+		ok = len <= raw.size() - kCoverMagicLen - 8;
+		if (ok && len > 0)
+			ok = DbCrypt::Decrypt(raw.data() + kCoverMagicLen + 8, static_cast<size_t>(len), plain) && ParseEntries(plain, entries);
+	}
+	if (!ok)
+	{
+		g_coverDbBroken = true;   // 못 풀면 덮어쓰지 않음
+		return;
+	}
+	for (const Entry& e : entries)
+	{
+		const CString name = CString(CA2W(e.name, CP_UTF8));
+		if (name.IsEmpty() || name.FindOneOf(L"\\/:") >= 0 || name.Find(L"..") >= 0)
+			continue;   // 파일 이름만 허용
+		const CString dst = dir + L"\\" + name;
+		if (::PathFileExistsW(dst))
+			continue;   // 이전 실행이 남긴 캐시가 있으면 그대로
+		try
+		{
+			CFile f;
+			if (f.Open(dst, CFile::modeCreate | CFile::modeWrite))
+			{
+				f.Write(plain.data() + e.offset, static_cast<UINT>(e.length));
+				f.Close();
+			}
+		}
+		catch (CException* ex)
+		{
+			ex->Delete();
+		}
+	}
+}
+
+int CVideoLibrary::SaveCoverDb(CString* error) const
+{
+	auto fail = [error](LPCWSTR msg) { if (error) *error = msg; return -1; };
+	if (g_coverDbBroken)
+		return fail(L"기동할 때 커버 DB(covers.vmdb)를 풀지 못해서 덮어쓰지 않았습니다.");
+	// 지금 이동식 영상의 커버만 (지워진 영상 · 이동식이 아닌 폴더의 캐시는 뺌)
+	std::set<CString> want;
+	for (const VideoItem& v : items)
+	{
+		const CString file = CoverCacheFile(v.path);
+		if (!file.IsEmpty())
+			want.insert(CString(::PathFindFileNameW(file)).MakeLower());
+	}
+	const CString dir = GetCoverCacheDir();
+	std::vector<CString> names;
+	{
+		WIN32_FIND_DATAW fd = {};
+		HANDLE h = ::FindFirstFileW(dir + L"\\*.jpg", &fd);
+		if (h != INVALID_HANDLE_VALUE)
+		{
+			do
+			{
+				CString n = fd.cFileName;
+				if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && want.count(CString(n).MakeLower()))
+					names.push_back(n);
+			} while (::FindNextFileW(h, &fd));
+			::FindClose(h);
+		}
+	}
+	const CString db = GetCoversDbPath();
+	if (!g_coverDirty && ::GetFileAttributesW(db) != INVALID_FILE_ATTRIBUTES)
+		return 0;   // 새로 쓴 커버 없음
+	if (names.empty() && ::GetFileAttributesW(db) == INVALID_FILE_ATTRIBUTES)
+		return 0;   // 이동식 영상 커버가 없으면 파일도 만들지 않음
+	std::vector<BYTE> plain;
+	for (const CString& n : names)
+	{
+		std::vector<BYTE> data;
+		if (!ReadWholeFile(dir + L"\\" + n, data))
+			return fail(L"커버 캐시 파일을 읽지 못했습니다.");
+		if (plain.size() + data.size() > 0x40000000ULL)
+			return fail(L"커버 이미지 전체 크기가 1GB 를 넘었습니다.");
+		PutEntry(plain, CStringA(CW2A(n, CP_UTF8)), data.data(), data.size());
+	}
+	std::vector<BYTE> sec;
+	if (!plain.empty() && !DbCrypt::Encrypt(plain.data(), plain.size(), sec))
+		return fail(L"커버 DB 를 암호화하지 못했습니다.");
+	const CString tmp = db + L".tmp";
+	try
+	{
+		CFile f;
+		if (!f.Open(tmp, CFile::modeCreate | CFile::modeWrite))
+			return fail(L"커버 DB 임시 파일을 만들지 못했습니다.");
+		f.Write(kCoverMagic, static_cast<UINT>(kCoverMagicLen));
+		const UINT64 len = sec.size();
+		f.Write(&len, 8);
+		if (len) f.Write(sec.data(), static_cast<UINT>(sec.size()));
+		f.Close();
+	}
+	catch (CException* e)
+	{
+		e->Delete();
+		::DeleteFileW(tmp);
+		return fail(L"커버 DB 를 쓰지 못했습니다.");
+	}
+	if (!::MoveFileExW(tmp, db, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+	{
+		::DeleteFileW(tmp);
+		return fail(L"covers.vmdb 를 교체하지 못했습니다.");
+	}
+	g_coverDirty = false;
+	return 1;
+}
+
+void CVideoLibrary::ClearCoverCache()
+{
+	DeleteTree(GetCacheDir() + L"\\covers", true);
+}
+
 bool CVideoLibrary::HasUnsavedImages()
 {
 	return !g_imageDbBroken && (g_imageDirty || g_imageChanged);
@@ -1229,6 +1439,7 @@ bool CVideoLibrary::Load()
 	}
 	// 이미지 DB(images.vmdb) → 이미지 캐시 폴더로 풀기 (이전 실행이 남긴 캐시 · 예전 Image 폴더도 합침)
 	LoadImageDb();
+	LoadCoverDb();   // 이동식 디스크 영상의 커버 이미지 캐시
 	// 원본 DB 를 작업 DB(library.work.vmdb)로 복사해서 사용 — 실행 중 저장은 작업 DB 에만, [DB 반영] / 종료 때 원본에 반영
 	if (::GetFileAttributesW(GetDataFilePath()) != INVALID_FILE_ATTRIBUTES)
 		::CopyFileW(GetDataFilePath(), GetWorkDbPath(), FALSE);

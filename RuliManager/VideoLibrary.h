@@ -217,6 +217,18 @@ public:
 	static void    LoadImageDb();
 	static int     SaveImageDb(CString* error = nullptr);
 	static bool    HasUnsavedImages();     // 이미지 DB 에 저장 안 한 캐시 변경이 있음 ([DB 반영] 활성)
+
+	// 이동식 디스크 영상의 커버 이미지 캐시 (디스크를 빼도 카드에 이미지 표시)
+	//  - 캐시 폴더 <실행 폴더>\cache\covers\<키 해시>.jpg (긴 변 640px 이하로 줄인 JPEG), 커버 DB covers.vmdb (암호화, 한 파일)
+	//  - 키 = 이동식 디스크 볼륨 일련번호 + 드라이브 문자를 뺀 경로 → 드라이브 문자가 바뀌어도 같은 캐시
+	//  - 기동 때 covers.vmdb → 캐시 폴더로 풀고, [DB 반영] · 종료 때 지금 이동식 영상의 것만 다시 묶음 (종료 때 저장에 성공하면 캐시 폴더 삭제)
+	CString        CoverCacheFile(const CString& videoPath) const;   // 이동식 영상이면 캐시 파일 경로, 아니면 빈 문자열
+	static CString GetCoverCacheDir();
+	static CString GetCoversDbPath();
+	static bool    SaveCoverCache(const CString& srcImage, const CString& cacheFile);   // 원본 이미지 → 줄인 JPEG (임시 파일에 쓰고 바꿔치기, 다른 스레드에서도)
+	static void    LoadCoverDb();
+	int            SaveCoverDb(CString* error = nullptr) const;     // 바뀐 것 없으면 0, 저장 1, 실패 -1
+	static void    ClearCoverCache();
 	static CString GetLegacyImageDir();    // 예전 이미지 폴더 <실행 파일 폴더>\Image (기동 때 캐시로 옮기고 저장 성공 후 Image.bak)
 	static CString GetLegacyLibraryPath(); // 예전 정보 파일 library.tsv (처음 한 번 옮겨 오고 .bak 으로 바꿈)
 	static CString GetPendingFilePath();   // 예전 임시 목록 pending.tsv

@@ -526,7 +526,7 @@ protected:
 	const CMediaInfoLabel::Info* CardMediaInfo(const CString& path);   // 있으면 정보, 없으면 백그라운드 읽기 요청 후 nullptr
 	afx_msg LRESULT OnCardMediaReady(WPARAM wParam, LPARAM lParam);
 	// 영상 카드 이미지: 백그라운드 스레드에서 이미지 파일을 찾아 읽고 카드 크기로 줄여 둠 (읽는 동안 카드에 "불러오는 중" 표시)
-	struct CoverJob { CString key; CString videoPath; int w = 0; int h = 0; UINT gen = 0; int item = -1; };
+	struct CoverJob { CString key; CString videoPath; int w = 0; int h = 0; UINT gen = 0; int item = -1; CString cacheFile; };   // cacheFile: 이동식 디스크 영상의 커버 캐시
 	struct CoverQueue
 	{
 		std::mutex mx;
