@@ -403,6 +403,14 @@ void CTagChipCtrl::OnPaint()
 	mem.SelectObject(oldBmp);
 }
 
+int CTagChipCtrl::ChipAt(CPoint client) const
+{
+	for (size_t i = 0; i < m_chipRects.size() && i < m_tags.size(); ++i)
+		if (m_chipRects[i].PtInRect(client))
+			return static_cast<int>(i);
+	return -1;
+}
+
 void CTagChipCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	if (!IsWindowEnabled())

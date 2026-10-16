@@ -65,6 +65,9 @@ protected:
 	CString m_imagePath;
 	bool    m_dirty = false;
 	bool    m_loading = false;
+	int     m_sortCol = 0;        // 태그 관리: 정렬 열 (0 = 이름, 1 = 영상 수)
+	bool    m_sortDesc = false;   // 태그 관리: 내림차순 (머리글 클릭으로 전환)
+	void    UpdateSortHeader();       // 정렬 열 머리글에 ▲ / ▼
 	bool    m_structChanged = false;  // Commit 에서 종류 변경 등으로 목록 구조가 바뀜 (항목 코드 다시 계산)
 
 	std::vector<NamedInfo>& Items() { return m_lib.NamedList(m_kind); }
@@ -85,6 +88,7 @@ protected:
 	afx_msg void OnKindStudio();
 	afx_msg void OnKindLabel();
 	afx_msg void OnLvnItemChanged(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnLvnColumnClick(NMHDR* pNMHDR, LRESULT* pResult);   // 태그 관리: 이름 / 영상 수 열 머리글 클릭 → 그 열로 정렬, 같은 열을 다시 누르면 오름차순 ↔ 내림차순
 	afx_msg void OnBnClickedNew();
 	afx_msg void OnBnClickedDelete();
 	afx_msg void OnBnClickedBulk();

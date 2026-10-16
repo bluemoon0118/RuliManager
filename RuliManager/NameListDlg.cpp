@@ -68,6 +68,7 @@ BEGIN_MESSAGE_MAP(CNameListDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_NL_KIND_STUDIO, &CNameListDlg::OnKindStudio)
 	ON_BN_CLICKED(IDC_NL_KIND_LABEL, &CNameListDlg::OnKindLabel)
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_NL_LIST, &CNameListDlg::OnLvnItemChanged)
+	ON_NOTIFY(LVN_COLUMNCLICK, IDC_NL_LIST, &CNameListDlg::OnLvnColumnClick)
 	ON_BN_CLICKED(IDC_NL_NEW, &CNameListDlg::OnBnClickedNew)
 	ON_BN_CLICKED(IDC_NL_DELETE, &CNameListDlg::OnBnClickedDelete)
 	ON_BN_CLICKED(IDC_NL_BULK, &CNameListDlg::OnBnClickedBulk)
@@ -197,6 +198,13 @@ BOOL CNameListDlg::OnInitDialog()
 	m_list.SetExtendedStyle(LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP);
 	m_list.InsertColumn(0, L"이름", LVCFMT_LEFT, dlu * 115 / 100);
 	m_list.InsertColumn(1, L"영상 수", LVCFMT_RIGHT, dlu * 40 / 100);
+	if (m_kind == LIST_TAG)
+	{
+		m_list.ModifyStyle(LVS_NOSORTHEADER, 0);   // 태그 관리: 이름 열 머리글 클릭으로 정렬 (제작사는 제작사 ↓ 레이블 묶음 순서 그대로)
+		if (CHeaderCtrl* h = m_list.GetHeaderCtrl())
+			h->ModifyStyle(0, HDS_BUTTONS);         // 만든 뒤에 바꾼 스타일은 머리글에도 직접 (누를 수 있게)
+		UpdateSortHeader();
+	}
 
 	m_editSearch.SetCueBanner(L"이름 검색");
 	m_image.SetPlaceholder(L"이미지 없음");
@@ -393,9 +401,26 @@ void CNameListDlg::FillListCode(int selectCode)
 	}
 	else
 	{
+		// 태그: 이름 순 또는 영상 수 순 (머리글 클릭으로 열 · 방향 전환)
 		for (int i : sorted)
 			if (matches(Items()[i]))
 				m_rows.push_back(i);
+		if (m_sortCol == 1)
+		{
+			// 영상 수 (같으면 이름 순 그대로 - sorted 가 이름 순이므로 안정 정렬)
+			std::vector<std::pair<int, int>> keyed;   // (영상 수, 항목)
+			for (int code : m_rows)
+				keyed.push_back({ CountOfCode(code), code });
+			std::stable_sort(keyed.begin(), keyed.end(), [this](const auto& a, const auto& b)
+			{
+				return m_sortDesc ? a.first > b.first : a.first < b.first;
+			});
+			m_rows.clear();
+			for (const auto& k : keyed)
+				m_rows.push_back(k.second);
+		}
+		else if (m_sortDesc)
+			std::reverse(m_rows.begin(), m_rows.end());
 	}
 
 	m_loading = true;
@@ -888,6 +913,47 @@ void CNameListDlg::OnLvnItemChanged(NMHDR* pNMHDR, LRESULT* pResult)
 		}
 		ShowItem(code);
 	}
+}
+
+void CNameListDlg::UpdateSortHeader()
+{
+	// 정렬 열 머리글에만 "▲" (오름차순) / "▼" (내림차순) - 머리글은 직접 그리므로 글자로 표시
+	const LPCWSTR names[2] = { L"이름", L"영상 수" };
+	for (int c = 0; c < 2; ++c)
+	{
+		LVCOLUMN col = {};
+		col.mask = LVCF_TEXT;
+		CString text = names[c];
+		if (c == m_sortCol)
+			text += m_sortDesc ? L" ▼" : L" ▲";
+		col.pszText = text.GetBuffer();
+		m_list.SetColumn(c, &col);
+		text.ReleaseBuffer();
+	}
+	if (CHeaderCtrl* h = m_list.GetHeaderCtrl())
+		h->Invalidate();
+}
+
+void CNameListDlg::OnLvnColumnClick(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	*pResult = 0;
+	const NMLISTVIEW* p = reinterpret_cast<NMLISTVIEW*>(pNMHDR);
+	if (m_kind != LIST_TAG || p->iSubItem < 0 || p->iSubItem > 1)
+		return;   // 이름 · 영상 수 열
+	// 지금 고른 항목은 정렬 뒤에도 선택 유지
+	int selCode = -1;
+	const int sel = m_list.GetNextItem(-1, LVNI_SELECTED);
+	if (sel >= 0 && sel < static_cast<int>(m_rows.size()))
+		selCode = m_rows[sel];
+	if (p->iSubItem == m_sortCol)
+		m_sortDesc = !m_sortDesc;            // 같은 열: 방향 전환
+	else
+	{
+		m_sortCol = p->iSubItem;
+		m_sortDesc = (m_sortCol == 1);       // 다른 열로 바꾸면: 이름은 오름차순, 영상 수는 많은 순부터
+	}
+	UpdateSortHeader();
+	FillListCode(selCode);
 }
 
 void CNameListDlg::OnEnChangeSearch()

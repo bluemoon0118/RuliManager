@@ -3,6 +3,7 @@
 #include "RuliManagerDlg.h"
 #include "ActorDlg.h"
 #include "TextInfoDlg.h"
+#include "TagLinkDlg.h"
 #include <cmath>
 #include <thread>
 #include "SettingsDlg.h"
@@ -262,6 +263,8 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_COMMAND(ID_MANAGE_TAGS, &CRuliManagerDlg::OnManageTags)
 	ON_COMMAND(ID_MANAGE_SERIES, &CRuliManagerDlg::OnManageSeries)
 	ON_BN_CLICKED(IDC_BTN_ACTOR_BACK, &CRuliManagerDlg::OnBnClickedActorBack)
+	ON_BN_CLICKED(IDC_DRILL_VIEW_GRID, &CRuliManagerDlg::OnBnClickedDrillViewGrid)
+	ON_BN_CLICKED(IDC_DRILL_VIEW_YEAR, &CRuliManagerDlg::OnBnClickedDrillViewYear)
 	ON_COMMAND(ID_ACTOR_SHOWVIDEOS, &CRuliManagerDlg::OnActorShowVideos)
 	ON_COMMAND(ID_ACTOR_EDIT, &CRuliManagerDlg::OnActorEdit)
 	ON_COMMAND(ID_CAT_DELETE, &CRuliManagerDlg::OnCatDelete)
@@ -270,6 +273,7 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_COMMAND(ID_VIDEO_TEXTINFO, &CRuliManagerDlg::OnVideoTextInfo)
 	ON_COMMAND(ID_VIDEO_PASTEINFO, &CRuliManagerDlg::OnVideoPasteInfo)
 	ON_COMMAND(ID_VIDEO_SCREENSHOT, &CRuliManagerDlg::OnVideoScreenshot)
+	ON_COMMAND(ID_VIDEO_REFRESHITEM, &CRuliManagerDlg::OnVideoRefreshItem)
 	ON_MESSAGE(WM_APP_SHOT_PROGRESS, &CRuliManagerDlg::OnShotProgress)
 	ON_MESSAGE(WM_APP_SHOT_DONE, &CRuliManagerDlg::OnShotDone)
 	ON_COMMAND(ID_NEW_ACTOR, &CRuliManagerDlg::OnNewActor)
@@ -277,6 +281,7 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_COMMAND(ID_NEW_LABEL, &CRuliManagerDlg::OnNewLabel)
 	ON_COMMAND(ID_NEW_TAG, &CRuliManagerDlg::OnNewTag)
 	ON_COMMAND(ID_ACTOR_TEXTINFO, &CRuliManagerDlg::OnActorTextInfo)
+	ON_COMMAND(ID_ACTOR_PASTEINFO, &CRuliManagerDlg::OnActorPasteInfo)
 	ON_BN_CLICKED(IDC_BTN_SAVE, &CRuliManagerDlg::OnBnClickedSave)
 	ON_BN_CLICKED(IDC_BTN_RENAME, &CRuliManagerDlg::OnBnClickedRename)
 	ON_BN_CLICKED(IDC_BTN_DELETE, &CRuliManagerDlg::OnBnClickedDelete)
@@ -452,7 +457,7 @@ BOOL CRuliManagerDlg::OnInitDialog()
 		{
 			if (m_view[row] == item)
 			{
-				GridSetSel(static_cast<int>(row));
+				SelectViewRow(static_cast<int>(row));
 				break;
 			}
 		}
@@ -464,6 +469,8 @@ BOOL CRuliManagerDlg::OnInitDialog()
 	m_actorStrip.Create(this, IDC_ACTOR_STRIP);
 	// 영상 스크린샷 격자 (설정에서 고르면 출연 배우 카드 자리에)
 	m_detailStripMode = (AfxGetApp()->GetProfileInt(L"Settings", L"DetailStrip", 0) == 1) ? 1 : 0;
+	m_mergeParts = AfxGetApp()->GetProfileInt(L"Settings", L"MergeParts", 0) != 0;
+	m_detailLeft = AfxGetApp()->GetProfileInt(L"Settings", L"DetailLeft", 0) != 0;
 	m_shotCols = (std::max)(1, (std::min)(10, static_cast<int>(AfxGetApp()->GetProfileInt(L"Settings", L"ShotCols", 3))));
 	m_shotStrip.Create(this, IDC_SHOT_STRIP);
 	m_shotStrip.SetColors(kBackColor, TCOL(TC_SUB2), TCOL(TC_THUMB), kScrollColor);
@@ -704,6 +711,48 @@ BOOL CRuliManagerDlg::OnInitDialog()
 		m_thumbs.Create(m_thumbW, m_thumbH, ILC_COLOR24, 64, 64);
 		AddThumbnail(nullptr, L"이미지 없음");
 		m_grid.Create(this, IDC_GRID, this, &m_thumbs, m_thumbW, m_thumbH);
+		// 배우 출연작 화면 [연도별] 보기 + [격자] [연도별] 전환 버튼 ([◀ 배우 목록] 줄 오른쪽)
+		m_actorDrillView = (AfxGetApp()->GetProfileInt(L"Settings", L"ActorDrillView", 0) == 1) ? 1 : 0;
+		m_yearView.Create(this, IDC_YEAR_VIEW);
+		m_yearView.SetColors(kBackColor, kTextColor, TCOL(TC_SUB2), TCOL(TC_COMBO));
+		m_yearView.ShowWindow(SW_HIDE);
+		m_yearView.m_onDrawCard = [this](CDC* dc, int item, const CRect& rc, bool sel)
+		{
+			m_cardImageOnly = true;   // 이미지만 (고정 크기 - 확대 슬라이더와 관계없음)
+			const auto cit = m_yearCardColors.find(item);
+			m_cardFill = (cit != m_yearCardColors.end()) ? cit->second : CLR_INVALID;   // 커버 빈 영역 = 배우 이름별 고유색
+			DrawVideoCard(dc, item, rc, sel, GetFocus() == &m_yearView);
+			m_cardImageOnly = false;
+			m_cardFill = CLR_INVALID;
+		};
+		m_yearView.m_onSelect = [this](int item) { SelectViewRow(item); };
+		m_yearView.m_onActivate = [this](int item) { GridActivate(item); };
+		m_yearView.m_onDblClickAt = [this](int item, const CRect& card, CPoint pt)   // 스크린샷 추출 표시 더블클릭 = 멈춤 / 대기열에서 뺌
+		{
+			m_cardImageOnly = true;   // ShotBadgeRect: 연도별 카드 배치
+			const bool handled = GridDblClick(item, card, pt);
+			m_cardImageOnly = false;
+			return handled;
+		};
+		m_yearView.m_onContext = [this](int item, CPoint pt) { if (item >= 0) ShowVideoContextMenu(item, pt); };
+		{
+			const wchar_t* labels[2] = { L"격자", L"연도별" };
+			for (int i = 0; i < 2; ++i)
+			{
+				const UINT id = IDC_DRILL_VIEW_GRID + i;
+				HWND h = ::CreateWindowExW(0, L"BUTTON", labels[i], WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON, 0, 0, 10, 10,
+					m_hWnd, reinterpret_cast<HMENU>(static_cast<UINT_PTR>(id)), AfxGetInstanceHandle(), nullptr);
+				if (!h)
+					continue;
+				::SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(GetFont()->GetSafeHandle()), TRUE);
+				if (m_drillViewBtns[i].Attach(id, this))
+				{
+					m_drillViewBtns[i].SetColors(kButtonColor, RGB(255, 255, 255), kBackColor);
+					m_drillViewBtns[i].SetToggle(kComboColor, TCOL(TC_TOGGLETEXT));
+					m_drillViewBtns[i].SetChecked(i == m_actorDrillView);
+				}
+			}
+		}
 		m_actorOwner.dlg = this;
 		m_actorGrid.Create(this, IDC_ACTOR_GRID, &m_actorOwner, &m_thumbs, m_thumbW, m_thumbH);
 		SetupActorCards();   // 배우 탭: 세로 사진 카드
@@ -1477,6 +1526,9 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 	const int top = y + btnH + DY(4);
 	const int bottom = by - gap;
 	const int leftW = LeftPaneWidth(cx);
+	// 격자(목록) 영역 x: 상세 화면이 오른쪽(기본)이면 왼쪽 끝, 왼쪽이면 오른쪽 끝 (설정 창, m_detailLeft)
+	const int lx = (m_detailLeft && m_mode != MODE_TAG) ? (cx - m - leftW) : m;
+	CRect gridRc;   // 영상 격자 자리 (연도별 보기에서 나눠 씀)
 	if (m_mode != MODE_VIDEO)
 	{
 		// 배우 격자 / 스튜디오·태그 목록 (검색 · 정렬 · 페이지 도구줄은 격자 머리 영역 - 함께 스크롤)
@@ -1489,13 +1541,13 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 			const int photoW = photoH0 * 3 / 4;
 			const int panelW = (std::max)(DX(80), leftW - photoW - gap * 2);
 			const int headerH = (std::max)(photoH0, (std::min)(m_drillPanel.CalcHeight(panelW), DY(190)));
-			MoveCtrl(IDC_DRILL_PHOTO, m, lt, photoW, photoH0);
-			MoveCtrl(IDC_DRILL_PANEL, m + photoW + gap * 2, lt, panelW, headerH);
+			MoveCtrl(IDC_DRILL_PHOTO, lx, lt, photoW, photoH0);
+			MoveCtrl(IDC_DRILL_PANEL, lx + photoW + gap * 2, lt, panelW, headerH);
 			lt += headerH + gap;
 		}
-		MoveCtrl(IDC_ACTOR_GRID, m, lt, leftW, bottom - lt);
-		MoveCtrl(IDC_LIST_CATEGORY, m, lt, leftW, bottom - lt);
-		MoveCtrl(IDC_CAT_GRID, m, lt, leftW, bottom - lt);
+		MoveCtrl(IDC_ACTOR_GRID, lx, lt, leftW, bottom - lt);
+		MoveCtrl(IDC_LIST_CATEGORY, lx, lt, leftW, bottom - lt);
+		MoveCtrl(IDC_CAT_GRID, lx, lt, leftW, bottom - lt);
 		const int countW = DX(40);
 		const int nameW = (std::max)(DX(60), (leftW - countW) * 40 / 100);
 		m_listCat.SetColumnWidth(0, nameW);
@@ -1503,15 +1555,22 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 		m_listCat.SetColumnWidth(2, (std::max)(DX(40), leftW - nameW - countW - ::GetSystemMetrics(SM_CXVSCROLL) - 6));
 
 		// 영상 보기 (위에 [◀ 목록] 줄)
-		MoveCtrl(IDC_BTN_ACTOR_BACK, m, top, DX(70), btnH);
-		MoveCtrl(IDC_STATIC_ACTOR_TITLE, m + DX(74), top + DY(3), leftW - DX(74), DY(9));
-		MoveCtrl(IDC_LIST_VIDEOS, m, lt, leftW, bottom - lt);
-		MoveCtrl(IDC_GRID, m, lt, leftW, bottom - lt);
+		MoveCtrl(IDC_BTN_ACTOR_BACK, lx, top, DX(70), btnH);
+		MoveCtrl(IDC_STATIC_ACTOR_TITLE, lx + DX(74), top + DY(3), leftW - DX(74), DY(9));
+		{
+			// 배우 출연작 화면: [격자] [연도별] (줄 오른쪽 끝, 붙여서)
+			const int vbw = DX(40);
+			MoveCtrl(IDC_DRILL_VIEW_YEAR, lx + leftW - vbw, top, vbw, btnH);
+			MoveCtrl(IDC_DRILL_VIEW_GRID, lx + leftW - vbw * 2 - 2, top, vbw, btnH);
+		}
+		MoveCtrl(IDC_LIST_VIDEOS, lx, lt, leftW, bottom - lt);
+		MoveCtrl(IDC_GRID, lx, lt, leftW, bottom - lt);
+		gridRc = CRect(lx, lt, lx + leftW, bottom);
 	}
 	else
 	{
-		MoveCtrl(IDC_LIST_VIDEOS, m, top, leftW, bottom - top);
-		MoveCtrl(IDC_GRID, m, top, leftW, bottom - top);
+		MoveCtrl(IDC_LIST_VIDEOS, lx, top, leftW, bottom - top);
+		MoveCtrl(IDC_GRID, lx, top, leftW, bottom - top);
 	}
 	// 목록 도구줄: 지금 보이는 격자의 머리 영역으로 (카드와 함께 스크롤)
 	{
@@ -1525,6 +1584,12 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 			host->SetHeaderHeight(tbH + gap);
 		}
 	}
+	// 배우 출연작 [연도별]: 격자(도구줄 포함)는 숨기고 그 자리 전체를 연도별 보기로
+	if (YearViewActive() && m_yearView.GetSafeHwnd() && !gridRc.IsRectEmpty())
+	{
+		MoveCtrl(IDC_YEAR_VIEW, gridRc.left, gridRc.top, gridRc.Width(), gridRc.Height());
+		m_yearView.SetCardSize(YearCardW(), YearCardH());
+	}
 
 	if (m_mode == MODE_TAG)
 	{
@@ -1533,8 +1598,8 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 		return;
 	}
 
-	const int rx = m + leftW + gap;
-	const int rw = cx - m - rx;
+	const int rx = m_detailLeft ? m : (m + leftW + gap);   // 상세 화면: 오른쪽(기본) / 왼쪽 (설정 창)
+	const int rw = cx - 2 * m - gap - leftW;
 	// 상세 정보(편집 칸)는 영상 탭에서만 표시, 다른 탭은 이미지 + 이름/정보 두 줄만
 	const bool showDetail = ShowVideoDetail();   // 영상 탭 + 배우 출연작 · 제작사 영상 화면
 	// 태그 칩이 여러 줄이면 그만큼 상세 영역을 늘림 (이미지가 줄어듦)
@@ -1573,7 +1638,7 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 			m_actorStrip.SetCardSize(m_stripCardW, m_stripCardCurH, DX(4));
 		}
 	}
-	const int stripH = (VideoStripShown() && m_actorStrip.GetSafeHwnd()) ? m_actorStrip.CalcHeight() : 0;   // 태그 아래 배우 카드 (영상 탭 + 제작사 영상 화면)
+	const int stripH = ((VideoStripShown() || ShotStripShown()) && m_actorStrip.GetSafeHwnd()) ? m_actorStrip.CalcHeight() : 0;   // 태그 아래 배우 카드 (영상 탭 + 제작사 영상 화면) / 스크린샷 (+ 배우 출연작 화면)
 	// 제작사 탭 상세(제작사 선택): 정보 줄 아래 하위 레이블 카드 (여러 줄, 오른쪽 영역 높이의 절반까지)
 	int labelStripH = 0;
 	if (!showDetail && m_mode == MODE_STUDIO && !IsActorGridMode() && m_labelStrip.GetSafeHwnd() && !m_stripForActor && !m_stripLabels.empty())   // 하위 레이블 · 상위 제작사 카드
@@ -2019,6 +2084,7 @@ void CRuliManagerDlg::BeginLibraryChange()
 	CommitDetails();
 	m_list.SetItemState(-1, 0, LVIS_SELECTED | LVIS_FOCUSED);
 	m_view.clear();
+	BuildMergedView(false);
 	m_list.SetItemCountEx(0);
 	m_grid.Refresh();
 	ShowDetails(-1);
@@ -2158,20 +2224,34 @@ void CRuliManagerDlg::ApplyFilter()
 	}
 
 	SortView();
+	// 분할 영상 합쳐서 보기: 같은 묶음 파트를 첫 파트 자리에 번호 순으로 붙임 (페이지 · 격자는 카드 단위)
+	const bool merge = m_mergeParts && !YearViewActive();
+	BuildMergedView(merge);
 	// 페이지 나누기: 정렬된 전체 중 지금 페이지만 표시 (m_view = 그 페이지의 항목)
-	m_totalVideo = static_cast<int>(m_view.size());
 	m_totalVideoBytes = 0;
 	for (int i : m_view)
 		m_totalVideoBytes += m_lib.items[i].size;
+	m_totalVideo = merge ? static_cast<int>(m_gridRows.size()) : static_cast<int>(m_view.size());   // 합쳐 보기: 카드 수
 	{
-		int first = 0, last = 0;
+		int first = 0, last = m_totalVideo;
 		// 배우 격자 등에서 불려도 영상 페이지 (영상 탭 목록은 영상 탭의 페이지당 개수, 출연작/영상 화면은 지금 탭 값)
 		if (m_drill.IsEmpty())
 			SlicePage(m_pageVideoMain, m_totalVideo, first, last, m_pageSizes[MODE_VIDEO]);
-		else
+		else if (!YearViewActive())   // 연도별 보기는 페이지를 나누지 않고 전부
 			SlicePage(m_pageDrill, m_totalVideo, first, last);
 		if (first > 0 || last < m_totalVideo)
-			m_view = std::vector<int>(m_view.begin() + first, m_view.begin() + last);
+		{
+			if (merge)
+			{
+				// 카드 범위 → 행 범위 (묶음은 붙어 있으므로 카드 경계에서 자름)
+				const int rowFirst = m_gridRows[first];
+				const int rowLast = (last < static_cast<int>(m_gridRows.size())) ? m_gridRows[last] : static_cast<int>(m_view.size());
+				m_view = std::vector<int>(m_view.begin() + rowFirst, m_view.begin() + rowLast);
+				BuildMergedView(true);   // 이 페이지의 칸 표 (순서는 이미 묶음끼리 붙어 있어 그대로)
+			}
+			else
+				m_view = std::vector<int>(m_view.begin() + first, m_view.begin() + last);
+		}
 	}
 	m_list.SetItemCountEx(static_cast<int>(m_view.size()), LVSICF_NOSCROLL);
 	m_list.Invalidate(FALSE);
@@ -2189,6 +2269,8 @@ void CRuliManagerDlg::ApplyFilter()
 
 	UpdateStatus();
 	UpdatePager();
+	if (YearViewActive())
+		RebuildYearView();
 }
 
 void CRuliManagerDlg::SortView()
@@ -3314,17 +3396,133 @@ void CRuliManagerDlg::SetGridView(bool grid)
 // ---------------------------------------------------------------------------
 // 격자 보기 데이터 제공 (IVideoGridOwner)
 
+void CRuliManagerDlg::BuildMergedView(bool apply)
+{
+	m_gridRows.clear();
+	m_rowGrid.clear();
+	m_gridParts.clear();
+	if (!apply)
+		return;
+	// 1) 묶음(2개 이상) → 행들, 파트 번호 순
+	std::map<CString, std::vector<std::pair<int, int>>> groups;   // 묶음 키 → (번호, 항목)
+	std::vector<CString> keyOf(m_view.size());
+	for (size_t r = 0; r < m_view.size(); ++r)
+	{
+		CString key;
+		int num = 0;
+		if (SplitPartName(m_lib.items[m_view[r]].path, key, num))
+		{
+			key.MakeLower();
+			keyOf[r] = key;
+			groups[key].push_back({ num, m_view[r] });
+		}
+	}
+	// 2) 정렬된 순서대로, 묶음은 처음 나온 자리에 전부(번호 순) 붙임
+	std::vector<int> order;
+	order.reserve(m_view.size());
+	std::set<CString> done;
+	std::vector<std::pair<size_t, size_t>> cards;   // (시작 행, 행 수)
+	for (size_t r = 0; r < m_view.size(); ++r)
+	{
+		const CString& key = keyOf[r];
+		auto git = key.IsEmpty() ? groups.end() : groups.find(key);
+		if (git == groups.end() || git->second.size() < 2)
+		{
+			cards.push_back({ order.size(), 1 });
+			order.push_back(m_view[r]);
+			continue;
+		}
+		if (!done.insert(key).second)
+			continue;   // 이미 첫 파트 자리에 붙임
+		auto list = git->second;
+		std::stable_sort(list.begin(), list.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+		cards.push_back({ order.size(), list.size() });
+		for (const auto& pr : list)
+			order.push_back(pr.second);
+	}
+	m_view.swap(order);
+	// 3) 칸 표
+	m_rowGrid.assign(m_view.size(), -1);
+	for (size_t g = 0; g < cards.size(); ++g)
+	{
+		const int start = static_cast<int>(cards[g].first), n = static_cast<int>(cards[g].second);
+		m_gridRows.push_back(start);
+		std::vector<int> parts;
+		for (int k = 0; k < n; ++k)
+		{
+			m_rowGrid[start + k] = static_cast<int>(g);
+			parts.push_back(start + k);
+		}
+		if (n >= 2)
+			m_gridParts[static_cast<int>(g)] = std::move(parts);
+	}
+}
+
+int CRuliManagerDlg::GridRowOf(int g) const
+{
+	if (m_gridRows.empty())
+		return g;
+	return (g >= 0 && g < static_cast<int>(m_gridRows.size())) ? m_gridRows[g] : -1;
+}
+
+int CRuliManagerDlg::GridIdxOf(int row) const
+{
+	if (m_gridRows.empty())
+		return row;
+	return (row >= 0 && row < static_cast<int>(m_rowGrid.size())) ? m_rowGrid[row] : -1;
+}
+
+int CRuliManagerDlg::PartZoneAt(int g, const CRect& card, CPoint pt) const
+{
+	auto it = m_gridParts.find(g);
+	if (it == m_gridParts.end() || card.Width() <= 0)
+		return -1;
+	const CRect img(card.left, card.top, card.right, card.top + m_vcardImgH);   // DrawVideoCard 의 이미지 영역
+	if (!img.PtInRect(pt))
+		return -1;
+	const int n = static_cast<int>(it->second.size());
+	return (std::min)(n - 1, (std::max)(0, static_cast<int>((pt.x - img.left) * n / img.Width())));
+}
+
+int CRuliManagerDlg::GridHitPart(int g, const CRect& card, CPoint pt)
+{
+	const int z = PartZoneAt(g, card, pt);
+	return z >= 0 ? z + 1 : 0;
+}
+
+bool CRuliManagerDlg::GridClick(int g, const CRect& card, CPoint pt)
+{
+	const int z = PartZoneAt(g, card, pt);
+	if (z < 0)
+		return false;
+	SelectViewRow(m_gridParts[g][z]);   // 누른 칸의 파트
+	return true;
+}
+
 int CRuliManagerDlg::GridGetCount()
 {
-	return static_cast<int>(m_view.size());
+	if (YearViewActive())
+		return 0;   // 연도별 보기: 격자는 도구줄(머리 영역)만
+	return m_gridRows.empty() ? static_cast<int>(m_view.size()) : static_cast<int>(m_gridRows.size());
 }
 
 int CRuliManagerDlg::GridGetSel()
 {
-	return GetSelectedRow();
+	return GridIdxOf(GetSelectedRow());   // 합쳐 보기: 파트를 골라도 그 카드
 }
 
-void CRuliManagerDlg::GridSetSel(int row)
+void CRuliManagerDlg::GridSetSel(int g)
+{
+	// 격자 칸 → 행 (합쳐 보기에서 같은 카드의 다른 파트를 이미 골랐으면 그대로)
+	if (!m_gridRows.empty() && g >= 0 && GridIdxOf(GetSelectedRow()) == g)
+	{
+		m_grid.OnSelectionChanged();
+		return;
+	}
+	SelectViewRow(GridRowOf(g));
+}
+
+void CRuliManagerDlg::SelectViewRow(int row)
 {
 	if (row < 0 || row >= static_cast<int>(m_view.size()))
 		return;
@@ -3334,8 +3532,9 @@ void CRuliManagerDlg::GridSetSel(int row)
 	m_grid.OnSelectionChanged();
 }
 
-void CRuliManagerDlg::GridGetItem(int row, int& image, CString& name, CString& release, CString& memo)
+void CRuliManagerDlg::GridGetItem(int g, int& image, CString& name, CString& release, CString& memo)
 {
+	const int row = GridRowOf(g);
 	if (row < 0 || row >= static_cast<int>(m_view.size()))
 	{
 		image = 0;
@@ -3499,6 +3698,8 @@ void CRuliManagerDlg::OnLvnItemChanged(NMHDR* pNMHDR, LRESULT* pResult)
 			CommitDetails();
 			ShowDetails(idx);
 		}
+		if (m_yearView.GetSafeHwnd() && m_yearView.IsWindowVisible())
+			m_yearView.SetSelected(p->iItem);   // 연도별 보기의 선택 표시도
 	}
 
 	if (p->uChanged & LVIF_STATE)
@@ -3899,6 +4100,9 @@ void CRuliManagerDlg::CommitDetails()
 	m_list.Invalidate(FALSE);
 	m_grid.Invalidate(FALSE);
 	MarkCategoriesDirty();   // 배우/스튜디오/태그 개수 갱신
+	// 배우 출연작 [연도별]: 참여 별칭(이름별 배경색) · 발매일(칸 위치)이 바뀌었을 수 있으므로 다시 만듦 (스크롤은 유지)
+	if (YearViewActive())
+		RebuildYearView();
 }
 
 void CRuliManagerDlg::OnBnClickedSave()
@@ -3958,6 +4162,8 @@ void CRuliManagerDlg::OnBnClickedSettings()
 	dlg.m_onDeleteDb = [this](int mask) { DeleteDb(mask); };
 	dlg.m_cardMedia = m_showCardMedia;
 	dlg.m_sfw = IsSfwMosaic();
+	dlg.m_mergeParts = m_mergeParts;
+	dlg.m_detailLeft = m_detailLeft;
 	dlg.m_detailStrip = m_detailStripMode;
 	dlg.m_shotCols = m_shotCols;
 	const int savedTheme = Theme::Find(AfxGetApp()->GetProfileString(L"Settings", L"Theme", L"Stash"));   // 저장된 테마 (다시 시작 전이면 지금 화면과 다를 수 있음)
@@ -3988,6 +4194,27 @@ void CRuliManagerDlg::OnBnClickedSettings()
 			StopCardMediaThread();   // 읽고 있던 대기열 멈춤 (이미 읽은 정보는 남겨 둠 → 다시 켜면 바로 표시)
 		if (m_grid.GetSafeHwnd())
 			m_grid.Invalidate(FALSE);
+	}
+	if (result == IDOK && dlg.m_detailLeft != m_detailLeft)
+	{
+		// 상세 화면 위치 (왼쪽 / 오른쪽) → 다시 배치
+		m_detailLeft = dlg.m_detailLeft;
+		AfxGetApp()->WriteProfileInt(L"Settings", L"DetailLeft", m_detailLeft ? 1 : 0);
+		if (m_layoutReady)
+		{
+			CRect client;
+			GetClientRect(&client);
+			LayoutControls(client.Width(), client.Height());
+			RedrawWindow(nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);   // 양쪽이 바뀌었으므로 전체
+		}
+	}
+	if (result == IDOK && dlg.m_mergeParts != m_mergeParts)
+	{
+		// 분할 영상 합쳐서 보기 켜기 / 끄기 → 격자 칸 다시 (선택한 영상은 유지)
+		m_mergeParts = dlg.m_mergeParts;
+		AfxGetApp()->WriteProfileInt(L"Settings", L"MergeParts", m_mergeParts ? 1 : 0);
+		m_overlayFade.clear();   // 격자 칸 번호가 바뀜
+		ApplyFilter();
 	}
 	if (result == IDOK && dlg.m_shotCols != m_shotCols)
 	{
@@ -4572,7 +4799,12 @@ void CRuliManagerDlg::UpdateLeftPane()
 	if (m_drillPanel.GetSafeHwnd()) m_drillPanel.ShowWindow(drillHeader ? SW_SHOW : SW_HIDE);
 	// 영상은 격자만 표시 (목록 컨트롤은 숨겨 둔 채 선택/데이터 관리용으로만 사용)
 	m_list.ShowWindow(SW_HIDE);
-	m_grid.ShowWindow(showVideos ? SW_SHOW : SW_HIDE);
+	m_grid.ShowWindow(showVideos && !YearViewActive() ? SW_SHOW : SW_HIDE);   // 연도별 보기에서는 격자(도구줄 포함) 숨김
+	if (m_yearView.GetSafeHwnd())
+		m_yearView.ShowWindow(showVideos && YearViewActive() ? SW_SHOW : SW_HIDE);   // 배우 출연작 [연도별]
+	for (CDarkButton& b : m_drillViewBtns)
+		if (b.GetSafeHwnd())
+			b.ShowWindow(drillHeader ? SW_SHOW : SW_HIDE);   // [격자] [연도별] 은 배우 출연작 화면에서만
 
 	// [표시: 목록 | 격자]는 스튜디오/태그 목록에서만, [정렬]은 영상이 보일 때만
 	const UINT viewIds[] = { IDC_STATIC_VIEW, IDC_RADIO_LISTVIEW, IDC_RADIO_GRIDVIEW };
@@ -5661,24 +5893,376 @@ void CRuliManagerDlg::OnVideoPasteInfo()
 
 	// 읽어낸 항목만 기존 정보에 덮어쓰기 (없는 항목은 그대로 유지)
 	VideoItem fetched;
-	m_lib.ApplyVideoText(fetched, info);
+	std::vector<CString> webTags;   // 붙여넣은 태그 (목록 이름으로 바꾸기 전)
+	m_lib.ApplyVideoText(fetched, info, &webTags);
 	VideoItem merged = m_lib.items[idx];
 	if (!fetched.code.IsEmpty())    merged.code = fetched.code;
 	if (!fetched.title.IsEmpty())   merged.title = fetched.title;
 	if (!fetched.release.IsEmpty()) merged.release = fetched.release;
-	if (!fetched.actors.IsEmpty())  { merged.actors = fetched.actors; merged.actorAliases = fetched.actorAliases; }
-	if (!fetched.studio.IsEmpty())
+	if (!fetched.actors.IsEmpty())
 	{
-		if (fetched.studio != merged.studio)
+		// 출연: 붙여넣은 "출연" 의 배우만 (기존 배우는 바꿈), 등록된 배우의 과거 이름(다른 이름)으로 적혀 있으면 참여 별칭 = 그 과거 이름
+		//  - 이름 판단: 대표 이름 그대로 → 다른 이름 그대로 → 언어별로 대표 이름과 같음 → 언어별로 다른 이름과 같음 (앞쪽 우선)
+		std::vector<CString> names;
+		auto addUnique = [](std::vector<CString>& v, const CString& s)
 		{
-			merged.label = fetched.label;   // 스튜디오가 바뀌면 예전 레이블 · 시리즈는 버림
-			merged.series = fetched.series;
+			for (const CString& e : v)
+				if (e.CompareNoCase(s) == 0) return;
+			v.push_back(s);
+		};
+		// ApplyVideoText 가 이미 정리했을 수 있음: fetched.actors = 대표 이름, fetched.actorAliases = 그 작품의 과거 이름 → 과거 이름을 되살림
+		const std::vector<CString> fetchedCredited = CVideoLibrary::SplitList(fetched.actorAliases);
+		for (const CString& n : CVideoLibrary::SplitList(fetched.actors))
+		{
+			int ai = -1;
+			CString alias;   // 과거 이름으로 적혔으면 그 다른 이름 (등록된 표기)
+			{
+				const int exact = m_lib.FindActor(n);
+				if (exact >= 0)
+				{
+					ai = exact;
+					for (const CString& c : fetchedCredited)
+						if (m_lib.FindActorByAnyName(c) == exact && c.CompareNoCase(m_lib.actors[exact].name) != 0) { alias = c; break; }
+				}
+			}
+			// 1) 대표 이름 · 다른 이름 그대로
+			for (size_t i = 0; i < m_lib.actors.size() && ai < 0; ++i)
+			{
+				const ActorInfo& a = m_lib.actors[i];
+				if (a.name.CompareNoCase(n) == 0) { ai = static_cast<int>(i); break; }
+				for (const CString& al : CVideoLibrary::SplitList(a.aliases))
+					if (al.CompareNoCase(n) == 0) { ai = static_cast<int>(i); alias = al; break; }
+			}
+			// 2) 언어별 이름이 같음 (대표 이름 먼저)
+			for (size_t i = 0; i < m_lib.actors.size() && ai < 0; ++i)
+				if (CVideoLibrary::SameNameByLang(m_lib.actors[i].name, n)) ai = static_cast<int>(i);
+			for (size_t i = 0; i < m_lib.actors.size() && ai < 0; ++i)
+				for (const CString& al : CVideoLibrary::SplitList(m_lib.actors[i].aliases))
+					if (CVideoLibrary::SameNameByLang(al, n)) { ai = static_cast<int>(i); alias = al; break; }
+			if (ai < 0)
+			{
+				addUnique(names, n);   // 등록 안 된 배우: 그대로 (저장할 때 배우 목록에 추가)
+				continue;
+			}
+			// 확인 창의 "배우:" 에는 이 작품에서 쓴 이름 그대로 (과거 이름이면 과거 이름) → 적용할 때 배우 이름 + 참여 별칭으로 정리됨
+			addUnique(names, alias.IsEmpty() ? m_lib.actors[ai].name : alias);
 		}
-		merged.studio = fetched.studio;
+		merged.actors = CVideoLibrary::JoinList(names);
+		merged.actorAliases.Empty();   // 참여 별칭은 "배우:" 의 과거 이름으로 정해짐 (따로 적지 않음)
 	}
-	if (!fetched.label.IsEmpty())   merged.label = fetched.label;
-	if (!fetched.series.IsEmpty())  merged.series = fetched.series;
+	// 제작사 · 레이블: 이미 설정된 값과 다른 값을 붙여넣으면 연결 창 (왼쪽 = 붙여넣은 값, 오른쪽 = 지금 값)
+	//  - 연결 = 같은 제작사 · 레이블 → 지금 값 유지 + 붙여넣은 이름을 그 항목의 서브이름으로 (다음부터 자동으로 같은 것)
+	//  - 연결 안 된 붙여넣은 값: 처음 "추가" = 그 종류(제작사 / 레이블)의 값을 붙여넣은 값으로 바꿈, "무시" = 안 바꿈
+	//  - 연결 안 된 지금 값: 같은 종류의 붙여넣은 값이 있으면 처음 "지움", 없으면 처음 "유지"
+	bool studioLinkDone = false;
+	{
+		CString curStudio = merged.studio, curLabel = merged.label;
+		curStudio.Trim();
+		curLabel.Trim();
+		auto sameStudio = [this](const CString& a, const CString& b)
+		{
+			if (a.CompareNoCase(b) == 0) return true;
+			const int x = m_lib.FindStudioLoose(a), y = m_lib.FindStudioLoose(b);
+			return x >= 0 && x == y;
+		};
+		auto sameLabel = [this](const CString& a, const CString& b)
+		{
+			if (a.CompareNoCase(b) == 0) return true;
+			const int x = m_lib.FindLabelLoose(a), y = m_lib.FindLabelLoose(b);
+			return x >= 0 && x == y;
+		};
+		const bool conflict = (!fetched.studio.IsEmpty() && !curStudio.IsEmpty() && !sameStudio(fetched.studio, curStudio)) ||
+		                      (!fetched.label.IsEmpty() && !curLabel.IsEmpty() && !sameLabel(fetched.label, curLabel));
+		if (conflict)
+		{
+			struct Item { int kind; CString name; CString disp; };   // kind 0 = 제작사, 1 = 레이블
+			auto disp = [](int kind, const CString& n) { return CString(kind == 0 ? L"제작사: " : L"레이블: ") + n; };
+			std::vector<Item> web, cur;
+			if (!fetched.studio.IsEmpty()) web.push_back({ 0, fetched.studio, disp(0, fetched.studio) });
+			if (!fetched.label.IsEmpty())  web.push_back({ 1, fetched.label, disp(1, fetched.label) });
+			if (!curStudio.IsEmpty())      cur.push_back({ 0, curStudio, disp(0, curStudio) });
+			if (!curLabel.IsEmpty())       cur.push_back({ 1, curLabel, disp(1, curLabel) });
+			auto sameItem = [&](const Item& w, const Item& c)   // 같은 항목인지 (종류가 달라도 레이블 ↔ 레이블 이름 등으로 비교)
+			{
+				return (c.kind == 0) ? sameStudio(w.name, c.name) : sameLabel(w.name, c.name);
+			};
+			std::vector<CString> curDisp, webDisp, autoLink;
+			std::vector<bool> addDefault, keepDefault;
+			for (const Item& c : cur) curDisp.push_back(c.disp);
+			for (const Item& w : web)
+			{
+				webDisp.push_back(w.disp);
+				CString link;
+				for (const Item& c : cur)
+					if (sameItem(w, c)) { link = c.disp; break; }
+				autoLink.push_back(link);
+				addDefault.push_back(link.IsEmpty());
+			}
+			for (const Item& c : cur)
+			{
+				bool linked = false, sameKindWeb = false;
+				for (size_t i = 0; i < web.size(); ++i)
+				{
+					if (autoLink[i] == c.disp) linked = true;
+					if (web[i].kind == c.kind && autoLink[i].IsEmpty()) sameKindWeb = true;
+				}
+				keepDefault.push_back(linked || !sameKindWeb);
+			}
+			CTagLinkDlg link(curDisp, webDisp, autoLink, addDefault, this);
+			link.m_caption = L"제작사 · 레이블 연결";
+			link.m_guide = L"붙여넣은 제작사 · 레이블(왼쪽)을 지금 영상에 설정된 값(오른쪽)과 연결하세요. 연결하면 지금 값을 유지하고 붙여넣은 이름을 그 항목의 서브이름으로 저장합니다(다음부터 자동으로 같은 것). "
+				L"연결 안 된 왼쪽 칩 = 추가(그 종류의 값을 바꿈) ↔ 무시, 연결 안 된 오른쪽 칩 = 지움 ↔ 유지 (누르면 전환).";
+			link.m_headCur = L"지금 값";
+			link.m_headWeb = L"붙여넣은 값";
+			link.m_keepDefault = keepDefault;
+			if (link.DoModal() != IDOK)
+				return;   // 취소: 붙여넣기 전체 취소
+			auto keptCur = [&](const Item& c)
+			{
+				for (const CString& k : link.m_keepTags)
+					if (k == c.disp) return true;
+				return false;
+			};
+			CString newStudio, newLabel;
+			for (const Item& c : cur)
+				if (keptCur(c)) (c.kind == 0 ? newStudio : newLabel) = c.name;
+			bool aliasChanged = false;
+			for (size_t i = 0; i < web.size() && i < link.m_result.size(); ++i)
+			{
+				const CTagLinkDlg::Result& r = link.m_result[i];
+				const Item& w = web[i];
+				if (!r.linked.IsEmpty())
+				{
+					// 연결: 붙여넣은 이름 → 그 항목의 서브이름 (이미 같은 항목으로 찾아지면 그대로)
+					for (const Item& c : cur)
+					{
+						if (c.disp != r.linked || sameItem(w, c))
+							continue;
+						const int n = (c.kind == 0) ? m_lib.FindStudioLoose(c.name) : m_lib.FindLabelLoose(c.name);
+						if (n < 0)
+							continue;   // 목록에 없는 이름
+						NamedInfo& t = (c.kind == 0) ? m_lib.studios[n] : m_lib.labelInfos[n];
+						bool dup = false;
+						for (const CString& e : CVideoLibrary::SplitLines(t.subName))
+							if (e.CompareNoCase(w.name) == 0) { dup = true; break; }
+						if (!dup && w.name.CompareNoCase(t.name) != 0)
+						{
+							t.subName.Trim();
+							t.subName += (t.subName.IsEmpty() ? CString() : CString(L"\n")) + w.name;
+							aliasChanged = true;
+						}
+					}
+				}
+				else if (r.addNew)
+					(w.kind == 0 ? newStudio : newLabel) = w.name;   // 그 종류의 값을 붙여넣은 값으로
+			}
+			if (!sameStudio(newStudio, curStudio))
+				merged.series = fetched.series;   // 제작사가 바뀌면 시리즈도 붙여넣은 값 (없으면 비움)
+			else if (!fetched.series.IsEmpty())
+				merged.series = fetched.series;
+			merged.studio = newStudio;
+			merged.label = newLabel;
+			if (aliasChanged)
+			{
+				if (!m_lib.Save())
+					AfxMessageBox(L"라이브러리 파일을 저장하지 못했습니다.", MB_ICONWARNING);
+				MarkCategoriesDirty();
+			}
+			studioLinkDone = true;
+		}
+	}
+	if (!studioLinkDone)
+	{
+		if (!fetched.studio.IsEmpty())
+		{
+			if (fetched.studio != merged.studio)
+			{
+				merged.label = fetched.label;   // 스튜디오가 바뀌면 예전 레이블 · 시리즈는 버림
+				merged.series = fetched.series;
+			}
+			merged.studio = fetched.studio;
+		}
+		if (!fetched.label.IsEmpty())   merged.label = fetched.label;
+		if (!fetched.series.IsEmpty())  merged.series = fetched.series;
+	}
 	if (!fetched.tags.IsEmpty())    merged.tags = fetched.tags;
+
+	// 태그 연결: 붙여넣은 태그 중 현재 영상 태그에 없는 것이 있으면 현재 태그와 연결하는 창 (연결한 이름은 그 태그의 다른 이름으로)
+	//  - 영상 태그 = 현재 태그 + 추가로 고른 붙여넣은 태그 (병합), 현재 태그가 없으면 예전처럼 붙여넣은 태그 그대로
+	const std::vector<CString> curTags = CVideoLibrary::SplitList(m_lib.items[idx].tags);
+	if (!webTags.empty() && !curTags.empty())
+	{
+		auto resolved = [this](const CString& t)   // DB 태그 이름 (없으면 그대로)
+		{
+			const int n = m_lib.FindNamed(LIST_TAG, t);
+			return n >= 0 ? m_lib.tagInfos[n].name : t;
+		};
+		auto findCur = [&curTags, &resolved](const CString& t) -> CString   // 현재 태그 중 같은 태그
+		{
+			const CString r = resolved(t);
+			for (const CString& c : curTags)
+				if (c.CompareNoCase(t) == 0 || c.CompareNoCase(r) == 0 || resolved(c).CompareNoCase(r) == 0)
+					return c;
+			return CString();
+		};
+		std::vector<CString> autoLink;
+		std::vector<bool> addDefault;
+		bool anyUnlinked = false;
+		std::vector<bool> curLinked(curTags.size(), false);
+		for (const CString& w : webTags)
+		{
+			const CString cur = findCur(w);   // 같은 태그로 확인된 것만 처음부터 연결
+			autoLink.push_back(cur);
+			addDefault.push_back(cur.IsEmpty());   // 연결 안 된 붙여넣은 태그는 무조건 추가 상태로 시작
+			if (cur.IsEmpty())
+				anyUnlinked = true;
+			for (size_t c = 0; c < curTags.size(); ++c)
+				if (!cur.IsEmpty() && curTags[c].CompareNoCase(cur) == 0)
+					curLinked[c] = true;
+		}
+		for (bool l : curLinked)
+			if (!l)
+				anyUnlinked = true;   // 연결 안 된 현재 태그 (처음에 지움 상태) 도 창에서 확인
+		std::vector<CString> out = curTags;   // 모두 연결됨 (창 없음): 현재 태그 그대로
+		if (anyUnlinked)
+		{
+			CTagLinkDlg link(curTags, webTags, autoLink, addDefault, this);
+			if (link.DoModal() != IDOK)
+				return;   // 취소: 붙여넣기 전체 취소
+			out = link.m_keepTags;   // 현재 태그 중 연결된 것 + 유지로 바꾼 것만 (나머지는 지움)
+			// 1) 연결 결과 정리: 다른 이름 추가 / 태그 병합 / 영상에 추가
+			std::vector<std::pair<CString, CString>> aliasList;   // (현재 태그, 그 태그의 다른 이름으로 넣을 웹 이름) - 웹 이름이 아직 어느 태그도 아님
+			std::vector<std::pair<CString, CString>> mergeList;   // (지울 현재 태그, 남길 태그 = 웹 이름이 이미 가리키는 태그) - 왼쪽 기준 병합
+			for (const CTagLinkDlg::Result& r : link.m_result)
+			{
+				if (!r.linked.IsEmpty())
+				{
+					CString web = r.web;
+					web.Trim();
+					if (web.IsEmpty() || web.CompareNoCase(r.linked) == 0)
+						continue;   // 같은 이름
+					const int n = m_lib.FindNamed(LIST_TAG, r.linked);
+					const int wn = m_lib.FindNamed(LIST_TAG, web);
+					if (wn >= 0 && wn == n)
+						continue;   // 이미 같은 태그 (이름 · 다른 이름 · 영어 · 일본어 이름)
+					if (wn >= 0)
+					{
+						// 웹 이름이 이미 다른 태그 → 왼쪽(웹) 태그 기준으로 병합, 오른쪽 태그 이름은 다른 이름으로
+						const CString srcName = (n >= 0) ? m_lib.tagInfos[n].name : r.linked;
+						const CString dstName = m_lib.tagInfos[wn].name;
+						if (std::find_if(mergeList.begin(), mergeList.end(), [&](const auto& m) { return m.first.CompareNoCase(srcName) == 0; }) == mergeList.end())
+							mergeList.push_back({ srcName, dstName });
+					}
+					else
+						aliasList.push_back({ r.linked, web });   // 웹 이름 → 오른쪽 태그의 다른 이름
+					continue;
+				}
+				if (!r.addNew)
+					continue;   // 무시
+				const CString name = resolved(r.web);
+				if (std::find_if(out.begin(), out.end(), [&](const CString& o) { return o.CompareNoCase(name) == 0 || resolved(o).CompareNoCase(name) == 0; }) == out.end())
+					out.push_back(name);
+			}
+			// 2) 병합은 다른 영상의 태그도 바꾸므로 한 번 확인
+			if (!mergeList.empty())
+			{
+				const std::map<CString, int> counts = m_lib.CountNamed(LIST_TAG);
+				CString msg = L"연결한 태그 중 이미 있는 태그가 있어 왼쪽(붙여넣은) 태그 기준으로 병합합니다.\n\n";
+				for (const auto& m : mergeList)
+				{
+					CString key = m.first;
+					key.MakeLower();
+					auto it = counts.find(key);
+					CString line;
+					line.Format(L"  '%s' → '%s'  (동영상 %d개)\n", static_cast<LPCWSTR>(m.first), static_cast<LPCWSTR>(m.second), it != counts.end() ? it->second : 0);
+					msg += line;
+				}
+				msg += L"\n오른쪽 태그는 모든 동영상에서 왼쪽 태그로 바뀌고, 이름은 왼쪽 태그의 다른 이름으로 들어간 뒤 태그 목록에서 삭제됩니다. 병합할까요?\n(아니요: 병합하지 않고 연결만 유지)";
+				if (AfxMessageBox(msg, MB_YESNO | MB_ICONQUESTION) != IDYES)
+					mergeList.clear();
+			}
+			bool libChanged = false;
+			auto addSub = [](NamedInfo& t, const CString& name)   // 다른 이름(줄바꿈 구분)에 추가 (이름 · 이미 있는 다른 이름은 건너뜀)
+			{
+				CString s = name;
+				s.Trim();
+				if (s.IsEmpty() || s.CompareNoCase(t.name) == 0)
+					return;
+				for (const CString& e : CVideoLibrary::SplitLines(t.subName))
+					if (e.CompareNoCase(s) == 0)
+						return;
+				t.subName.Trim();
+				t.subName += (t.subName.IsEmpty() ? CString() : CString(L"\n")) + s;
+			};
+			// 3) 병합: 영상 태그 바꿈 → 오른쪽 태그의 이름 · 다른 이름 · 영어 · 일본어 이름을 왼쪽 태그의 다른 이름으로 → 오른쪽 태그 삭제
+			for (const auto& m : mergeList)
+			{
+				const int si = m_lib.FindNamed(LIST_TAG, m.first);
+				int di = m_lib.FindNamed(LIST_TAG, m.second);
+				if (di < 0 || si == di)
+					continue;
+				m_lib.RenameNamedInVideos(LIST_TAG, m.first, m.second);   // 모든 영상 (이미 왼쪽 태그가 있으면 하나로)
+				if (si >= 0)
+				{
+					const NamedInfo s = m_lib.tagInfos[si];
+					NamedInfo& d = m_lib.tagInfos[di];
+					addSub(d, s.name);
+					for (const CString& e : CVideoLibrary::SplitLines(s.subName))
+						addSub(d, e);
+					if (d.nameEn.IsEmpty()) d.nameEn = s.nameEn; else addSub(d, s.nameEn);
+					if (d.nameJa.IsEmpty()) d.nameJa = s.nameJa; else addSub(d, s.nameJa);
+					if (d.memo.IsEmpty()) d.memo = s.memo;
+					if (d.image.IsEmpty()) d.image = s.image;
+					if (s.favorite) d.favorite = true;
+					m_lib.tagInfos.erase(m_lib.tagInfos.begin() + si);
+				}
+				else
+					addSub(m_lib.tagInfos[di], m.first);   // 목록에 없던 태그: 이름만 다른 이름으로
+				for (CString& o : out)   // 이 영상의 남길 태그도 왼쪽 태그로
+					if (o.CompareNoCase(m.first) == 0)
+						o = m.second;
+				libChanged = true;
+			}
+			// 4) 다른 이름 추가: 웹 이름이 아직 어느 태그도 아니면 오른쪽 태그의 다른 이름으로 (태그 목록에 없는 태그면 등록)
+			for (const auto& al : aliasList)
+			{
+				if (m_lib.FindNamed(LIST_TAG, al.second) >= 0)
+					continue;   // 그사이 다른 태그 이름이 됨
+				int n = m_lib.FindNamed(LIST_TAG, al.first);
+				if (n < 0)
+				{
+					NamedInfo info;
+					info.name = al.first;
+					m_lib.tagInfos.push_back(info);
+					n = static_cast<int>(m_lib.tagInfos.size()) - 1;
+				}
+				addSub(m_lib.tagInfos[n], al.second);
+				libChanged = true;
+			}
+			// 남길 태그 중복 정리 (병합으로 같은 태그가 됐을 수 있음)
+			{
+				std::vector<CString> uniq;
+				for (const CString& o : out)
+					if (std::find_if(uniq.begin(), uniq.end(), [&](const CString& u) { return u.CompareNoCase(o) == 0; }) == uniq.end())
+						uniq.push_back(o);
+				out.swap(uniq);
+			}
+			if (libChanged)
+			{
+				// 다른 이름 · 병합은 연결 창 확인 때 바로 저장 (다음 확인 창을 취소해도 남음)
+				if (!m_lib.Save())
+					AfxMessageBox(L"라이브러리 파일을 저장하지 못했습니다.", MB_ICONWARNING);
+				MarkCategoriesDirty();
+				if (!mergeList.empty())
+				{
+					m_grid.Invalidate(FALSE);
+					if (m_curItem >= 0)
+						ShowDetails(m_curItem);   // 상세 칸의 태그도 병합된 이름으로 (나중에 저장할 때 예전 태그가 되살아나지 않게)
+				}
+			}
+		}
+		merged.tags = CVideoLibrary::JoinList(out);
+	}
 
 	// 2단계: 읽어낸 결과를 확인 / 수정한 뒤 적용
 	CTextInfoDlg dlg2(L"읽어낸 정보 확인 - " + fileName,
@@ -5686,7 +6270,7 @@ void CRuliManagerDlg::OnVideoPasteInfo()
 		CVideoLibrary::VideoInfoText(merged), this);
 	if (dlg2.DoModal() != IDOK)
 		return;
-	ApplyTextToVideo(idx, dlg2.m_text);
+	ApplyTextToVideo(idx, dlg2.m_text);   // 저장 포함
 }
 
 void CRuliManagerDlg::ApplyTextToVideo(int idx, const CString& text)
@@ -5744,6 +6328,289 @@ void CRuliManagerDlg::OnActorTextInfo()
 	RebuildActorGrid();
 	ShowActorInfo(SelectedActorIndex());
 	MarkCategoriesDirty();
+}
+
+void CRuliManagerDlg::OnActorPasteInfo()
+{
+	// 배우 탭: 배우 프로필 사이트 화면을 복사한 글 → 읽어낸 항목만 덮어써서 확인 창 → 적용 (영상의 [웹페이지 내용 붙여넣기] 와 같은 흐름)
+	if (!IsActorGridMode())
+		return;
+	const int idx = SelectedActorIndex();
+	if (idx < 0 || idx >= static_cast<int>(m_lib.actors.size()))
+		return;
+	const CString name = m_lib.actors[idx].name;
+
+	// 1단계: 사이트 화면 글 붙여넣기
+	CTextInfoDlg dlg(L"웹페이지 내용 붙여넣기 - " + name,
+		L"배우 프로필 사이트 화면을 드래그해 복사(Ctrl+C)한 뒤 여기에 붙여넣으세요(Ctrl+V).\r\n"
+		L"생년월일 / 키 / 치수(B W H) / 컵 / 국적 / 데뷔 / 은퇴 / 다른 이름, 生年月日 / 身長 / スリーサイズ / カップ / 出身地 / デビュー / 別名 같은 항목을 찾아 읽습니다.",
+		CString(), this);
+	dlg.m_pasteButton = true;   // [공백라인 제거]
+	if (dlg.DoModal() != IDOK)
+		return;
+	const CString info = CVideoLibrary::ParsePastedActorText(dlg.m_text);
+	// "이름: …" 줄 (붙여넣은 글 맨 앞의 ":" 없는 줄들 → "한글(English, 日本語)") - ApplyActorText 는 이름을 읽지 않으므로 따로
+	auto nameLineOf = [](const CString& text) -> CString
+	{
+		CString t = text;
+		t.Replace(L"\r\n", L"\n");
+		int pos = 0;
+		while (pos <= t.GetLength())
+		{
+			int nl = t.Find(L'\n', pos);
+			if (nl < 0) nl = t.GetLength();
+			CString l = t.Mid(pos, nl - pos);
+			pos = nl + 1;
+			l.Trim();
+			const int sep = l.FindOneOf(L":\xFF1A");
+			if (sep <= 0)
+				continue;
+			CString k = l.Left(sep);
+			k.Trim();
+			if (k == L"이름" || k.CompareNoCase(L"name") == 0)
+			{
+				CString v = l.Mid(sep + 1);
+				v.Trim();
+				CVideoLibrary::RemoveListCommas(v);   // 구분 쉼표는 이름에 쓸 수 없음 (괄호 안 쉼표는 허용)
+				return v;
+			}
+		}
+		return CString();
+	};
+	const CString pastedName = nameLineOf(info);
+	ActorInfo fetched;
+	fetched.name = pastedName.IsEmpty() ? name : pastedName;   // 다른 이름이 배우 이름과 같으면 빼기 위해
+	const bool anyField = !info.IsEmpty() && CVideoLibrary::ApplyActorText(fetched, info);
+	if (!anyField && pastedName.IsEmpty())
+	{
+		AfxMessageBox(L"붙여넣은 내용에서 배우 정보를 찾지 못했습니다.", MB_ICONINFORMATION);
+		return;
+	}
+
+	// 읽어낸 항목만 기존 정보에 덮어쓰기 (없는 항목은 그대로, 다른 이름은 합침)
+	ActorInfo merged = m_lib.actors[idx];
+	if (!pastedName.IsEmpty())
+		merged.name = pastedName;   // 확인 창의 "이름:" 줄 (고치면 그 이름으로)
+	auto take = [](CString& dst, const CString& src) { if (!src.IsEmpty()) dst = src; };
+	take(merged.gender, fetched.gender);
+	take(merged.birth, fetched.birth);
+	take(merged.nationality, fetched.nationality);
+	take(merged.height, fetched.height);
+	take(merged.bust, fetched.bust);
+	take(merged.waist, fetched.waist);
+	take(merged.hip, fetched.hip);
+	take(merged.cup, fetched.cup);
+	take(merged.debut, fetched.debut);
+	take(merged.retire, fetched.retire);
+	if (!fetched.aliases.IsEmpty())
+	{
+		// 다른 이름 (사이트에는 이름 변경 순서 = 오래된 것부터 → ApplyActorText 가 이미 역순으로 읽음: fetched.aliases = 최근 이름부터)
+		//  - 배우 관리 창 이름 콤보에 그 순서대로 (현재 이름 다음에 가장 최근 과거 이름)
+		//  - 현재 이름과 같은 이름(언어 단위로 같음)은 버림 (변경 내역의 마지막 = 현재 이름)
+		//  - 이미 등록된 다른 이름과 같은 이름이면: 구성요소(언어 수)가 더 많은 쪽으로 대체 ("아오이" → "아오이(Aoi, 葵)")
+		//  - 사이트에 없는 기존 다른 이름은 뒤에 그대로 남김
+		std::vector<CString> existing = CVideoLibrary::SplitList(merged.aliases);
+		std::vector<bool> used(existing.size(), false);
+		std::vector<CString> result;
+		auto sameName = [](const CString& a, const CString& b)
+		{
+			return a.CompareNoCase(b) == 0 || CVideoLibrary::SameNameByLang(a, b);
+		};
+		for (const CString& web : CVideoLibrary::SplitList(fetched.aliases))
+		{
+			if (sameName(web, merged.name))
+				continue;   // 현재 이름
+			bool dup = false;
+			for (const CString& r : result)
+				if (sameName(r, web)) { dup = true; break; }
+			if (dup)
+				continue;
+			CString pick = web;
+			for (size_t e = 0; e < existing.size(); ++e)
+			{
+				if (used[e] || !sameName(existing[e], web))
+					continue;
+				used[e] = true;
+				if (CVideoLibrary::NameLangCount(existing[e]) >= CVideoLibrary::NameLangCount(web))
+					pick = existing[e];   // 기존 이름이 같거나 더 완전하면 그대로
+			}
+			result.push_back(pick);
+		}
+		for (size_t e = 0; e < existing.size(); ++e)
+		{
+			if (used[e] || sameName(existing[e], merged.name))
+				continue;
+			bool dup = false;
+			for (const CString& r : result)
+				if (sameName(r, existing[e])) { dup = true; break; }
+			if (!dup)
+				result.push_back(existing[e]);
+		}
+		merged.aliases = CVideoLibrary::JoinList(result);
+	}
+
+	// 2단계: 확인 / 수정 후 적용 (텍스트로 정보 입력과 같은 형식 · 같은 적용)
+	CTextInfoDlg dlg2(L"읽어낸 정보 확인 - " + name,
+		L"붙여넣은 내용에서 읽어낸 결과입니다. 확인하고 필요하면 고친 뒤 확인을 누르면 적용됩니다. (\"이름:\" 을 바꾸면 배우 이름도 바뀜, 별점 · 즐겨찾기 · 메모는 그대로)",
+		CVideoLibrary::ActorInfoText(merged), this);
+	if (dlg2.DoModal() != IDOK)
+		return;
+	ActorInfo a = m_lib.actors[idx];
+	CVideoLibrary::ClearActorTextFields(a);
+	CVideoLibrary::ApplyActorText(a, dlg2.m_text);
+	// 이름이 바뀌었으면 배우 이름 변경 (영상의 배우 이름도, 예전 이름이 언어 단위로도 다르면 다른 이름으로 남김)
+	{
+		const CString newName = nameLineOf(dlg2.m_text);
+		if (!newName.IsEmpty() && newName != a.name)
+		{
+			const int other = m_lib.FindActor(newName);
+			if (other >= 0 && other != idx)
+				AfxMessageBox(L"같은 이름의 배우가 이미 있어 이름은 바꾸지 않았습니다.\n\n" + newName, MB_ICONWARNING);
+			else
+			{
+				const CString oldName = a.name;
+				m_lib.RenameActorInVideos(oldName, newName);
+				a.name = newName;
+				if (!CVideoLibrary::SameNameByLang(oldName, newName))
+				{
+					std::vector<CString> al = CVideoLibrary::SplitList(a.aliases);
+					al.push_back(oldName);
+					a.aliases = CVideoLibrary::JoinList(al);
+				}
+			}
+		}
+	}
+	m_lib.actors[idx] = a;
+
+	// 과거 이름(다른 이름)과 언어별 이름이 같은 다른 배우가 따로 등록되어 있으면 → 이 배우로 병합
+	//  - 그 배우로 등록된 영상은 이 배우 + 참여 별칭 = 그 과거 이름 (마지막 이름이 아니라 그때 쓰던 이름으로)
+	//  - 그 배우의 정보는 이 배우에 비어 있는 칸만 채우고, 다른 이름은 합친 뒤 그 배우 항목은 삭제
+	bool mergedAny = false;
+	{
+		struct MergeItem { CString other; CString past; };
+		std::vector<MergeItem> merges;
+		for (const CString& past : CVideoLibrary::SplitList(a.aliases))
+		{
+			for (size_t j = 0; j < m_lib.actors.size(); ++j)
+			{
+				if (static_cast<int>(j) == idx)
+					continue;
+				const ActorInfo& o = m_lib.actors[j];
+				bool similar = CVideoLibrary::SameNameByLang(o.name, past);
+				for (const CString& oa : CVideoLibrary::SplitList(o.aliases))
+					if (!similar && CVideoLibrary::SameNameByLang(oa, past)) similar = true;
+				if (!similar)
+					continue;
+				bool dup = false;
+				for (const MergeItem& m : merges)
+					if (m.other.CompareNoCase(o.name) == 0) { dup = true; break; }
+				if (!dup)
+					merges.push_back({ o.name, past });
+			}
+		}
+		if (!merges.empty())
+		{
+			CString msg;
+			msg.Format(L"과거 이름과 같은 배우가 따로 등록되어 있습니다. '%s'(으)로 병합할까요?\n\n", static_cast<LPCWSTR>(a.name));
+			for (const MergeItem& m : merges)
+			{
+				CString line;
+				line.Format(L"  '%s' → 과거 이름 '%s'  (영상 %d개)\n", static_cast<LPCWSTR>(m.other), static_cast<LPCWSTR>(m.past), m_lib.CountVideosWithActor(m.other));
+				msg += line;
+			}
+			msg += L"\n병합하면 그 배우의 영상은 이 배우(참여 별칭 = 과거 이름)로 바뀌고, 그 배우 정보는 비어 있는 칸만 가져온 뒤 삭제됩니다.";
+			if (AfxMessageBox(msg, MB_YESNO | MB_ICONQUESTION) != IDYES)
+				merges.clear();
+		}
+		for (const MergeItem& m : merges)
+		{
+			const int j = m_lib.FindActor(m.other);
+			const int cur = m_lib.FindActor(a.name);
+			if (j < 0 || cur < 0 || j == cur)
+				continue;
+			// 영상: 그 배우(이름 · 별칭 표기) → 이 배우, 참여 별칭은 과거 이름으로
+			for (VideoItem& v : m_lib.items)
+			{
+				std::vector<CString> list = CVideoLibrary::SplitList(v.actors);
+				bool found = false;
+				for (CString& n : list)
+					if (m_lib.FindActorByAnyName(n) == j) { n = a.name; found = true; }
+				if (!found)
+					continue;
+				std::vector<CString> credited;
+				for (const CString& c : CVideoLibrary::SplitList(v.actorAliases))
+				{
+					const int who = m_lib.FindActorByAnyName(c);
+					if (who != j && who != cur)
+						credited.push_back(c);   // 다른 배우의 참여 별칭은 그대로
+				}
+				credited.push_back(m.past);
+				v.actors = CVideoLibrary::JoinList(CVideoLibrary::SplitList(CVideoLibrary::JoinList(list)));
+				v.actorAliases = CVideoLibrary::JoinList(CVideoLibrary::SplitList(CVideoLibrary::JoinList(credited)));
+			}
+			// 배우 정보: 비어 있는 칸만 채움
+			ActorInfo& dst = m_lib.actors[cur];
+			const ActorInfo src = m_lib.actors[j];
+			auto fill = [](CString& d, const CString& s) { if (d.IsEmpty() && !s.IsEmpty()) d = s; };
+			fill(dst.photo, src.photo);
+			fill(dst.gender, src.gender);
+			fill(dst.birth, src.birth);
+			fill(dst.nationality, src.nationality);
+			fill(dst.height, src.height);
+			fill(dst.debut, src.debut);
+			fill(dst.retire, src.retire);
+			fill(dst.bust, src.bust);
+			fill(dst.waist, src.waist);
+			fill(dst.hip, src.hip);
+			fill(dst.cup, src.cup);
+			fill(dst.memo, src.memo);
+			if (!src.urls.IsEmpty())
+			{
+				std::vector<CString> urls = CVideoLibrary::SplitUrls(dst.urls);
+				for (const CString& u : CVideoLibrary::SplitUrls(src.urls))
+					if (std::find_if(urls.begin(), urls.end(), [&](const CString& e) { return e.CompareNoCase(u) == 0; }) == urls.end())
+						urls.push_back(u);
+				dst.urls = CVideoLibrary::JoinUrls(urls);
+			}
+			dst.rating = (std::max)(dst.rating, src.rating);
+			dst.favorite = dst.favorite || src.favorite;
+			// 다른 이름: 그 배우의 이름 · 다른 이름 중 아직 없는 것만 뒤에 (언어별로 같은 이름은 구성요소가 많은 쪽 유지)
+			std::vector<CString> al = CVideoLibrary::SplitList(dst.aliases);
+			std::vector<CString> incoming = CVideoLibrary::SplitList(src.aliases);
+			incoming.insert(incoming.begin(), src.name);
+			for (const CString& n : incoming)
+			{
+				if (CVideoLibrary::SameNameByLang(n, dst.name))
+					continue;
+				bool done = false;
+				for (CString& e : al)
+				{
+					if (!CVideoLibrary::SameNameByLang(e, n))
+						continue;
+					if (CVideoLibrary::NameLangCount(n) > CVideoLibrary::NameLangCount(e))
+						e = n;
+					done = true;
+					break;
+				}
+				if (!done)
+					al.push_back(n);
+			}
+			dst.aliases = CVideoLibrary::JoinList(al);
+			m_lib.actors.erase(m_lib.actors.begin() + j);
+			mergedAny = true;
+		}
+	}
+	m_lib.CleanupActorAliases();        // 이름과 같은 별칭 정리
+	m_lib.NormalizeAllVideoActors();    // 새 별칭으로 적힌 영상 배우 → 배우 이름 + 참여 별칭
+	if (!m_lib.Save())
+		AfxMessageBox(L"라이브러리 파일을 저장하지 못했습니다.", MB_ICONWARNING);
+
+	ResetThumbnails();   // 기본 이미지(성별)가 바뀌었을 수 있음
+	RebuildActorGrid();
+	ShowActorInfo(SelectedActorIndex());
+	MarkCategoriesDirty();
+	if (mergedAny)
+		ApplyFilter();   // 병합으로 영상의 배우가 바뀜
 }
 
 void CRuliManagerDlg::OnActorDelete()
@@ -6562,9 +7429,9 @@ void CRuliManagerDlg::OnZoomChanged(int pos)
 	m_catGrid.OnSelectionChanged();
 }
 
-bool CRuliManagerDlg::GridDrawCard(CDC* dc, int row, const CRect& card, bool selected, bool focused)
+bool CRuliManagerDlg::GridDrawCard(CDC* dc, int g, const CRect& card, bool selected, bool focused)
 {
-	DrawVideoCard(dc, row, card, selected, focused);
+	DrawVideoCard(dc, GridRowOf(g), card, selected, focused);   // 합쳐 보기: 첫 파트로 그림 (순번은 고른 파트)
 	return true;
 }
 
@@ -6606,8 +7473,9 @@ void CRuliManagerDlg::OnTimer(UINT_PTR nIDEvent)
 	}
 }
 
-CString CRuliManagerDlg::GridTipText(int row, const CRect& card, CPoint pt)
+CString CRuliManagerDlg::GridTipText(int g, const CRect& card, CPoint pt)
 {
+	const int row = GridRowOf(g);   // 격자 칸 → 행 (합쳐 보기면 카드의 첫 파트)
 	{
 		CRect badge;
 		int pos = 0;
@@ -6656,41 +7524,111 @@ bool CRuliManagerDlg::ShotBadgeRect(int row, const CRect& card, CRect& out, CStr
 {
 	if (!m_shotBusy || row < 0 || row >= static_cast<int>(m_view.size()))
 		return false;
-	const VideoItem& v = m_lib.items[m_view[row]];
+	// 분할 영상 합쳐 보기(격자): 카드의 파트 중 하나라도 추출 중 / 대기 중이면 표시
+	std::vector<int> rows{ row };
+	if (!m_cardImageOnly)
+	{
+		auto pit = m_gridParts.find(GridIdxOf(row));
+		if (pit != m_gridParts.end() && GridRowOf(pit->first) == row)
+			rows = pit->second;
+	}
 	CString t;
 	int pos = 0;
-	if (!m_shotVideoPath.IsEmpty() && v.path.CompareNoCase(m_shotVideoPath) == 0)
-		t.Format(L"(%d/%d)", m_shotDone, m_shotTotal);   // 추출 중
-	else if ((pos = ShotQueuePos(v.path)) > 0)
-		t.Format(L"(대기 %d)", pos);                      // 대기열 순번
-	else
+	bool found = false;
+	for (int pr : rows)
+	{
+		const VideoItem& v = m_lib.items[m_view[pr]];
+		if (!m_shotVideoPath.IsEmpty() && v.path.CompareNoCase(m_shotVideoPath) == 0)
+		{
+			t.Format(L"(%d/%d)", m_shotDone, m_shotTotal);   // 추출 중
+			pos = 0;
+			found = true;
+			break;
+		}
+		const int qp = ShotQueuePos(v.path);
+		if (qp > 0 && (!found || qp < pos))
+		{
+			pos = qp;
+			t.Format(L"(대기 %d)", pos);                      // 대기열 순번 (여러 파트면 가장 앞)
+			found = true;
+		}
+	}
+	if (!found)
 		return false;
 	if (text) *text = t;
 	if (queuePos) *queuePos = pos;
-	// 카드 전체의 왼쪽 아래
+	// 카드 전체의 왼쪽 아래 (연도별 보기 = 이미지만 있는 카드: 커버 이미지 왼쪽 아래, 여백을 좁게)
 	CClientDC dc(this);
 	CFont* pf = dc.SelectObject(&m_vcardSubFont);
 	const int tw = dc.GetTextExtent(t).cx;
 	dc.SelectObject(pf);
-	const int margin = DX(4);
+	const int margin = m_cardImageOnly ? DX(2) : DX(4);
 	const int bh = m_vcardSubLine + DX(4);
 	const int bottom = card.bottom - margin;
 	out = CRect(card.left + margin, bottom - bh, card.left + margin + tw + DX(10), bottom);
 	return true;
 }
 
-bool CRuliManagerDlg::GridDblClick(int row, const CRect& card, CPoint pt)
+void CRuliManagerDlg::DrawShotBadge(CDC* dc, int row, const CRect& card)
 {
+	CRect badge;
+	CString t;
+	int pos = 0;
+	if (!ShotBadgeRect(row, card, badge, &t, &pos))
+		return;
+	const int saved = dc->SaveDC();
+	dc->IntersectClipRect(card);   // 연도별 보기의 작은 카드에서도 카드 밖으로 넘치지 않게
+	CBrush br(RGB(0x10, 0x14, 0x18));
+	CPen pen(PS_SOLID, 1, pos > 0 ? TCOL(TC_BORDER) : kButtonColor);   // 대기 = 회색 테두리, 추출 중 = 파란 테두리
+	CBrush* ob = dc->SelectObject(&br);
+	CPen* op = dc->SelectObject(&pen);
+	dc->RoundRect(badge, CPoint(DX(4), DX(4)));
+	dc->SelectObject(ob);
+	dc->SelectObject(op);
+	CFont* pf = dc->SelectObject(&m_vcardSubFont);   // 굵은 글꼴
+	dc->SetBkMode(TRANSPARENT);
+	dc->SetTextColor(pos > 0 ? TCOL(TC_SUB) : RGB(255, 255, 255));
+	CRect tr = badge;
+	dc->DrawText(t, tr, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+	dc->SelectObject(pf);
+	dc->RestoreDC(saved);
+}
+
+void CRuliManagerDlg::InvalidateShotCards()
+{
+	// 스크린샷 추출 진행 · 대기 순번 표시가 바뀜: 격자 + 연도별 보기
+	if (m_grid.GetSafeHwnd())
+		m_grid.Invalidate(FALSE);
+	if (m_yearView.GetSafeHwnd() && m_yearView.IsWindowVisible())
+		m_yearView.Invalidate(FALSE);
+}
+
+bool CRuliManagerDlg::GridDblClick(int g, const CRect& card, CPoint pt)
+{
+	const int row = GridRowOf(g);   // 격자 칸 → 행 (연도별 보기는 칸 표가 없어 그대로)
 	CRect badge;
 	int pos = 0;
 	if (!ShotBadgeRect(row, card, badge, nullptr, &pos) || !badge.PtInRect(pt))
+	{
+		// 분할 영상 합쳐 보기: 이미지 위 파트 칸 더블클릭 = 그 파트 재생
+		if (!m_cardImageOnly)
+		{
+			const int z = PartZoneAt(g, card, pt);
+			if (z >= 0)
+			{
+				SelectViewRow(m_gridParts[g][z]);
+				GridActivate(g);
+				return true;
+			}
+		}
 		return false;
+	}
 	if (pos > 0)
 	{
 		// 대기 중인 영상: 대기열에서 뺌
 		m_shotQueue.erase(m_shotQueue.begin() + (pos - 1));
 		UpdateShotTitle();
-		m_grid.Invalidate(FALSE);
+		InvalidateShotCards();
 	}
 	else
 		m_shotCancel = true;   // 추출 중인 영상: 멈춤 (지금 장면이 끝나면 멈추고 저장한 것은 남김) → 다음 대기 영상
@@ -6740,6 +7678,40 @@ namespace
 		::SelectObject(mem, old);
 		::DeleteDC(mem);
 		return bmp;
+	}
+
+	// MakeCoverBitmap 으로 만든 커버에서 실제 이미지 영역 (가장자리의 배경색(back)만 있는 줄 · 칸을 뺀 나머지, 비트맵 좌표)
+	//  - 32비트 DIB 가 아니면 비트맵 전체
+	CRect CoverContentRect(HBITMAP bmp, COLORREF back)
+	{
+		DIBSECTION ds = {};
+		if (!bmp || ::GetObject(bmp, sizeof(ds), &ds) != sizeof(ds) || !ds.dsBm.bmBits || ds.dsBm.bmBitsPixel != 32)
+		{
+			BITMAP bm = {};
+			if (bmp)
+				::GetObject(bmp, sizeof(bm), &bm);
+			return CRect(0, 0, bm.bmWidth, bm.bmHeight);
+		}
+		const int w = ds.dsBm.bmWidth, h = ds.dsBm.bmHeight;
+		const bool topDown = ds.dsBmih.biHeight < 0;
+		const BYTE* base = static_cast<const BYTE*>(ds.dsBm.bmBits);
+		const DWORD key = (static_cast<DWORD>(GetRValue(back)) << 16) | (static_cast<DWORD>(GetGValue(back)) << 8) | GetBValue(back);
+		auto px = [&](int x, int y) -> DWORD
+		{
+			const int row = topDown ? y : (h - 1 - y);
+			return reinterpret_cast<const DWORD*>(base + static_cast<size_t>(row) * ds.dsBm.bmWidthBytes)[x] & 0x00FFFFFF;
+		};
+		auto rowEmpty = [&](int y) { for (int x = 0; x < w; ++x) if (px(x, y) != key) return false; return true; };
+		auto colEmpty = [&](int x, int y0, int y1) { for (int y = y0; y < y1; ++y) if (px(x, y) != key) return false; return true; };
+		int top = 0, bottom = h;
+		while (top < bottom && rowEmpty(top)) ++top;
+		while (bottom > top && rowEmpty(bottom - 1)) --bottom;
+		if (top >= bottom)
+			return CRect(0, 0, 0, 0);   // 전부 배경색
+		int left = 0, right = w;
+		while (left < right && colEmpty(left, top, bottom)) ++left;
+		while (right > left && colEmpty(right - 1, top, bottom)) --right;
+		return CRect(left, top, right, bottom);
 	}
 }
 
@@ -6946,10 +7918,19 @@ LRESULT CRuliManagerDlg::OnCoverReady(WPARAM, LPARAM lParam)
 			if (m_view[row] != r->item)
 				continue;
 			CRect card;
-			if (m_grid.GetCardRect(static_cast<int>(row), card) && CRect().IntersectRect(&card, &client))
+			if (m_grid.GetCardRect(GridIdxOf(static_cast<int>(row)), card) && CRect().IntersectRect(&card, &client))
 				m_grid.InvalidateRect(&card, FALSE);
 			break;
 		}
+	}
+	if (m_yearView.GetSafeHwnd() && m_yearView.IsWindowVisible())   // 연도별 보기도 그 카드만
+	{
+		for (size_t row = 0; row < m_view.size(); ++row)
+			if (m_view[row] == r->item)
+			{
+				m_yearView.InvalidateItem(static_cast<int>(row));
+				break;
+			}
 	}
 	return 0;
 }
@@ -6959,12 +7940,13 @@ void CRuliManagerDlg::GridPrefetch(int first, int last)
 	// 화면 바로 위 · 아래 카드의 이미지를 미리 읽어 둠 (스크롤해서 보일 때 바로 그려지게)
 	if (!m_grid.GetSafeHwnd() || m_vcardImgH <= 0)
 		return;
-	for (int row = first; row <= last && row < static_cast<int>(m_view.size()); ++row)
+	for (int g = first; g <= last; ++g)   // 격자 칸 (합쳐 보기면 카드의 첫 파트)
 	{
-		if (row < 0)
+		const int row = GridRowOf(g);
+		if (row < 0 || row >= static_cast<int>(m_view.size()))
 			continue;
 		CRect card;
-		if (!m_grid.GetCardRect(row, card) || card.Width() <= 0)
+		if (!m_grid.GetCardRect(g, card) || card.Width() <= 0)
 			continue;
 		GetVideoCover(m_view[row], card.Width(), m_vcardImgH, nullptr, true);
 	}
@@ -7152,8 +8134,8 @@ void CRuliManagerDlg::DrawVideoCard(CDC* dc, int row, const CRect& rc, bool sele
 		dc->SelectObject(op);
 	}
 
-	// 이미지 (위쪽 모서리 둥글게)
-	const CRect img(rc.left, rc.top, rc.right, rc.top + m_vcardImgH);
+	// 이미지 (위쪽 모서리 둥글게) - 이미지만 그릴 때(연도별 보기)는 카드 전체가 이미지
+	const CRect img(rc.left, rc.top, rc.right, m_cardImageOnly ? rc.bottom : rc.top + m_vcardImgH);
 	{
 		CRgn clip;
 		clip.CreateRoundRectRgn(rc.left, rc.top, rc.right + 1, rc.bottom + 1, radius, radius);
@@ -7169,13 +8151,29 @@ void CRuliManagerDlg::DrawVideoCard(CDC* dc, int row, const CRect& rc, bool sele
 			if (m_lib.IsRemovableItem(v.path, &online) && !online)
 			{
 				// 이동식 디스크 연결 안 됨: 캐시의 커버를 반투명으로
-				dc->FillSolidRect(img, kThumbBackColor);
+				dc->FillSolidRect(img, m_cardFill != CLR_INVALID ? m_cardFill : kThumbBackColor);
 				BLENDFUNCTION bf = { AC_SRC_OVER, 0, 100, 0 };
 				::AlphaBlend(dc->GetSafeHdc(), img.left, img.top, img.Width(), img.Height(), mem.GetSafeHdc(), 0, 0, img.Width(), img.Height(), bf);
 			}
 			else
 				dc->BitBlt(img.left, img.top, img.Width(), img.Height(), &mem, 0, 0, SRCCOPY);
 			mem.SelectObject(old);
+			if (m_cardFill != CLR_INVALID)
+			{
+				// 연도별 보기: 이미지 비율 때문에 남는 빈 영역(위아래 / 좌우)을 배우 이름별 고유색으로
+				CRect content = CoverContentRect(static_cast<HBITMAP>(bmp->GetSafeHandle()), kThumbBackColor);
+				content.OffsetRect(img.left, img.top);
+				content &= img;
+				if (content.IsRectEmpty())
+					dc->FillSolidRect(img, m_cardFill);
+				else
+				{
+					if (content.top > img.top)       dc->FillSolidRect(img.left, img.top, img.Width(), content.top - img.top, m_cardFill);
+					if (content.bottom < img.bottom) dc->FillSolidRect(img.left, content.bottom, img.Width(), img.bottom - content.bottom, m_cardFill);
+					if (content.left > img.left)     dc->FillSolidRect(img.left, content.top, content.left - img.left, content.Height(), m_cardFill);
+					if (content.right < img.right)   dc->FillSolidRect(content.right, content.top, img.right - content.right, content.Height(), m_cardFill);
+				}
+			}
 		}
 		else if (coverLoading)
 		{
@@ -7193,22 +8191,41 @@ void CRuliManagerDlg::DrawVideoCard(CDC* dc, int row, const CRect& rc, bool sele
 		}
 		else
 		{
-			dc->FillSolidRect(img, kThumbBackColor);
+			dc->FillSolidRect(img, m_cardFill != CLR_INVALID ? m_cardFill : kThumbBackColor);   // 연도별 보기: 배우 이름별 고유색
 			VectorIcon::Movie(dc, img, RGB(255, 255, 255), 0.78);   // 영상 기본 이미지: 흰 원 + 재생 (원본 SVG 처럼 이미지 높이의 약 71%)
 		}
 		dc->SelectClipRgn(nullptr);
 	}
 
+	if (m_cardImageOnly)
+	{
+		// 연도별 보기: 이미지만 (로고 · 별점 리본 · 재생 시간 · 아래 글자 없음), 선택 테두리만
+		if (selected)
+		{
+			CPen pen(PS_SOLID, 2, focused ? kButtonColor : TCOL(TC_BORDER));
+			CPen* op = dc->SelectObject(&pen);
+			CBrush* ob = static_cast<CBrush*>(dc->SelectStockObject(NULL_BRUSH));
+			CRect sr = rc;
+			sr.DeflateRect(1, 1);
+			dc->RoundRect(sr, CPoint(radius, radius));
+			dc->SelectObject(op);
+			dc->SelectObject(ob);
+		}
+		DrawShotBadge(dc, row, rc);   // 스크린샷 추출 "(3/15)" / "(대기 2)" — 커버 이미지 왼쪽 아래
+		return;
+	}
+
 	// 이미지 위에 마우스를 올리면 이미지만 (로고 · 별점 리본 · 해상도 / 재생 시간이 부드럽게 사라짐 / 나타남)
-	const bool imageOnly = (m_grid.HotRow() == row && m_grid.HotZone() == 1);
+	const int gIdx = GridIdxOf(row);   // 격자 칸 (분할 영상 합쳐 보기면 카드 칸, 아니면 행과 같음)
+	const bool imageOnly = (m_grid.HotRow() == gIdx && m_grid.HotZone() == 1);
 	int overlayAlpha = 255;   // 0 = 숨김, 255 = 다 보임
 	{
-		auto fit = m_overlayFade.find(row);
+		auto fit = m_overlayFade.find(gIdx);   // 격자 칸 기준 (OnTimer 의 페이드도 칸)
 		if (fit != m_overlayFade.end())
 			overlayAlpha = fit->second;
 		if ((imageOnly && overlayAlpha != 0) || (!imageOnly && overlayAlpha != 255))
 		{
-			m_overlayFade[row] = overlayAlpha;   // 목표까지 타이머로 조금씩 (StepOverlayFade)
+			m_overlayFade[gIdx] = overlayAlpha;   // 목표까지 타이머로 조금씩 (StepOverlayFade)
 			if (!m_fadeTimer)
 				m_fadeTimer = SetTimer(kOverlayFadeTimer, 15, nullptr);
 		}
@@ -7316,28 +8333,62 @@ void CRuliManagerDlg::DrawVideoCard(CDC* dc, int row, const CRect& rc, bool sele
 		tmp.SelectObject(ob);
 	}
 
-	// 스크린샷 추출 중인 영상: 카드 왼쪽 아래에 "(3/15)", 대기 중인 영상은 "(대기 2)" (더블클릭하면 멈춤 / 대기열에서 뺌)
+	// 분할 영상 합쳐 보기: 이미지 위에 마우스를 올리면 파트 수만큼 좌우 칸 + 반투명 번호 (올라간 칸은 밝게, 고른 파트 칸은 아래 파란 줄)
+	const auto partsIt = m_gridParts.find(gIdx);
+	const bool merged = (partsIt != m_gridParts.end() && GridRowOf(gIdx) == row);
+	int selPart = -1;   // 이 카드에서 고른 파트 (0 부터)
+	if (merged)
 	{
-		CRect badge;
-		CString t;
-		int pos = 0;
-		if (ShotBadgeRect(row, rc, badge, &t, &pos))
-		{
-			CBrush br(RGB(0x10, 0x14, 0x18));
-			CPen pen(PS_SOLID, 1, pos > 0 ? TCOL(TC_BORDER) : kButtonColor);   // 대기 = 회색 테두리, 추출 중 = 파란 테두리
-			CBrush* ob = dc->SelectObject(&br);
-			CPen* op = dc->SelectObject(&pen);
-			dc->RoundRect(badge, CPoint(DX(4), DX(4)));
-			dc->SelectObject(ob);
-			dc->SelectObject(op);
-			CFont* pf = dc->SelectObject(&m_vcardSubFont);   // 굵은 글꼴
-			dc->SetBkMode(TRANSPARENT);
-			dc->SetTextColor(pos > 0 ? TCOL(TC_SUB) : RGB(255, 255, 255));
-			CRect tr = badge;
-			dc->DrawText(t, tr, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-			dc->SelectObject(pf);
-		}
+		const int selRow = GetSelectedRow();
+		for (size_t p = 0; p < partsIt->second.size(); ++p)
+			if (partsIt->second[p] == selRow) { selPart = static_cast<int>(p); break; }
 	}
+	if (merged && imageOnly)
+	{
+		EnsureGdiPlus();
+		const int n = static_cast<int>(partsIt->second.size());
+		const int hotPart = m_grid.HotPart() - 1;
+		CRgn clip;
+		clip.CreateRoundRectRgn(rc.left, rc.top, rc.right + 1, rc.bottom + 1, radius, radius);
+		dc->SelectClipRgn(&clip);
+		dc->IntersectClipRect(img);
+		{
+			Gdiplus::Graphics g(dc->GetSafeHdc());
+			g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+			g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAliasGridFit);
+			Gdiplus::SolidBrush dim(Gdiplus::Color(70, 0, 0, 0));
+			Gdiplus::SolidBrush hot(Gdiplus::Color(60, 255, 255, 255));
+			Gdiplus::Pen sep(Gdiplus::Color(110, 255, 255, 255), 1.0f);
+			Gdiplus::FontFamily family(L"Segoe UI");
+			const float fs = (std::max)(9.0f, (std::min)(img.Height() * 0.45f, img.Width() / static_cast<float>(n) * 0.6f));
+			Gdiplus::Font font(&family, fs, Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
+			Gdiplus::StringFormat fmt;
+			fmt.SetAlignment(Gdiplus::StringAlignmentCenter);
+			fmt.SetLineAlignment(Gdiplus::StringAlignmentCenter);
+			for (int p = 0; p < n; ++p)
+			{
+				const int x0 = img.left + img.Width() * p / n, x1 = img.left + img.Width() * (p + 1) / n;
+				const Gdiplus::RectF cell(static_cast<float>(x0), static_cast<float>(img.top), static_cast<float>(x1 - x0), static_cast<float>(img.Height()));
+				g.FillRectangle(p == hotPart ? static_cast<Gdiplus::Brush*>(&hot) : static_cast<Gdiplus::Brush*>(&dim), cell);
+				if (p > 0)
+					g.DrawLine(&sep, static_cast<float>(x0), static_cast<float>(img.top + 2), static_cast<float>(x0), static_cast<float>(img.bottom - 2));
+				Gdiplus::SolidBrush text(Gdiplus::Color(p == hotPart ? 235 : 150, 255, 255, 255));
+				wchar_t num[8];
+				swprintf_s(num, L"%d", p + 1);
+				g.DrawString(num, -1, &font, cell, &fmt, &text);
+				if (p == selPart)
+				{
+					Gdiplus::SolidBrush selBar(Gdiplus::Color(230, GetRValue(kButtonColor), GetGValue(kButtonColor), GetBValue(kButtonColor)));
+					const float bh = static_cast<float>((std::max)(2, DX(3)));
+					g.FillRectangle(&selBar, Gdiplus::RectF(cell.X + 2, cell.GetBottom() - bh - 1, cell.Width - 4, bh));
+				}
+			}
+		}
+		dc->SelectClipRgn(nullptr);
+	}
+
+	// 스크린샷 추출 중인 영상: 카드 왼쪽 아래에 "(3/15)", 대기 중인 영상은 "(대기 2)" (더블클릭하면 멈춤 / 대기열에서 뺌)
+	DrawShotBadge(dc, row, rc);
 
 	CFont* normal = GetFont();
 	CFont* oldFont = dc->SelectObject(&m_videoTitleFont);   // 제목: 2pt 큰 글꼴
@@ -7354,7 +8405,9 @@ void CRuliManagerDlg::DrawVideoCard(CDC* dc, int row, const CRect& rc, bool sele
 	{
 		CString key;
 		int num = 0;
-		if (SplitPartName(v.path, key, num))
+		// 합쳐 보기: 이 카드에서 고른 파트의 순번 (안 골랐으면 첫 파트)
+		const CString& labelPath = (merged && selPart > 0) ? m_lib.items[m_view[partsIt->second[selPart]]].path : v.path;
+		if (SplitPartName(labelPath, key, num))
 		{
 			const auto it = m_partTotal.find(key);
 			const int total = (it != m_partTotal.end()) ? it->second : 1;
@@ -8352,6 +9405,71 @@ void CRuliManagerDlg::OnBnClickedRemoveFolder()
 	ApplyFilter();
 }
 
+void CRuliManagerDlg::OnVideoRefreshItem()
+{
+	// 선택한 영상만 새로고침: 영상 이미지(커버) · 해상도/재생 시간 · 파일 크기/수정일 · 스크린샷을 다시 읽음 (나눠진 영상은 묶음 전체)
+	//  - 전체 [새로고침] 과 달리 폴더를 다시 훑지 않고, DB 의 정보(제목 · 배우 · 태그 …)는 바꾸지 않음
+	const int idx = GetSelectedItem();
+	if (idx < 0 || idx >= static_cast<int>(m_lib.items.size()) || IsItemOffline(idx))
+		return;
+	CommitDetails();
+	std::vector<size_t> targets{ static_cast<size_t>(idx) };
+	for (size_t s : m_lib.PartSiblings(static_cast<size_t>(idx)))
+		targets.push_back(s);
+	int missing = 0;
+	for (size_t t : targets)
+	{
+		VideoItem& v = m_lib.items[t];
+		CString low = v.path;
+		low.MakeLower();
+		// 커버 이미지 (카드 크기별 캐시: "경로|폭x높이")
+		const CString prefix = low + L"|";
+		for (auto it = m_videoCovers.begin(); it != m_videoCovers.end(); )
+			it = (it->first.Left(prefix.GetLength()) == prefix) ? m_videoCovers.erase(it) : std::next(it);
+		for (auto it = m_coverUse.begin(); it != m_coverUse.end(); )
+			it = (it->first.Left(prefix.GetLength()) == prefix) ? m_coverUse.erase(it) : std::next(it);
+		for (auto it = m_coverPending.begin(); it != m_coverPending.end(); )
+			it = (it->Left(prefix.GetLength()) == prefix) ? m_coverPending.erase(it) : std::next(it);
+		m_thumbIndex.erase(CVideoLibrary::MakeKey(v.path));
+		// 해상도 · 재생 시간 (카드 · 상세)
+		m_cardMedia.erase(low);
+		m_cardMediaRequested.erase(low);
+		m_mediaInfo.Forget(v.path);
+		// 파일 크기 · 수정일
+		WIN32_FILE_ATTRIBUTE_DATA fa = {};
+		if (::GetFileAttributesExW(v.path, GetFileExInfoStandard, &fa))
+		{
+			v.size = (static_cast<ULONGLONG>(fa.nFileSizeHigh) << 32) | fa.nFileSizeLow;
+			v.modified = (static_cast<ULONGLONG>(fa.ftLastWriteTime.dwHighDateTime) << 32) | fa.ftLastWriteTime.dwLowDateTime;
+		}
+		else
+			++missing;
+	}
+	// 스크린샷 (축소 이미지 · 목록 다시 읽기)
+	m_shotThumbs.clear();
+	m_shotFiles.clear();
+	m_shotVideo.Empty();
+	m_lib.Save();
+
+	m_grid.Invalidate(FALSE);
+	if (m_yearView.GetSafeHwnd() && m_yearView.IsWindowVisible())
+		m_yearView.Invalidate(FALSE);
+	if (m_curItem >= 0)
+		ShowDetails(m_curItem);   // 상세 이미지 · 해상도 · 스크린샷 다시
+	RefreshShotStrip();
+	UpdateStatus();
+	CString s;
+	s.Format(L"새로고침: %s%s", static_cast<LPCWSTR>(m_lib.items[idx].FileName()),
+		targets.size() > 1 ? static_cast<LPCWSTR>(CString(L" (나눠진 파일 묶음 전체)")) : L"");
+	if (missing > 0)
+	{
+		CString m;
+		m.Format(L" - 파일을 찾지 못한 영상 %d개", missing);
+		s += m;
+	}
+	m_staticStatus.SetWindowText(s);
+}
+
 void CRuliManagerDlg::OnBnClickedRefresh()
 {
 	CommitDetails();
@@ -8631,6 +9749,32 @@ void CRuliManagerDlg::OnBnClickedOpenDefault()
 
 void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 {
+	if (pWnd->GetSafeHwnd() == m_tagChips.GetSafeHwnd())
+	{
+		// 영상 상세의 태그 칩: [태그 관리...] (오른쪽 클릭한 칩이 있으면 관리 창에서 그 태그 선택)
+		CString select;
+		if (point.x == -1 && point.y == -1)
+		{
+			CRect r;
+			m_tagChips.GetWindowRect(&r);
+			point = CPoint(r.left + DX(10), r.top + r.Height() / 2);
+		}
+		else
+		{
+			CPoint pt = point;
+			m_tagChips.ScreenToClient(&pt);
+			const int chip = m_tagChips.ChipAt(pt);
+			if (chip >= 0 && chip < static_cast<int>(m_tagChips.Tags().size()))
+				select = m_tagChips.Tags()[chip];
+		}
+		CMenu menu;
+		menu.CreatePopupMenu();
+		menu.AppendMenu(MF_STRING, 1, L"태그 관리...");
+		const UINT cmd = menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD, point.x, point.y, this);
+		if (cmd == 1)
+			OpenListManager(LIST_TAG, select);
+		return;
+	}
 	if (pWnd->GetSafeHwnd() == m_studioCard.GetSafeHwnd())
 	{
 		// 영상 상세의 제작사 / 레이블 카드: 변경 · 영상 보기 · 비우기
@@ -8659,6 +9803,8 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 		else
 			menu.AppendMenu(MF_STRING | (has ? 0 : MF_GRAYED), 2, LabelRowShown() ? L"이 레이블의 영상 보기" : L"이 제작사의 영상 보기");
 		menu.AppendMenu(MF_SEPARATOR);
+		menu.AppendMenu(MF_STRING, 6, L"제작사 관리...");   // 제작사 / 레이블 관리 창 (이 카드의 레이블 · 제작사 선택)
+		menu.AppendMenu(MF_SEPARATOR);
 		menu.AppendMenu(MF_STRING | ((has && !ro) ? 0 : MF_GRAYED), 3, L"비우기");
 		if (!ro)
 			menu.SetDefaultItem(1);
@@ -8673,6 +9819,19 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 			OpenStudioCardTarget(1);
 		else if (cmd == 3 && m_studioCard.m_onPartClick)
 			m_studioCard.m_onPartClick(0, 1);   // × 와 같음
+		else if (cmd == 6)
+		{
+			// 관리 창에서 선택할 항목: 레이블이 있으면 레이블, 없으면 제작사 (비어 있으면 선택 없이)
+			CString select = studio;
+			if (LabelRowShown() && m_curItem >= 0 && m_curItem < static_cast<int>(m_lib.items.size()))
+			{
+				CString label = m_lib.items[m_curItem].label;
+				label.Trim();
+				if (!label.IsEmpty())
+					select = label;
+			}
+			OpenListManager(LIST_STUDIO, select);
+		}
 		return;
 	}
 	if (pWnd->GetSafeHwnd() == m_actorGrid.GetSafeHwnd())
@@ -8698,6 +9857,7 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 		menu.AppendMenu(MF_STRING, ID_ACTOR_SHOWVIDEOS, L"출연작 보기\tEnter");
 		menu.AppendMenu(MF_STRING, ID_ACTOR_EDIT,       L"배우 정보 편집...\tF2");
 		menu.AppendMenu(MF_STRING, ID_ACTOR_TEXTINFO,   L"텍스트로 정보 입력...");
+		menu.AppendMenu(MF_STRING, ID_ACTOR_PASTEINFO,  L"웹페이지 내용 붙여넣기...");
 		menu.AppendMenu(MF_SEPARATOR);
 		menu.AppendMenu(MF_STRING, ID_ACTOR_DELETE,     L"배우 삭제\tDel");
 		menu.SetDefaultItem(ID_ACTOR_SHOWVIDEOS);
@@ -8787,7 +9947,7 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 		CRect r;
 		if (fromGrid)
 		{
-			m_grid.GetTileRect(row, r);
+			m_grid.GetTileRect(GridIdxOf(row), r);
 			point = r.CenterPoint();
 			m_grid.ClientToScreen(&point);
 		}
@@ -8802,9 +9962,15 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 	{
 		CPoint pt = point;
 		m_grid.ScreenToClient(&pt);
-		row = m_grid.HitTest(pt);
-		if (row < 0) { ShowNewItemMenu(point); return; }   // 빈곳: 폴더 추가 등
-		GridSetSel(row);
+		const int g = m_grid.HitTest(pt);   // 격자 칸
+		if (g < 0) { ShowNewItemMenu(point); return; }   // 빈곳: 폴더 추가 등
+		CRect card;
+		const int z = m_grid.GetCardRect(g, card) ? PartZoneAt(g, card, pt) : -1;
+		if (z >= 0)
+			SelectViewRow(m_gridParts[g][z]);   // 합쳐 보기: 이미지 위 파트 칸 → 그 파트 메뉴
+		else
+			GridSetSel(g);
+		row = GetSelectedRow();
 	}
 	else
 	{
@@ -8815,6 +9981,11 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 		m_list.SetItemState(row, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
 	}
 
+	ShowVideoContextMenu(row, point);
+}
+
+void CRuliManagerDlg::ShowVideoContextMenu(int row, CPoint point)
+{
 	// 연결 해제된 이동식 디스크의 영상: [DB에서 삭제] 말고는 비활성
 	const UINT ro = IsItemOffline((row >= 0 && row < static_cast<int>(m_view.size())) ? m_view[row] : -1) ? MF_GRAYED : 0;
 	CMenu menu;
@@ -8824,6 +9995,7 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 	menu.AppendMenu(MF_STRING | ro, ID_VIDEO_TEXTINFO,   L"텍스트로 정보 입력...");
 	menu.AppendMenu(MF_STRING | ro, ID_VIDEO_PASTEINFO,  L"웹페이지 내용 붙여넣기...");
 	menu.AppendMenu(MF_STRING | ro, ID_VIDEO_SCREENSHOT, L"스크린샷 추출...");   // 추출 중이면 대기열에
+	menu.AppendMenu(MF_STRING | ro, ID_VIDEO_REFRESHITEM, L"이 영상 새로고침");      // 이미지 · 해상도 · 크기 · 스크린샷 다시 읽기
 	menu.AppendMenu(MF_SEPARATOR);
 	menu.AppendMenu(MF_STRING, IDC_BTN_DELETE,      L"DB에서 삭제 (파일 유지)\tDel");
 	if (!ro)
@@ -9129,6 +10301,8 @@ void CRuliManagerDlg::CreateScrollBars()
 		{ &m_grid,      true,  CDarkScrollBar::TARGET_GRID },
 		{ &m_actorGrid, true,  CDarkScrollBar::TARGET_GRID },
 		{ &m_catGrid,   true,  CDarkScrollBar::TARGET_GRID },
+		{ &m_yearView,  true,  CDarkScrollBar::TARGET_GRID },   // 배우 출연작 [연도별] (세로 · 가로)
+		{ &m_yearView,  false, CDarkScrollBar::TARGET_GRID },
 	};
 	for (size_t i = 0; i < _countof(targets) && i < _countof(m_scrollBars); ++i)
 	{
@@ -9444,8 +10618,7 @@ void CRuliManagerDlg::OnVideoScreenshot()
 	else
 	{
 		UpdateShotTitle();
-		if (m_grid.GetSafeHwnd())
-			m_grid.Invalidate(FALSE);   // 카드에 "(대기 n)"
+		InvalidateShotCards();   // 카드에 "(대기 n)"
 	}
 }
 
@@ -9489,8 +10662,7 @@ void CRuliManagerDlg::StartNextShot()
 		m_shotBusy = false;
 		m_shotVideoPath.Empty();
 		UpdateShotTitle();
-		if (m_grid.GetSafeHwnd())
-			m_grid.Invalidate(FALSE);
+		InvalidateShotCards();
 		return;
 	}
 	const ShotJob job = m_shotQueue.front();
@@ -9501,8 +10673,7 @@ void CRuliManagerDlg::StartNextShot()
 	m_shotDone = 0;
 	m_shotTotal = job.count;
 	UpdateShotTitle();
-	if (m_grid.GetSafeHwnd())
-		m_grid.Invalidate(FALSE);   // 진행 표시 · 대기 순번
+	InvalidateShotCards();   // 진행 표시 · 대기 순번
 	const HWND hwnd = GetSafeHwnd();
 	const CString path = job.path;
 	const int count = job.count;
@@ -9523,8 +10694,7 @@ LRESULT CRuliManagerDlg::OnShotProgress(WPARAM wParam, LPARAM lParam)
 	m_shotDone = static_cast<int>(wParam);
 	m_shotTotal = static_cast<int>(lParam);
 	UpdateShotTitle();
-	if (m_grid.GetSafeHwnd())
-		m_grid.Invalidate(FALSE);   // 영상 카드의 진행 표시
+	InvalidateShotCards();   // 영상 카드의 진행 표시
 	return 0;
 }
 
@@ -9541,6 +10711,196 @@ LRESULT CRuliManagerDlg::OnShotDone(WPARAM, LPARAM lParam)
 	if (r && !r->error.IsEmpty())
 		AfxMessageBox(CString(::PathFindFileNameW(r->video)) + L"\n\n" + r->error, MB_ICONWARNING);
 	return 0;
+}
+
+void CRuliManagerDlg::OnBnClickedDrillViewGrid() { SetActorDrillView(0); }
+void CRuliManagerDlg::OnBnClickedDrillViewYear() { SetActorDrillView(1); }
+
+void CRuliManagerDlg::SetActorDrillView(int mode)
+{
+	// 배우 출연작 화면: [격자] ↔ [연도별] (레지스트리에 저장, 다음에 배우를 열 때도 같은 보기)
+	mode = (mode == 1) ? 1 : 0;
+	for (int i = 0; i < 2; ++i)
+		if (m_drillViewBtns[i].GetSafeHwnd())
+			m_drillViewBtns[i].SetChecked(i == mode);
+	if (mode == m_actorDrillView)
+		return;
+	m_actorDrillView = mode;
+	AfxGetApp()->WriteProfileInt(L"Settings", L"ActorDrillView", mode);
+	m_yearViewActor = -1;   // 다시 만들 때 스크롤을 처음으로
+	ApplyFilter();          // 연도별은 페이지를 나누지 않음 → 목록을 다시
+	UpdateLeftPane();       // 보이기 / 숨기기 + 다시 배치
+	m_grid.Refresh();
+	if (mode == 1)
+		m_yearView.SetFocus();
+}
+
+void CRuliManagerDlg::RebuildYearView()
+{
+	// m_view(출연작, 검색 · 별점 거르기 적용) → 연도 줄(세로) × 1~12월 칸(가로) (발매일 "YYYY-MM-DD" / "YYYY.MM.DD", 월을 모르면 "?" 칸, 연도가 없으면 "날짜 없음" 줄)
+	if (!m_yearView.GetSafeHwnd())
+		return;
+	std::vector<int> rows(m_view.size());
+	for (size_t i = 0; i < rows.size(); ++i)
+		rows[i] = static_cast<int>(i);
+	std::stable_sort(rows.begin(), rows.end(), [this](int a, int b)   // 같은 달 안에서는 발매일 순
+	{
+		return m_lib.items[m_view[a]].release.Compare(m_lib.items[m_view[b]].release) < 0;
+	});
+	// 나눠진 영상(파트): 첫 번째 파트 카드만, 나머지 파트는 그 카드에 묶음 (카드 위 1 · 2 … 칸으로 고름)
+	std::map<CString, std::vector<std::pair<int, int>>> groups;   // 묶음 → (파트 번호, 행)
+	for (int row : rows)
+	{
+		CString key;
+		int num = 0;
+		if (SplitPartName(m_lib.items[m_view[row]].path, key, num))
+		{
+			const auto it = m_partTotal.find(key);
+			if (it != m_partTotal.end() && it->second > 1)
+				groups[key].push_back({ num, row });
+		}
+	}
+	std::map<int, std::vector<int>> parts;   // 카드 행 → 파트 행들 (번호 순)
+	std::set<int> hiddenParts;               // 카드로 따로 그리지 않는 파트 행
+	for (auto& kv : groups)
+	{
+		auto& list = kv.second;
+		if (list.size() < 2)
+			continue;
+		std::sort(list.begin(), list.end());
+		std::vector<int> rowsOfGroup;
+		for (const auto& pr : list)
+			rowsOfGroup.push_back(pr.second);
+		for (size_t i = 1; i < rowsOfGroup.size(); ++i)
+			hiddenParts.insert(rowsOfGroup[i]);
+		parts[rowsOfGroup[0]] = std::move(rowsOfGroup);
+	}
+	std::map<int, CYearView::Column> years;
+	CYearView::Column noDate;
+	noDate.title = L"날짜 없음";
+	bool anyNoDate = false;
+	for (int row : rows)
+	{
+		if (hiddenParts.count(row))
+			continue;   // 2번째 이후 파트는 첫 파트 카드에 묶음
+		const CString& rel = m_lib.items[m_view[row]].release;
+		int y = 0, mo = 0;
+		if (rel.GetLength() >= 4 && iswdigit(rel[0]) && iswdigit(rel[1]) && iswdigit(rel[2]) && iswdigit(rel[3]))
+			y = _wtoi(rel.Left(4));
+		if (rel.GetLength() >= 7 && iswdigit(rel[5]))
+			mo = _wtoi(rel.Mid(5, 2));
+		if (y < 1900 || y > 3000)
+		{
+			noDate.months[12].push_back(row);
+			anyNoDate = true;
+			continue;
+		}
+		CYearView::Column& col = years[y];
+		if (col.title.IsEmpty())
+			col.title.Format(L"%d년", y);
+		col.months[(mo >= 1 && mo <= 12) ? mo - 1 : 12].push_back(row);
+	}
+	std::vector<CYearView::Column> cols;
+	for (auto& kv : years)
+		cols.push_back(std::move(kv.second));   // 오래된 연도부터
+	if (anyNoDate)
+		cols.push_back(std::move(noDate));
+	// 배우 이름별 카드 배경색: 별칭 변경 이력(… 별칭2 → 별칭1 → 대표 이름, 괄호 부분 빼고 같은 이름은 하나로 — 배우 상세 이력과 같은 순서)의
+	// 이름마다 고유색, 영상의 배우 칸에 그 배우가 적힌 이름의 색으로 카드 뒤를 칠함
+	std::vector<std::pair<CString, COLORREF>> legend;
+	std::map<int, COLORREF> cardColors;
+	if (m_drillActorIdx >= 0 && m_drillActorIdx < static_cast<int>(m_lib.actors.size()))
+	{
+		auto stripParen = [](const CString& name)   // "나기 히카루(Hikaru Nagi)" → "나기 히카루"
+		{
+			int p = name.Find(L'(');
+			const int pw = name.Find(L'\xFF08');
+			if (p < 0 || (pw >= 0 && pw < p)) p = pw;
+			CString s = (p > 0) ? name.Left(p) : name;
+			s.Trim();
+			if (s.IsEmpty())
+			{
+				s = name;
+				s.Trim();
+			}
+			return s;
+		};
+		static const COLORREF kNameColors[] = {
+			RGB(0xE5, 0x73, 0x73), RGB(0x4F, 0xA8, 0xE0), RGB(0x66, 0xBB, 0x6A), RGB(0xFF, 0xA7, 0x26), RGB(0xAB, 0x6F, 0xD0),
+			RGB(0xEC, 0x6F, 0xA0), RGB(0x26, 0xA6, 0x9A), RGB(0xC0, 0xCA, 0x33), RGB(0xA1, 0x88, 0x7F), RGB(0x78, 0x90, 0x9C) };
+		const ActorInfo& actor = m_lib.actors[m_drillActorIdx];
+		std::vector<CString> names;   // 이력 순서 (오래된 이름 → 대표 이름)
+		const std::vector<CString> als = CVideoLibrary::SplitList(actor.aliases);
+		for (auto it = als.rbegin(); it != als.rend(); ++it)
+			names.push_back(stripParen(*it));
+		names.push_back(stripParen(actor.name));
+		std::vector<CString> uniq;    // 같은 이름은 하나로 (대표 이름 쪽을 남김)
+		for (auto it = names.rbegin(); it != names.rend(); ++it)
+		{
+			bool dup = it->IsEmpty();
+			for (const CString& u : uniq)
+				if (u.CompareNoCase(*it) == 0) { dup = true; break; }
+			if (!dup)
+				uniq.insert(uniq.begin(), *it);
+		}
+		// 색 순서는 배우마다 무작위 (배우 대표 이름으로 정한 시드 → 같은 배우는 언제 열어도 같은 색, 이름이 10개 이하면 서로 다른 색)
+		size_t order[_countof(kNameColors)];
+		for (size_t i = 0; i < _countof(order); ++i)
+			order[i] = i;
+		{
+			CString seedName = actor.name;
+			seedName.MakeLower();
+			UINT32 h = 2166136261u;   // FNV-1a
+			for (int i = 0; i < seedName.GetLength(); ++i)
+			{
+				h ^= static_cast<UINT32>(seedName[i]);
+				h *= 16777619u;
+			}
+			UINT32 s = h ? h : 0x9E3779B9u;
+			for (size_t i = _countof(order) - 1; i > 0; --i)   // Fisher-Yates (xorshift32)
+			{
+				s ^= s << 13; s ^= s >> 17; s ^= s << 5;
+				std::swap(order[i], order[s % (i + 1)]);
+			}
+		}
+		for (size_t i = 0; i < uniq.size(); ++i)
+			legend.push_back({ uniq[i], kNameColors[order[i % _countof(order)]] });
+		for (const CYearView::Column& col : cols)
+			for (const auto& month : col.months)
+				for (int row : month)
+				{
+					// 이 작품에서 쓴 이름: 참여 별칭(actorAliases)에 이 배우의 별칭이 있으면 그것, 없으면 배우 칸 이름
+					//  (배우 칸은 대표 이름으로 정리되어 저장되므로 과거 이름은 참여 별칭에 있음 — NormalizeVideoActors)
+					const VideoItem& vi = m_lib.items[m_view[row]];
+					std::vector<CString> candidates;
+					for (const CString& c : CVideoLibrary::SplitList(vi.actorAliases))
+						if (m_lib.FindActorByAnyName(c) == m_drillActorIdx)
+							candidates.push_back(c);
+					for (const CString& n : CVideoLibrary::SplitList(vi.actors))
+					{
+						const int who = m_lib.FindActorByAnyName(n);
+						if (who < 0 || who == m_drillActorIdx)
+							candidates.push_back(n);   // 다른 배우는 빼고
+					}
+					for (const CString& n : candidates)
+					{
+						const CString s = stripParen(n);
+						bool found = false;
+						for (const auto& lg : legend)
+							if (lg.first.CompareNoCase(s) == 0) { cardColors[row] = lg.second; found = true; break; }
+						if (found)
+							break;
+					}
+				}
+	}
+	const bool reset = (m_yearViewActor != m_drillActorIdx);
+	m_yearViewActor = m_drillActorIdx;
+	m_yearCardColors = cardColors;   // 카드 커버의 빈 영역도 같은 색 (m_onDrawCard)
+	m_yearView.SetCardColors(std::move(cardColors));
+	m_yearView.SetLegend(std::move(legend));
+	m_yearView.SetCardSize(YearCardW(), YearCardH());
+	m_yearView.SetData(std::move(cols), std::move(parts), reset);
+	m_yearView.SetSelected(GetSelectedRow());
 }
 
 void CRuliManagerDlg::RefreshShotStrip()

@@ -19,6 +19,7 @@ public:
 	void SetColors(COLORREF back, COLORREF sub, COLORREF text);
 	void SetFile(const CString& path);   // 빈 문자열 = 표시 없음
 	void ForgetFailed();                 // 읽지 못한 경로의 기억을 지움 (다음 SetFile 때 다시 읽음)
+	void Forget(const CString& path);    // 그 경로의 기억을 지움 (영상 새로고침 - 다음 SetFile 때 다시 읽음)
 	int  NeededWidth();                  // 지금 내용을 그리는 데 필요한 폭 (픽셀, 내용 없으면 0)
 
 	static Info    ReadInfo(const CString& path);               // 속성에서 읽기 (캐시 없음)

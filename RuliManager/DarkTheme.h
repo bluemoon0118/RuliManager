@@ -44,4 +44,5 @@ private:
 	CBrush m_edit;
 	std::vector<std::unique_ptr<CDarkButton>> m_buttons;
 	std::vector<std::unique_ptr<CDarkHeader>> m_headers;
+	std::vector<std::unique_ptr<CDarkCheck>>  m_checks;    // 체크박스 · 라디오 (Windows 11 모양으로 직접 그림)
 };

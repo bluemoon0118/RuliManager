@@ -760,7 +760,7 @@ void CDarkScrollBar::ScrollTargetTo(int pos)
 	switch (m_type)
 	{
 	case TARGET_GRID:
-		::SendMessage(target, WM_DARKSCROLL_SETPOS, static_cast<WPARAM>(pos), 0);
+		::SendMessage(target, WM_DARKSCROLL_SETPOS, static_cast<WPARAM>(pos), m_vert ? 0 : 1);   // lParam 1 = 가로 스크롤바
 		break;
 	case TARGET_EDIT:
 		if (m_vert)
@@ -1037,3 +1037,240 @@ int CDarkScrollBar::OnMouseActivate(CWnd* /*pDesktopWnd*/, UINT /*nHitTest*/, UI
 {
 	return MA_NOACTIVATE;   // 클릭해도 포커스를 가져가지 않음
 }
+
+// ---------------------------------------------------------------------------
+// CDarkCheck: Windows 11 모양 체크박스 · 라디오 버튼
+
+namespace
+{
+	void EnsureGdiPlusCheck()
+	{
+		static ULONG_PTR token = 0;
+		if (!token)
+		{
+			Gdiplus::GdiplusStartupInput input;
+			Gdiplus::GdiplusStartup(&token, &input, nullptr);
+		}
+	}
+	Gdiplus::Color GdipColor(COLORREF c, BYTE a = 255)
+	{
+		return Gdiplus::Color(a, GetRValue(c), GetGValue(c), GetBValue(c));
+	}
+	COLORREF ShadeCheck(COLORREF c, int pct)   // pct < 0 어둡게, > 0 밝게
+	{
+		auto ch = [pct](int v) { return pct < 0 ? v * (100 + pct) / 100 : v + (255 - v) * pct / 100; };
+		return RGB(ch(GetRValue(c)), ch(GetGValue(c)), ch(GetBValue(c)));
+	}
+	void AddRoundRect(Gdiplus::GraphicsPath& p, const Gdiplus::RectF& r, float rad)
+	{
+		const float d = rad * 2.0f;
+		p.AddArc(r.X, r.Y, d, d, 180.0f, 90.0f);
+		p.AddArc(r.GetRight() - d, r.Y, d, d, 270.0f, 90.0f);
+		p.AddArc(r.GetRight() - d, r.GetBottom() - d, d, d, 0.0f, 90.0f);
+		p.AddArc(r.X, r.GetBottom() - d, d, d, 90.0f, 90.0f);
+		p.CloseFigure();
+	}
+}
+
+bool CDarkCheck::Subclass(HWND hwnd)
+{
+	if (!SubclassWindow(hwnd))
+		return false;
+	Invalidate();
+	return true;
+}
+
+bool CDarkCheck::IsRadio() const
+{
+	const LONG type = GetStyle() & BS_TYPEMASK;
+	return type == BS_RADIOBUTTON || type == BS_AUTORADIOBUTTON;
+}
+
+void CDarkCheck::PaintTo(CDC* dc)
+{
+	CRect rc;
+	GetClientRect(&rc);
+	dc->FillSolidRect(rc, TCOL(TC_BACK));
+	CFont* font = GetFont();
+	CFont* oldFont = font ? dc->SelectObject(font) : nullptr;
+	TEXTMETRIC tm = {};
+	dc->GetTextMetrics(&tm);
+
+	const bool enabled = IsWindowEnabled() != FALSE;
+	const LRESULT state = ::SendMessageW(m_hWnd, BM_GETSTATE, 0, 0);
+	const int check = static_cast<int>(::SendMessageW(m_hWnd, BM_GETCHECK, 0, 0));
+	const bool pushed = (state & BST_PUSHED) != 0;
+	const bool on = (check != BST_UNCHECKED);
+	const bool radio = IsRadio();
+
+	// 칸 크기: 글자 높이에 맞춤 (9pt 맑은 고딕 · 100% 에서 약 14px)
+	const int size = (std::max)(12, static_cast<int>(tm.tmHeight) * 7 / 8);
+	const bool rightButton = (GetStyle() & BS_LEFTTEXT) != 0;
+	const int boxX = rightButton ? rc.right - size - 1 : rc.left + 1;
+	const int boxY = rc.top + (rc.Height() - size) / 2;
+	const COLORREF accent = TCOL(TC_ACCENT);
+
+	EnsureGdiPlusCheck();
+	{
+		Gdiplus::Graphics g(dc->GetSafeHdc());
+		g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+		const Gdiplus::RectF box(boxX + 0.5f, boxY + 0.5f, size - 1.0f, size - 1.0f);
+		COLORREF fill, border;
+		if (on)
+		{
+			fill = enabled ? (pushed ? ShadeCheck(accent, -15) : (m_hot ? ShadeCheck(accent, 12) : accent)) : TCOL(TC_DISABLED);
+			border = fill;
+		}
+		else
+		{
+			fill = pushed ? ShadeCheck(TCOL(TC_EDIT), 8) : TCOL(TC_EDIT);
+			border = !enabled ? TCOL(TC_BORDER) : (m_hot || pushed ? TCOL(TC_LIGHT) : TCOL(TC_SUB));
+		}
+		Gdiplus::SolidBrush fb(GdipColor(fill));
+		Gdiplus::Pen bp(GdipColor(border), 1.0f);
+		if (radio)
+		{
+			g.FillEllipse(&fb, box);
+			g.DrawEllipse(&bp, box);
+			if (on)
+			{
+				// 가운데 흰 원 (마우스를 올리면 조금 크게)
+				const float d = size * (m_hot && enabled && !pushed ? 0.46f : 0.40f);
+				Gdiplus::SolidBrush dot(GdipColor(enabled ? RGB(255, 255, 255) : TCOL(TC_EDIT)));
+				g.FillEllipse(&dot, box.X + (box.Width - d) / 2.0f, box.Y + (box.Height - d) / 2.0f, d, d);
+			}
+		}
+		else
+		{
+			Gdiplus::GraphicsPath path;
+			AddRoundRect(path, box, (std::max)(2.0f, size * 0.22f));
+			g.FillPath(&fb, &path);
+			g.DrawPath(&bp, &path);
+			if (on)
+			{
+				Gdiplus::Pen mark(GdipColor(enabled ? RGB(255, 255, 255) : TCOL(TC_EDIT)), (std::max)(1.5f, size * 0.12f));
+				mark.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
+				mark.SetLineJoin(Gdiplus::LineJoinRound);
+				if (check == BST_INDETERMINATE)
+					g.DrawLine(&mark, box.X + size * 0.28f, box.Y + box.Height / 2.0f, box.GetRight() - size * 0.28f, box.Y + box.Height / 2.0f);
+				else
+				{
+					const Gdiplus::PointF pts[3] = {
+						Gdiplus::PointF(box.X + size * 0.24f, box.Y + size * 0.52f),
+						Gdiplus::PointF(box.X + size * 0.42f, box.Y + size * 0.69f),
+						Gdiplus::PointF(box.X + size * 0.76f, box.Y + size * 0.33f) };
+					g.DrawLines(&mark, pts, 3);
+				}
+			}
+		}
+	}
+
+	// 글자
+	CString text;
+	GetWindowText(text);
+	const int gap = (std::max)(4, size / 2);
+	CRect tr = rc;
+	if (rightButton)
+		tr.right = boxX - gap;
+	else
+		tr.left = boxX + size + gap;
+	dc->SetBkMode(TRANSPARENT);
+	dc->SetTextColor(enabled ? TCOL(TC_TEXT) : TCOL(TC_DISABLED));
+	const bool hidePrefix = (::SendMessageW(m_hWnd, WM_QUERYUISTATE, 0, 0) & UISF_HIDEACCEL) != 0;
+	UINT fmt = DT_VCENTER | DT_LEFT | (hidePrefix ? DT_HIDEPREFIX : 0);
+	if (GetStyle() & BS_MULTILINE)
+	{
+		// 여러 줄: 높이를 재서 세로 가운데
+		CRect calc = tr;
+		dc->DrawText(text, calc, DT_WORDBREAK | DT_CALCRECT | (hidePrefix ? DT_HIDEPREFIX : 0));
+		tr.top += (tr.Height() - calc.Height()) / 2;
+		tr.bottom = tr.top + calc.Height();
+		fmt = DT_WORDBREAK | DT_LEFT | (hidePrefix ? DT_HIDEPREFIX : 0);
+	}
+	else
+		fmt |= DT_SINGLELINE;
+	dc->DrawText(text, tr, fmt);
+	// 키보드 포커스: 글자 둘레 점선 (마우스로 누를 때는 표시 안 함)
+	if (GetFocus() == this && !(::SendMessageW(m_hWnd, WM_QUERYUISTATE, 0, 0) & UISF_HIDEFOCUS) && !text.IsEmpty())
+	{
+		CRect fr = tr;
+		dc->DrawText(text, fr, (fmt & ~DT_VCENTER) | DT_CALCRECT);
+		const int h = fr.Height();
+		fr.OffsetRect(0, (tr.Height() - h) / 2 - (fr.top - tr.top));
+		fr.InflateRect(2, 1);
+		dc->SetTextColor(TCOL(TC_TEXT));
+		dc->DrawFocusRect(fr);
+	}
+	if (oldFont)
+		dc->SelectObject(oldFont);
+}
+
+LRESULT CDarkCheck::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
+{
+	switch (message)
+	{
+	case WM_ERASEBKGND:
+		return TRUE;
+	case WM_PAINT:
+	case WM_PRINTCLIENT:
+	{
+		PAINTSTRUCT ps = {};
+		HDC hdc = (message == WM_PAINT) ? ::BeginPaint(m_hWnd, &ps) : reinterpret_cast<HDC>(wParam);
+		CRect rc;
+		GetClientRect(&rc);
+		// 메모리에 그린 뒤 한 번에 복사 (깜빡임 없게)
+		CDC* screen = CDC::FromHandle(hdc);
+		CDC mem;
+		mem.CreateCompatibleDC(screen);
+		CBitmap bmp;
+		bmp.CreateCompatibleBitmap(screen, (std::max)(1, rc.Width()), (std::max)(1, rc.Height()));
+		CBitmap* old = mem.SelectObject(&bmp);
+		PaintTo(&mem);
+		screen->BitBlt(0, 0, rc.Width(), rc.Height(), &mem, 0, 0, SRCCOPY);
+		mem.SelectObject(old);
+		if (message == WM_PAINT)
+			::EndPaint(m_hWnd, &ps);
+		return 0;
+	}
+	case WM_MOUSEMOVE:
+		if (!m_tracking)
+		{
+			TRACKMOUSEEVENT tme = { sizeof(tme), TME_LEAVE, m_hWnd, 0 };
+			m_tracking = ::TrackMouseEvent(&tme) != FALSE;
+		}
+		if (!m_hot)
+		{
+			m_hot = true;
+			Invalidate(FALSE);
+		}
+		break;
+	case WM_MOUSELEAVE:
+		m_tracking = false;
+		m_hot = false;
+		Invalidate(FALSE);
+		break;
+	default:
+		break;
+	}
+	const LRESULT r = CWnd::WindowProc(message, wParam, lParam);
+	// 원래 컨트롤이 상태를 바꾸며 직접 그린 뒤 → 우리 모양으로 다시 그림
+	switch (message)
+	{
+	case BM_SETCHECK: case BM_SETSTATE: case BM_CLICK: case BM_SETSTYLE:
+	case WM_LBUTTONDOWN: case WM_LBUTTONUP: case WM_LBUTTONDBLCLK:
+	case WM_KEYDOWN: case WM_KEYUP: case WM_CHAR:
+	case WM_ENABLE: case WM_SETTEXT: case WM_SETFOCUS: case WM_KILLFOCUS:
+	case WM_CAPTURECHANGED: case WM_UPDATEUISTATE: case WM_CHANGEUISTATE:
+		if (::IsWindow(m_hWnd))
+			::RedrawWindow(m_hWnd, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW);
+		break;
+	case WM_MOUSEMOVE:   // 누른 채 안팎으로 움직일 때만 (눌림 표시가 바뀜)
+		if (::IsWindow(m_hWnd) && ::GetCapture() == m_hWnd)
+			::RedrawWindow(m_hWnd, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW);
+		break;
+	default:
+		break;
+	}
+	return r;
+}
+

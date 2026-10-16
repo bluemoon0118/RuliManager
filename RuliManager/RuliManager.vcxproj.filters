@@ -25,6 +25,8 @@
     <ClInclude Include="ImageViewerWnd.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="Theme.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="ScreenshotExtractor.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="YearView.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="TagLinkDlg.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="BulkNameDlg.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="TextInfoDlg.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="NameListDlg.h"><Filter>헤더 파일</Filter></ClInclude>
@@ -68,6 +70,8 @@
     <ClCompile Include="ImageViewerWnd.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="Theme.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="ScreenshotExtractor.cpp"><Filter>소스 파일</Filter></ClCompile>
+    <ClCompile Include="YearView.cpp"><Filter>소스 파일</Filter></ClCompile>
+    <ClCompile Include="TagLinkDlg.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="SuggestEdit.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="TagChipCtrl.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="TextDraw.cpp"><Filter>소스 파일</Filter></ClCompile>

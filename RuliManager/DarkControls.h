@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-// 직접 그린 스크롤바가 대상 창에 스크롤 위치를 지정할 때 보내는 메시지 (wParam = 위치)
+// 직접 그린 스크롤바가 대상 창에 스크롤 위치를 지정할 때 보내는 메시지 (wParam = 위치, lParam = 1 이면 가로 스크롤바)
 const UINT WM_DARKSCROLL_SETPOS = WM_APP + 50;
 
 // ---------------------------------------------------------------------------
@@ -148,3 +148,23 @@ protected:
 	afx_msg void OnKillFocus(CWnd* pNewWnd);
 	DECLARE_MESSAGE_MAP()
 };
+
+// ---------------------------------------------------------------------------
+// 체크박스 · 라디오 버튼을 Windows 11 모양으로 직접 그림 (기존 Button 컨트롤을 서브클래싱)
+//  - 체크: 둥근 사각형 (꺼짐 = 어두운 칸 + 회색 테두리, 켜짐 = 강조색 칸 + 흰 체크 표시, 3상태 = 흰 가로줄)
+//  - 라디오: 원 (꺼짐 = 어두운 원 + 회색 테두리, 켜짐 = 강조색 원 + 가운데 흰 원)
+//  - 마우스 오버 = 테두리 밝게 / 누름 = 조금 어둡게, 비활성 = 흐리게, 키보드 포커스 = 글자 둘레 점선
+//  - 클릭 · 그룹 동작은 원래 컨트롤 그대로 (그리기만 바꿈, 상태가 바뀌는 메시지 뒤에 다시 그림)
+class CDarkCheck : public CWnd
+{
+public:
+	bool Subclass(HWND hwnd);
+
+protected:
+	bool m_hot = false;
+	bool m_tracking = false;
+	bool IsRadio() const;
+	void PaintTo(CDC* dc);
+	virtual LRESULT WindowProc(UINT message, WPARAM wParam, LPARAM lParam) override;
+};
+

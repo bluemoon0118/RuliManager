@@ -14,6 +14,7 @@
 #define IDD_SETTINGS                136
 #define IDD_IMAGE_SEARCH            137
 #define IDD_SERIES                  140
+#define IDD_TAG_LINK                141
 
 #define IDC_BTN_ADDFOLDER           1000
 #define IDC_BTN_REMOVEFOLDER        1001
@@ -71,6 +72,8 @@
 #define ID_ACTOR_TEXTINFO           32816
 #define ID_VIDEO_PASTEINFO          32817
 #define ID_VIDEO_SCREENSHOT         32824
+#define ID_ACTOR_PASTEINFO          32825
+#define ID_VIDEO_REFRESHITEM        32826
 #define ID_MANAGE_ACTORS            32810
 #define ID_MANAGE_STUDIOS           32811
 #define ID_MANAGE_TAGS              32812
@@ -241,6 +244,15 @@
 #define IDC_SHOT_STRIP              1271
 #define IDC_SET_SHOT_COLS           1272
 #define IDC_SET_SHOT_COLS_SPIN      1273
+#define IDC_YEAR_VIEW               1274
+#define IDC_DRILL_VIEW_GRID         1275
+#define IDC_DRILL_VIEW_YEAR         1276
+#define IDC_SET_MERGE_PARTS         1277
+#define IDC_SET_DETAIL_RIGHT        1278
+#define IDC_SET_DETAIL_LEFT         1279
+#define IDC_TL_SEARCH               1280
+#define IDC_TL_VIEW                 1281
+#define IDC_TL_GUIDE                1282
 #define IDC_NAMED_MEMO              1233
 #define IDC_ACT_GENDER              1159
 
@@ -254,9 +266,9 @@
 // 다음은 새 개체에 사용할 기본값입니다.
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE    141
-#define _APS_NEXT_COMMAND_VALUE     32825
-#define _APS_NEXT_CONTROL_VALUE     1274
+#define _APS_NEXT_RESOURCE_VALUE    142
+#define _APS_NEXT_COMMAND_VALUE     32827
+#define _APS_NEXT_CONTROL_VALUE     1283
 #define _APS_NEXT_SYMED_VALUE       101
 #endif
 #endif
