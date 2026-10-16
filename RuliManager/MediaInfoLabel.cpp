@@ -258,6 +258,15 @@ void CMediaInfoLabel::SetFile(const CString& path)
 		Invalidate(FALSE);
 }
 
+void CMediaInfoLabel::Forget(const CString& path)
+{
+	CString key = path;
+	key.MakeLower();
+	m_cache.erase(key);
+	if (m_path.CompareNoCase(path) == 0)
+		m_path.Empty();   // 같은 경로로 SetFile 해도 다시 읽게
+}
+
 void CMediaInfoLabel::ForgetFailed()
 {
 	for (auto it = m_cache.begin(); it != m_cache.end();)

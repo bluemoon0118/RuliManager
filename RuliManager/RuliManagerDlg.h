@@ -20,6 +20,7 @@
 #include <atomic>
 #include "DropCounter.h"
 #include "ScreenshotExtractor.h"
+#include "YearView.h"
 
 class CRuliManagerDlg : public CDialogEx, public IVideoGridOwner
 {
@@ -56,7 +57,7 @@ protected:
 	void UpdateModeButtons();
 	static inline const COLORREF& kScrollColor = TCOL(TC_SCROLL); // #6C7478 (스크롤바 배경)
 	static inline const COLORREF& kThumbBackColor = TCOL(TC_THUMB); // #2A353D (격자 이미지 배경)
-	CDarkScrollBar m_scrollBars[8];
+	CDarkScrollBar m_scrollBars[10];
 	void CreateScrollBars();
 	CListCtrl  m_list;
 	CEdit      m_editSearch;
@@ -67,6 +68,22 @@ protected:
 	CImagePreview     m_drillPhoto;
 	CActorDetailPanel m_drillPanel;
 	int  m_drillActorIdx = -1;
+	// 배우 출연작 화면 보기: [격자] (기존) / [연도별] (연도 열 × 1~12월 줄) - 레지스트리 Settings\ActorDrillView
+	CYearView   m_yearView;
+	CDarkButton m_drillViewBtns[2];
+	int  m_actorDrillView = 0;          // 0 = 격자, 1 = 연도별
+	int  m_yearViewActor = -1;          // 연도별 보기를 마지막으로 만든 배우 (바뀌면 스크롤을 처음으로)
+	bool m_cardImageOnly = false;       // DrawVideoCard: 이미지만 (연도별 보기 카드 - 덧그림 · 글자 없음)
+	COLORREF m_cardFill = CLR_INVALID;  // DrawVideoCard: 커버 빈 영역(비율 여백 · 기본 이미지 배경) 색 (연도별 보기 - 배우 이름별 고유색, CLR_INVALID = 기본)
+	std::map<int, COLORREF> m_yearCardColors;   // 연도별 보기 카드 항목 → 배우 이름별 고유색
+	int  YearCardW() { return DX(73); }              // 연도별 보기 카드: 확대 1단계 영상 카드 이미지의 50% (확대 슬라이더 영향 없음)
+	int  YearCardH() { return DX(73) * 9 / 16; }
+	bool YearViewActive() const { return DrillHeaderShown() && m_actorDrillView == 1; }
+	void RebuildYearView();
+	void SetActorDrillView(int mode);
+	void ShowVideoContextMenu(int row, CPoint point);   // 영상 오른쪽 클릭 메뉴 (격자 · 목록 · 연도별 공통)
+	afx_msg void OnBnClickedDrillViewGrid();
+	afx_msg void OnBnClickedDrillViewYear();
 	bool DrillHeaderShown() const { return m_mode == MODE_ACTOR && !m_drill.IsEmpty() && m_drillActorIdx >= 0; }
 	void UpdateDrillHeader();        // 출연작 화면 위 배우 사진 · 정보 갱신
 	void ToggleActorFavorite(int actorIdx);
@@ -84,6 +101,7 @@ protected:
 	void ShowNewItemMenu(CPoint screenPt);   // 지금 탭에 맞는 [새 …] 메뉴
 	bool AskNewName(const CString& caption, const CString& prompt, CString& name);   // 영상 카드 오른쪽 클릭 → 웹페이지 내용 붙여넣기 (txt 와 연동 없음)
 	void ApplyTextToVideo(int idx, const CString& text);   // "항목: 값" 글자로 영상 정보 교체 (텍스트로 정보 입력 / 사이트에서 가져오기)   // 영상 카드 오른쪽 클릭 → 텍스트로 정보 입력 (정보 txt 와 같은 규칙)
+	afx_msg void OnActorPasteInfo();  // 배우 카드 오른쪽 클릭 → 웹페이지 내용 붙여넣기 (프로필 화면 복사 글)
 	afx_msg void OnActorTextInfo();   // 배우 카드 오른쪽 클릭 → 텍스트로 정보 입력   // 배우 탭 우클릭 → 배우 삭제 (Del)   // 태그 탭 우클릭 → 삭제
 	void ToggleTagFavorite(const CString& tag);   // 태그 즐겨찾기 (태그 목록에 없으면 추가)
 	bool IsTagFavorite(const CString& tag) const;
@@ -98,7 +116,7 @@ protected:
 	std::map<CString, std::unique_ptr<CBitmap>> m_shotThumbs;   // "경로|폭|높이" → 축소 이미지 (nullptr = 못 읽음)
 	int         m_shotCardW = 0, m_shotCardH = 0;
 	int         m_shotCols = 3;      // 스크린샷 가로 배치 수 (설정 창, 레지스트리 Settings\ShotCols, 기본 3)
-	bool ShotStripShown() const { return VideoStripShown() && m_detailStripMode == 1; }
+	bool ShotStripShown() const { return (VideoStripShown() || DrillHeaderShown()) && m_detailStripMode == 1; }   // 영상 탭 · 제작사 영상 화면 · 배우 출연작 화면 (배우 출연작 화면은 배우 카드 대신 없음 → 스크린샷만)
 	void RefreshShotStrip();         // 지금 영상의 스크린샷 목록 다시 읽기
 	void DrawShotCard(CDC* dc, int i, const CRect& rc, bool hot);
 	CLinkBar    m_namedLinks;        // 제작사 탭 상세: 제작사 / 레이블 링크 (사이트 아이콘, 정보 줄 아래 - 링크가 있을 때만)
@@ -329,6 +347,17 @@ protected:
 	// 데이터
 	CVideoLibrary    m_lib;
 	std::vector<int> m_view;          // 목록 행 → m_lib.items 인덱스
+	// 분할 영상 합쳐서 보기 (설정 창, 레지스트리 Settings\MergeParts): 격자에 첫 번째 파트 카드 하나만, 이미지 위를 파트 수만큼 좌우로 나눠 고름
+	bool m_mergeParts = false;
+	bool m_detailLeft = false;                 // 상세 화면 위치: false = 오른쪽 (기본), true = 왼쪽 (설정 창, 레지스트리 Settings\DetailLeft)
+	std::vector<int> m_gridRows;               // 격자 칸 → m_view 행 (카드에 그리는 첫 파트, 비어 있으면 칸 = 행)
+	std::vector<int> m_rowGrid;                // m_view 행 → 격자 칸 (파트 행은 그 카드 칸)
+	std::map<int, std::vector<int>> m_gridParts;   // 격자 칸 → 파트 행들 (번호 순, 2개 이상일 때만)
+	int  GridRowOf(int g) const;               // 격자 칸 → 행 (합쳐 보기가 아니면 그대로)
+	int  GridIdxOf(int row) const;             // 행 → 격자 칸
+	void SelectViewRow(int row);               // m_view 행 선택 (격자 칸이 아니라 행 번호)
+	void BuildMergedView(bool apply);          // m_view 를 분할 묶음끼리 붙여 정렬하고 격자 칸 표를 만듦 (apply = false: 표만 비움)
+	int  PartZoneAt(int g, const CRect& card, CPoint pt) const;   // 합친 카드 이미지 위 파트 칸 (0 부터, 아니면 -1)
 	std::map<CString, int> m_partTotal;   // 나눠진 영상 묶음(폴더 + 파일 이름의 마지막 '_' 왼쪽) → 파일 수 (카드의 (1/3) 표시)
 	static bool SplitPartName(const CString& path, CString& key, int& num);
 	void RecyclePartImages(const std::vector<CString>& videoPaths, const CString& keepBase);   // 분할 파일별 이미지 → 휴지통   // "ABC-123_2.mp4" → 묶음 키 + 순번 2 (순번 없으면 false)
@@ -437,6 +466,10 @@ protected:
 	bool GridDrawCard(CDC* dc, int row, const CRect& card, bool selected, bool focused) override;   // 영상 카드
 	int  GridHoverZone(int row, const CRect& card, CPoint pt) override;   // 1 = 영상 카드 이미지 위 (이미지만 표시)
 	bool GridDblClick(int row, const CRect& card, CPoint pt) override;    // 스크린샷 추출 진행 표시 더블클릭 → 멈춤
+	bool GridClick(int row, const CRect& card, CPoint pt) override;     // 합친 카드: 이미지 위 파트 칸 → 그 파트 선택
+	int  GridHitPart(int row, const CRect& card, CPoint pt) override;   // 합친 카드: 이미지 위 파트 칸 번호 (1 부터)
+	void DrawShotBadge(CDC* dc, int row, const CRect& card);   // 스크린샷 추출 "(3/15)" / "(대기 2)" (카드 왼쪽 아래, 격자 · 연도별)
+	void InvalidateShotCards();                                // 진행 표시가 바뀜: 격자 + 연도별 보기 다시 그림
 	bool ShotBadgeRect(int row, const CRect& card, CRect& out, CString* text = nullptr, int* queuePos = nullptr);   // 영상 카드 왼쪽 아래 "(3/15)" / "(대기 2)" 영역 (추출 중 · 대기 중인 영상만, queuePos 0 = 추출 중)
 	CString GridTipText(int row, const CRect& card, CPoint pt) override;   // 영상 카드 제목 3줄 칸: 잘렸으면 제목 전체
 	// 영상 카드 덧그림(로고 · 별점 리본 · 해상도 / 재생 시간) 페이드: 행 → 지금 불투명도 (0 ~ 255, 바뀌는 중인 카드만)
@@ -581,6 +614,7 @@ protected:
 	void UpdateShotTitle();        // 창 제목: "스크린샷 추출 중 (3 / 15) · 대기 2"
 	int  ShotQueuePos(const CString& path) const;   // 대기열 순번 (1부터, 없으면 0)
 	afx_msg void OnVideoScreenshot();
+	afx_msg void OnVideoRefreshItem();   // 영상 카드 오른쪽 클릭 → 이 영상만 새로고침 (이미지 · 해상도/재생 시간 · 파일 크기 · 스크린샷 다시 읽기)
 	afx_msg LRESULT OnShotProgress(WPARAM wParam, LPARAM lParam);
 	afx_msg LRESULT OnShotDone(WPARAM wParam, LPARAM lParam);
 

@@ -29,6 +29,8 @@ BOOL CSettingsDlg::OnInitDialog()
 	UpdateCounts();
 	CheckDlgButton(IDC_SET_CARD_MEDIA, m_cardMedia ? BST_CHECKED : BST_UNCHECKED);
 	CheckDlgButton(IDC_SET_SFW, m_sfw ? BST_CHECKED : BST_UNCHECKED);
+	CheckDlgButton(IDC_SET_MERGE_PARTS, m_mergeParts ? BST_CHECKED : BST_UNCHECKED);
+	CheckRadioButton(IDC_SET_DETAIL_RIGHT, IDC_SET_DETAIL_LEFT, m_detailLeft ? IDC_SET_DETAIL_LEFT : IDC_SET_DETAIL_RIGHT);
 	CheckRadioButton(IDC_SET_STRIP_ACTORS, IDC_SET_STRIP_SHOTS, m_detailStrip == 1 ? IDC_SET_STRIP_SHOTS : IDC_SET_STRIP_ACTORS);
 	SetDlgItemInt(IDC_SET_SHOT_COLS, static_cast<UINT>(m_shotCols), FALSE);
 	if (CEdit* e = static_cast<CEdit*>(GetDlgItem(IDC_SET_SHOT_COLS)))
@@ -125,6 +127,8 @@ void CSettingsDlg::OnOK()
 {
 	m_cardMedia = IsDlgButtonChecked(IDC_SET_CARD_MEDIA) == BST_CHECKED;
 	m_sfw = IsDlgButtonChecked(IDC_SET_SFW) == BST_CHECKED;
+	m_mergeParts = IsDlgButtonChecked(IDC_SET_MERGE_PARTS) == BST_CHECKED;
+	m_detailLeft = IsDlgButtonChecked(IDC_SET_DETAIL_LEFT) == BST_CHECKED;
 	m_detailStrip = (IsDlgButtonChecked(IDC_SET_STRIP_SHOTS) == BST_CHECKED) ? 1 : 0;
 	{
 		BOOL ok = FALSE;

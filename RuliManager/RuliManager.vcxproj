@@ -106,6 +106,8 @@
     <ClInclude Include="ImageViewerWnd.h" />
     <ClInclude Include="Theme.h" />
     <ClInclude Include="ScreenshotExtractor.h" />
+    <ClInclude Include="YearView.h" />
+    <ClInclude Include="TagLinkDlg.h" />
     <ClInclude Include="BulkNameDlg.h" />
     <ClInclude Include="TextInfoDlg.h" />
     <ClInclude Include="NameListDlg.h" />
@@ -150,6 +152,8 @@
     <ClCompile Include="ImagePreview.cpp" />
     <ClCompile Include="ImageViewerWnd.cpp" />
     <ClCompile Include="Theme.cpp" />
+    <ClCompile Include="YearView.cpp" />
+    <ClCompile Include="TagLinkDlg.cpp" />
     <ClCompile Include="ScreenshotExtractor.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp20</LanguageStandard>

@@ -32,6 +32,7 @@ public:
 	const std::vector<CString>& Tags() const { return m_tags; }
 	int  CalcHeight(int width);                       // 이 폭에서 필요한 높이 (픽셀)
 	bool AddFromEdit();                               // 입력 칸의 글자를 태그로 추가
+	int  ChipAt(CPoint client) const;                 // 그 위치의 칩 번호 (없으면 -1, 클라이언트 좌표)
 
 protected:
 	std::vector<CString> m_tags;

@@ -133,6 +133,15 @@ void CDarkDialogTheme::Apply(CWnd* dlg, std::initializer_list<UINT> dangerIds)
 			else
 			{
 				::SetWindowTheme(h, L"", L"");   // 체크박스/라디오: 테마를 끄면 글자색 지정 가능
+				// 체크박스 · 라디오는 Windows 11 모양으로 직접 그림 (그룹 상자 · 누름 모양 체크는 제외)
+				const bool checkLike = (type == BS_CHECKBOX || type == BS_AUTOCHECKBOX || type == BS_3STATE || type == BS_AUTO3STATE ||
+				                        type == BS_RADIOBUTTON || type == BS_AUTORADIOBUTTON);
+				if (checkLike && !(::GetWindowLongW(h, GWL_STYLE) & BS_PUSHLIKE) && !CWnd::FromHandlePermanent(h))
+				{
+					auto chk = std::make_unique<CDarkCheck>();
+					if (chk->Subclass(h))
+						m_checks.push_back(std::move(chk));
+				}
 			}
 		}
 		else

@@ -4678,6 +4678,16 @@ bool CVideoLibrary::SameNameByLang(const CString& a, const CString& b)
 	return false;
 }
 
+int CVideoLibrary::NameLangCount(const CString& name)
+{
+	// 이름의 구성요소 수 = 들어 있는 언어 수 (한글 · 영어 · 일본어 …) - "한글이름(영문이름, 일본어이름)" 이 3 으로 가장 완전한 형태
+	std::vector<int> langs;
+	for (const NamePart& p : NameParts(name))
+		if (std::find(langs.begin(), langs.end(), p.lang) == langs.end())
+			langs.push_back(p.lang);
+	return static_cast<int>(langs.size());
+}
+
 bool CVideoLibrary::ApplyVideoTextInfo(VideoItem& v, const CString& file) const
 {
 	CString text;
@@ -4686,7 +4696,7 @@ bool CVideoLibrary::ApplyVideoTextInfo(VideoItem& v, const CString& file) const
 	return ApplyVideoText(v, text);
 }
 
-bool CVideoLibrary::ApplyVideoText(VideoItem& v, CString text) const
+bool CVideoLibrary::ApplyVideoText(VideoItem& v, CString text, std::vector<CString>* rawTags) const
 {
 	if (text.Find(kActorTxtHeader) >= 0)
 		return false;   // 배우 정보 파일은 영상 정보로 읽지 않음
@@ -4836,6 +4846,8 @@ bool CVideoLibrary::ApplyVideoText(VideoItem& v, CString text) const
 			t.Replace(L'|', L',');
 			t.Replace(L'#', L',');
 			t.Replace(L'＃', L',');
+			if (rawTags && v.tags.IsEmpty())
+				*rawTags = SplitList(t);   // 목록 이름으로 바꾸기 전 (붙여넣은 그대로)
 			setIfEmpty(v.tags, JoinList(SplitList(t)));
 		}
 		else if (KeyIs(key, { L"물방울", L"ocount", L"o" }))
@@ -4848,15 +4860,29 @@ bool CVideoLibrary::ApplyVideoText(VideoItem& v, CString text) const
 	{
 		// 출연자 이름이 등록 배우의 한글 / 영어 / 일어 이름 조각과 같으면 그 배우로 연결
 		//  (이름 · 별칭과 그대로 같은 경우는 아래 NormalizeVideoActors 가 배우 이름 + 참여 별칭으로 정리)
+		//  과거 이름(다른 이름)과 언어별로 같으면 → 배우 이름 + 참여 별칭 = 그 과거 이름 (등록된 표기)
 		std::vector<CString> list = SplitList(v.actors), out;
+		std::vector<CString> credited = SplitList(v.actorAliases);
 		for (const CString& n : list)
 		{
 			CString name = n;
 			if (FindActorByAnyName(n) < 0)
 			{
-				const int idx = FindActorByNamePart(n);
+				int idx = -1;
+				CString alias;
+				for (size_t i = 0; i < actors.size() && idx < 0; ++i)   // 1) 언어별로 대표 이름과 같음
+					if (SameNameByLang(actors[i].name, n)) idx = static_cast<int>(i);
+				for (size_t i = 0; i < actors.size() && idx < 0; ++i)   // 2) 언어별로 다른 이름(과거 이름)과 같음
+					for (const CString& al : SplitList(actors[i].aliases))
+						if (SameNameByLang(al, n)) { idx = static_cast<int>(i); alias = al; break; }
+				if (idx < 0)
+					idx = FindActorByNamePart(n);                        // 3) 이름 조각
 				if (idx >= 0)
+				{
 					name = actors[idx].name;
+					if (!alias.IsEmpty() && std::find_if(credited.begin(), credited.end(), [&](const CString& c) { return c.CompareNoCase(alias) == 0; }) == credited.end())
+						credited.push_back(alias);
+				}
 			}
 			bool dup = false;
 			for (const CString& o : out)
@@ -4865,6 +4891,7 @@ bool CVideoLibrary::ApplyVideoText(VideoItem& v, CString text) const
 				out.push_back(name);
 		}
 		v.actors = JoinList(out);
+		v.actorAliases = JoinList(credited);
 		NormalizeVideoActors(v);   // 별칭으로 적힌 배우 → 배우 이름 + 참여 별칭
 	}
 
@@ -4983,7 +5010,7 @@ CString CVideoLibrary::ParsePastedVideoText(const CString& raw)
 		else if (kv && isMaker(key))  { if (maker.IsEmpty()) { maker = val; maker.TrimLeft(L'#'); maker.Trim(); } }
 		else if (kv && isLabel(key))  { if (label.IsEmpty()) { label = val; label.TrimLeft(L'#'); label.Trim(); } }
 		else if (kv && isSeries(key)) { if (series.IsEmpty() && val != L"-" && val != L"----") { series = val; series.TrimLeft(L'#'); series.Trim(); } }
-		else if (kv && isCast(key))
+		else if (kv && isCast(key) && cast.empty())   // "출연" 항목 한 줄만 (페이지 아래쪽 다른 목록의 배우는 넣지 않음)
 		{
 			CString v = val;
 			v.Replace(L'#', L',');
@@ -5100,6 +5127,158 @@ CString CVideoLibrary::ParsePastedVideoText(const CString& raw)
 		add(L"제작사", label);
 	add(L"시리즈", series);
 	add(L"태그", JoinList(genres));
+	return out;
+}
+
+CString CVideoLibrary::ParsePastedActorText(const CString& raw)
+{
+	// 배우 프로필 화면을 복사한 글 → "항목: 값" 줄 (ApplyActorText 가 읽는 항목만)
+	//  - "항목: 값" / "항목：값" / "항목<탭>값" / "항목 값" 한 줄, 또는 항목 줄 다음 줄이 값 ("生年月日" ↵ "1998年2月17日")
+	//  - 항목 없이 "T162 B88(E) W58 H86" 같은 치수 줄도 읽음
+	static const LPCWSTR keys[] = {
+		L"생년월일", L"생일", L"출생", L"출생일", L"birthday", L"birth", L"birthdate", L"born", L"dob", L"dateofbirth", L"生年月日", L"誕生日",
+		L"키", L"신장", L"height", L"身長",
+		L"치수", L"쓰리사이즈", L"3사이즈", L"사이즈", L"신체사이즈", L"measurements", L"measurement", L"sizes", L"threesizes", L"bwh", L"スリーサイズ", L"サイズ",
+		L"가슴", L"바스트", L"bust", L"バスト", L"허리", L"웨이스트", L"waist", L"ウエスト", L"엉덩이", L"힙", L"hip", L"hips", L"ヒップ",
+		L"컵", L"컵사이즈", L"cup", L"cupsize", L"カップ", L"ブラ",
+		L"국적", L"국가", L"출신", L"출신지", L"nationality", L"country", L"国籍", L"出身", L"出身地",
+		L"성별", L"gender", L"sex", L"性別",
+		L"데뷔", L"데뷔일", L"debut", L"careerstart", L"activefrom", L"デビュー", L"デビュー日",
+		L"은퇴", L"은퇴일", L"retire", L"retired", L"careerend", L"引退", L"引退日",
+		L"별칭", L"별명", L"다른이름", L"예명", L"aliases", L"alias", L"aka", L"別名", L"旧芸名",
+	};
+	auto isKey = [](const CString& k)
+	{
+		const CString n = NormKey(k);
+		if (n.IsEmpty())
+			return false;
+		for (LPCWSTR s : keys)
+			if (n == s)
+				return true;
+		return false;
+	};
+	CString text = raw;
+	text.Replace(L"\r\n", L"\n");
+	text.Replace(L'\r', L'\n');
+	text.Replace(L'\x00A0', L' ');
+	std::vector<CString> lines;
+	{
+		int pos = 0;
+		while (pos <= text.GetLength())
+		{
+			int nl = text.Find(L'\n', pos);
+			if (nl < 0) nl = text.GetLength();
+			CString l = text.Mid(pos, nl - pos);
+			l.Trim();
+			if (!l.IsEmpty())
+				lines.push_back(l);
+			pos = nl + 1;
+		}
+	}
+	// 줄을 항목 / 값으로 나눔: 구분자(: ： = 탭) 또는 앞쪽 공백 (항목 이름이 알려진 것일 때만)
+	auto splitLine = [&isKey](const CString& line, CString& key, CString& val) -> bool
+	{
+		int sep = -1;
+		for (wchar_t c : { L':', L'\xFF1A', L'=', L'\t' })
+		{
+			const int p = line.Find(c);
+			if (p > 0 && (sep < 0 || p < sep)) sep = p;
+		}
+		if (sep > 0 && sep <= 20 && isKey(line.Left(sep)))
+		{
+			key = line.Left(sep);
+			key.Trim();
+			val = line.Mid(sep + 1);
+			val.Trim();
+			return true;
+		}
+		if (isKey(line))
+		{
+			key = line;
+			val.Empty();
+			return true;
+		}
+		for (int p = 1; p < line.GetLength() && p <= 12; ++p)   // "身長 162cm" / "키 162"
+		{
+			if (line[p] != L' ' && line[p] != L'\x3000')
+				continue;
+			if (isKey(line.Left(p)))
+			{
+				key = line.Left(p);
+				key.Trim();
+				val = line.Mid(p + 1);
+				val.Trim();
+				return true;
+			}
+		}
+		return false;
+	};
+	CString out;
+	auto add = [&out](const CString& k, const CString& v) { CString t = v; t.Trim(); if (t.IsEmpty()) return; out += k; out += L": "; out += t; out += L"\r\n"; };
+	// 맨 앞의 ":" 없는 줄들 = 이름 (한글 · 영어 · 일본어 순) → "아오이 츠카사(Tsukasa Aoi, 葵つかさ)"
+	size_t first = 0;
+	{
+		std::vector<CString> names;
+		while (first < lines.size() && names.size() < 4)
+		{
+			const CString& l = lines[first];
+			CString k, v;
+			if (l.FindOneOf(L":\xFF1A=\t") >= 0 || splitLine(l, k, v) || l.GetLength() > 40)
+				break;   // 항목 줄 · 긴 글이 나오면 이름 끝
+			names.push_back(l);
+			++first;
+		}
+		if (!names.empty())
+		{
+			CString name = names[0];
+			if (names.size() > 1)
+			{
+				name += L"(";
+				for (size_t n = 1; n < names.size(); ++n)
+				{
+					if (n > 1) name += L", ";
+					name += names[n];
+				}
+				name += L")";
+			}
+			add(L"이름", name);
+		}
+	}
+	bool sizes = false;
+	for (size_t i = first; i < lines.size(); ++i)
+	{
+		CString key, val;
+		if (splitLine(lines[i], key, val))
+		{
+			if (val.IsEmpty() && i + 1 < lines.size())
+			{
+				CString k2, v2;
+				if (!splitLine(lines[i + 1], k2, v2))
+					val = lines[++i];   // 다음 줄이 값
+			}
+			add(key, val);
+			continue;
+		}
+		// 항목 없는 치수 줄: "T162 B88(E) W58 H86" / "B88 W58 H86"
+		if (!sizes)
+		{
+			CString up = lines[i];
+			up.MakeUpper();
+			const int pb = up.Find(L'B'), pw = up.Find(L'W'), ph = up.Find(L'H');
+			if (pb >= 0 && pw > pb && ph > pw && up.GetLength() <= 40 && FirstNumber(up, pb) > 0 && FirstNumber(up, pw) > 0 && FirstNumber(up, ph) > 0)
+			{
+				const int pt = up.Find(L'T');
+				if (pt >= 0 && pt < pb && FirstNumber(up, pt) >= 100)
+				{
+					CString h;
+					h.Format(L"%d", FirstNumber(up, pt));
+					add(L"키", h);
+				}
+				add(L"치수", lines[i].Mid(pb));
+				sizes = true;
+			}
+		}
+	}
 	return out;
 }
 
