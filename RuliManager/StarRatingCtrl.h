@@ -9,14 +9,19 @@
 class CStarRatingCtrl : public CWnd
 {
 public:
+	// 값 단위 = 반 별 (0 ~ 별 수 x 2, 예: 7 = 별 3.5개)
 	std::function<void(int)> m_onChanged;
 
 	bool Create(CWnd* parent, UINT id, int maxStars = 5);
-	void SetRating(int rating);              // 알림 없이 값만 바꿈
+	void SetRating(int rating);              // 알림 없이 값만 바꿈 (반 별 단위)
 	int  GetRating() const { return m_rating; }
+	// 별점 입력 단위 (설정 창): false = 1점(별 하나씩), true = 0.5점(별 반쪽 - 별의 왼쪽 절반을 누르면 .5)
+	static void SetHalfStep(bool half) { s_halfStep = half; }
+	static bool HalfStep() { return s_halfStep; }
 	void SetColors(COLORREF back, COLORREF star, COLORREF empty, COLORREF text);
 
 protected:
+	static bool s_halfStep;
 	int  m_max = 5;
 	int  m_rating = 0;
 	int  m_hover = -1;                       // 마우스가 올라간 별 수 (-1: 없음)
@@ -28,7 +33,7 @@ protected:
 
 	int  StarSize() const;
 	int  StarGap() const;
-	int  HitStar(CPoint pt) const;            // 1..max, 별 영역 밖이면 0
+	int  HitStar(CPoint pt) const;            // 반 별 단위 값 (0.5점 방식: 별 왼쪽 절반 = .5), 별 영역 밖이면 0
 	void ChangeTo(int rating);
 
 	afx_msg void OnPaint();

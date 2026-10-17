@@ -932,6 +932,7 @@ void CActorDetailPanel::OnPaint()
 			y = top + lines * histH;
 		}
 
+
 		// 메모를 오른쪽 빈 영역에 (별점 줄 높이부터 패널 아래까지, 넘치면 …)
 		if (m_memoRight && !m_memo.IsEmpty())
 		{

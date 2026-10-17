@@ -28,6 +28,10 @@ public:
 	virtual void GridPrefetch(int /*first*/, int /*last*/) {}
 };
 
+// 줄 배치(리스트 보기)의 한 줄: start 번 카드부터 다음 줄 start 전까지 - 한 화면 줄에 모두 (넘치면 좌우 스크롤)
+//  firstCol: 첫 카드의 칸 (예: 앞 페이지 제작사의 레이블이 이어지면 1 → 제작사 칸 비움), wrapCol: 사용 안 함 (예전 줄 바꿈용)
+struct GridLine { int start = 0; int firstCol = 0; int wrapCol = 0; };
+
 // 썸네일 + 파일명 + 발매일 + 메모를 카드 형태로 바둑판 배열하는 컨트롤
 class CVideoGrid : public CWnd
 {
@@ -57,6 +61,10 @@ public:
 	int  ScrollY() const { return m_scroll; }
 	void ScrollToTop() { if (GetSafeHwnd()) SetScroll(0); }   // 맨 위로 (탭 전환 · 카드로 들어갈 때)
 
+	// 줄 배치 (리스트 보기): 비우면 보통 바둑판, 주면 줄마다 새 화면 줄에서 시작 (Refresh 전에 호출)
+	void SetLines(const std::vector<GridLine>& lines);
+	bool LineMode() const { return !m_lines.empty(); }
+
 protected:
 	IVideoGridOwner* m_owner = nullptr;
 	CImageList* m_images = nullptr;
@@ -82,6 +90,24 @@ protected:
 	int  m_fixedW = 0;       // 고정 카드 크기 (배우 카드)
 	int  m_fixedH = 0;
 	int  m_offsetX = 0;      // 고정 카드일 때 가운데 정렬 여백
+	// 줄 배치 (리스트 보기)
+	std::vector<GridLine> m_lines;
+	std::vector<POINT> m_pos;        // 카드 → (x = 칸, y = 화면 줄)
+	std::vector<int>   m_cellItem;   // 화면 줄 * m_cols + 칸 → 카드 (-1: 빈 칸)
+	int  m_lineRows = 0;             // 줄 배치의 화면 줄 수
+	int  m_lineCols = 0;             // 줄 배치의 가장 긴 줄 칸 수 (화면보다 길면 좌우 스크롤)
+	int  m_scrollX = 0;              // 줄 배치 가로 스크롤 위치
+	int  Cols(int count) const { return LineReady(count) ? m_lineCols : m_cols; }
+	void SetScrollX(int pos);
+	void UpdateHorzBar();
+	afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
+	void BuildLinePositions(int count);
+	bool LineReady(int count) const { return !m_lines.empty() && static_cast<int>(m_pos.size()) == count; }
+	int  RowCount(int count) const;                 // 화면 줄 수
+	bool PosOf(int row, int& r, int& c) const;      // 카드의 화면 줄 / 칸
+	int  ItemAt(int r, int c) const;                // 화면 줄 / 칸의 카드 (-1: 없음)
+	void ItemRangeOfRows(int r0, int r1, int& first, int& last) const;   // 화면 줄 [r0, r1] 의 카드 범위
+	void MoveVert(int rows);                        // 위 · 아래 줄로 (같은 칸 근처)
 	CFont m_fontBold;
 	int  m_hot = -1;          // 마우스가 올라간 카드
 	int  m_hotPart = 0;       // 마우스가 올라간 카드 위 버튼

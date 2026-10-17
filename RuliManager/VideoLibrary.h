@@ -10,7 +10,8 @@ struct VideoItem
 	CString   title;         // 제목 (파일 이름과 별개, 비어 있으면 파일 이름 사용)
 	ULONGLONG size = 0;      // 바이트
 	ULONGLONG modified = 0;  // FILETIME (UTC) 64비트 값
-	int       rating = 0;    // 0~5
+	int       censor = 0;    // 검열: 0 해당없음, 1 검열됨, 2 모자이크파괴, 3 무수정, 4 무수정-유출 (DB V 줄 18번째 칸)
+	int       rating = 0;    // 별점 0~10 (반 별 단위, 7 = 3.5점) - DB 에는 "3.5" 처럼 점수로
 	int       oCount = 0;    // 물방울 카운트 (상세 정보 별점 오른쪽, 클릭마다 +1)
 	CString   actors;        // 쉼표로 구분된 배우
 	CString   actorAliases;  // 이 작품에서 배우가 쓴 별칭 (쉼표 구분)
@@ -29,6 +30,7 @@ struct VideoItem
 // 배우 한 명의 정보 (동영상의 actors 에는 배우 이름이 쉼표로 저장됨)
 struct ActorInfo
 {
+	mutable int id = 0; // 고유 번호 (1 ~ 99999999, DB 에는 8자리 "00000001") - 0 = 아직 없음 (저장할 때 부여), 이름이 바뀌어도 그대로
 	CString name;      // 이름 (중복 불가)
 	CString lastAlias; // 영상 배우 칩에서 마지막으로 고른 별칭 (새로 배우를 넣을 때 초기값)
 	CString aliases;   // 별칭 (여러 개, 쉼표 구분) - 동영상의 배우 칸에 별칭으로 적혀 있어도 이 배우로 연결
@@ -38,7 +40,7 @@ struct ActorInfo
 	CString height;    // 키 (cm, 숫자)
 	CString debut;     // 데뷔일 "YYYY-MM-DD"
 	CString retire;    // 은퇴일 "YYYY-MM-DD" (비어 있으면 활동 중/모름)
-	int     rating = 0; // 별점 0~5 (0 = 없음)
+	int     rating = 0; // 별점 0~10 (반 별 단위, 0 = 없음) - DB 에는 "3.5" 처럼 점수로
 	bool    favorite = false; // 즐겨찾기 (배우 카드 오른쪽 위 하트)
 	CString bust;      // 치수: 가슴 (cm, 숫자)
 	CString waist;     // 치수: 허리
@@ -94,7 +96,31 @@ public:
 
 	bool Load();
 	bool Save() const;               // DB 파일은 AES 로 암호화해서 저장 (DbCrypt.h)
-	bool LoadedPlainText() const { return m_loadedPlainText; }   // 예전 평문 DB 를 읽었음 → 바로 저장하면 암호화됨
+	bool LoadedPlainText() const { return m_loadedPlainText; }
+	// DB 프로그램 버전: 저장할 때 "#AppVersion\t<버전>" 줄로 기록 (예전 DB 는 빈 문자열)
+	const CString& DbVersion() const { return m_dbVersion; }
+	static CString AppVersion();                                      // 지금 프로그램 버전 (Version.h)
+	static int  CompareVersions(const CString& a, const CString& b);   // a < b: 음수, 같음: 0, a > b: 양수 (빈 문자열 = 가장 낮음)
+	static bool BackupDataFile(const CString& dbVersion, CString& backupPath);   // 원본 DB → <DB 폴더>\DbBackup\library_v<버전>_<날짜시각>.vmdb
+	int  ConvertDb(const CString& fromVersion);                       // 예전 버전 DB 변환 (반환: 바뀐 단계 수)
+	// 배우 고유 번호: DB 의 영상 배우 칸은 "#00000001", 참여 별칭은 "#00000001:과거이름" 으로 저장 (읽을 때 이름으로 바꿈)
+	void AssignActorIds() const;                                      // 번호 없는(또는 겹치는) 배우에 새 번호 (다음 번호부터, 지운 번호는 다시 쓰지 않음)
+	int  FindActorById(int id) const;                                 // 번호로 배우 찾기 (-1 = 없음)
+	static CString ActorIdText(int id);                               // "00000001"
+	// 별점 (반 별 단위 0 ~ 10) ↔ 글자 "3.5" / "3" (0 = 빈 문자열) - 예전 DB 의 정수 "3" 은 별 3개(6)로 읽음
+	static CString RatingValueText(int halfUnits);
+	// 배우 · 제작사(레이블 포함) · 태그 DB 를 암호화하지 않은 텍스트로 내보내기 / 그 파일로 일괄 등록 (설정 창 [DB 관리])
+	enum { EXPORT_ACTORS = 0, EXPORT_STUDIOS = 1, EXPORT_TAGS = 2, EXPORT_VIDEOS = 3 };
+	bool ExportListFile(int what, const CString& path) const;
+	bool ImportListFile(int what, const CString& path, int& added, int& updated);   // 같은 항목은 파일의 값이 있는 칸만 덮어씀
+	// 검열 정보: 이름은 설정 창에서 고른 언어 (0 = 한글, 1 = 영어, 2 = 일본어)
+	static const int kCensorCount = 5;
+	static const wchar_t* CensorName(int index, int lang = -1);       // lang -1 = 설정 언어
+	static int  ParseCensor(const CString& text);                     // 세 언어 이름 중 하나 → 번호 (없으면 -1)
+	static void SetCensorLang(int lang);
+	static int  CensorLang();
+	static int     ParseRatingValue(const CString& text);             // "3.5" → 7, "3" → 6, 범위 밖 · 빈칸 → 0
+   // 예전 평문 DB 를 읽었음 → 바로 저장하면 암호화됨
 	bool DbBroken() const { return m_dbBroken; }
 	// 작업 DB: 실행 중에는 library.work.vmdb 에 저장하고 [DB 반영] / 종료 때 library.vmdb 로 반영
 	bool HasUnappliedChanges() const { return m_workDirty; }   // 작업 DB 에 반영 안 한 변경이 있음
@@ -131,6 +157,7 @@ public:
 	int  FindStudioLoose(const CString& name) const;   // 스튜디오 이름 · 서브이름으로 찾기 (그대로 → 공백 · 대소문자 · 기호 무시 순, 없으면 -1)
 	static bool SameNameByLang(const CString& a, const CString& b);
 	static int  NameLangCount(const CString& name);   // 이름의 구성요소(언어) 수: "한글(English, 日本語)" = 3
+	static CString ComposeFullName(const CString& existing, const CString& web);   // 기존 이름 + 웹 이름 → "한글(English, 日本語)" (언어마다 기존 표기 우선, 없는 언어만 웹에서)
 	// 성별 목록 (저장 값, 순서 = 배우 관리 창 콤보 순서, 0번 = 미지정 "")
 	static int     GenderCount();
 	static CString GenderAt(int i);
@@ -285,6 +312,8 @@ public:
 
 private:
 	bool m_loadedPlainText = false;
+	CString m_dbVersion;   // 읽은 DB 의 프로그램 버전
+	mutable int m_nextActorId = 1;   // 다음에 줄 배우 번호 (DB "#ActorIdNext" 줄에 저장)
 	bool m_dbBroken = false;
 	mutable bool m_workDirty = false;
 	// 이미지가 바뀌지 않았으면 저장할 때 images.vmdb 를 다시 쓰지 않음

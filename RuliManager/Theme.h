@@ -54,4 +54,5 @@ namespace Theme
 	void           Apply(int index);           // g_themeColors 를 그 테마 색으로 (시작할 때만)
 	void           LoadFromSettings();         // 레지스트리 Settings\Theme → Apply (없으면 Stash)
 	void           SaveToSettings(int index);  // 레지스트리에 저장 (다시 시작하면 적용)
+	COLORREF       Color(int index, int role); // 그 테마의 색 (적용하지 않고 읽기만 - 설정 창 미리보기)
 }

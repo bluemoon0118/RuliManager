@@ -57,7 +57,10 @@ void CDarkCombo::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		CString text;
 		GetLBText(static_cast<int>(lpDIS->itemID), text);
 		dc.SetBkMode(TRANSPARENT);
-		dc.SetTextColor(IsWindowEnabled() ? m_text : Dim(m_text));
+		COLORREF textColor = m_text;
+		if (lpDIS->itemID < m_itemColors.size() && m_itemColors[lpDIS->itemID] != CLR_DEFAULT)
+			textColor = m_itemColors[lpDIS->itemID];   // 항목별 글자색
+		dc.SetTextColor(IsWindowEnabled() ? textColor : Dim(textColor));
 		CFont* old = dc.SelectObject(GetFont());
 		rc.DeflateRect(4, 0);
 		dc.DrawText(text, &rc, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS);
@@ -190,7 +193,31 @@ void CDarkButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	CPen pen(PS_SOLID, 1, focused && !disabled ? Shade(base, 160) : fill);
 	CBrush* oldBrush = dc.SelectObject(&brush);
 	CPen* oldPen = dc.SelectObject(&pen);
-	dc.RoundRect(&rc, CPoint(6, 6));
+	if (m_segment == SEG_NONE)
+		dc.RoundRect(&rc, CPoint(6, 6));
+	else
+	{
+		// 세그먼트: 바깥쪽 모서리만 둥글게 (안쪽은 옆 칸과 붙도록 각지게), 묶음 테두리 + 칸 사이 구분선
+		const COLORREF edge = Shade(m_toggle ? m_offBg : base, 150);
+		CPen edgePen(PS_SOLID, 1, edge);
+		dc.SelectObject(&edgePen);
+		CRect shape = rc;
+		if (m_segment == SEG_LEFT)        shape.right += 8;    // 오른쪽 둥근 모서리는 밖으로 (잘림)
+		else if (m_segment == SEG_RIGHT)  shape.left -= 8;
+		else                              shape.InflateRect(8, 0);
+		CRgn clip;
+		clip.CreateRectRgnIndirect(&rc);
+		dc.SelectClipRgn(&clip);
+		dc.RoundRect(&shape, CPoint(6, 6));
+		if (m_segment != SEG_LEFT)
+		{
+			// 왼쪽 칸과의 구분선 (왼쪽 테두리)
+			dc.MoveTo(rc.left, rc.top);
+			dc.LineTo(rc.left, rc.bottom);
+		}
+		dc.SelectClipRgn(nullptr);
+		dc.SelectObject(&pen);
+	}
 	dc.SelectObject(oldBrush);
 	dc.SelectObject(oldPen);
 

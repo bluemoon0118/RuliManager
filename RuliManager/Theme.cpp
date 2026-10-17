@@ -114,6 +114,15 @@ namespace
 	int g_current = 0;
 }
 
+COLORREF Theme::Color(int index, int role)
+{
+	if (index < 0 || index >= kPaletteCount)
+		index = 0;
+	if (role < 0 || role >= TC_COUNT)
+		return RGB(0, 0, 0);
+	return kPalettes[index].c[role];
+}
+
 // 처음 값 = Stash (상수 초기화라 다른 전역 변수보다 먼저 정해짐)
 COLORREF g_themeColors[TC_COUNT] = {
 	RGB(0x20, 0x2B, 0x33),   // TC_BACK
