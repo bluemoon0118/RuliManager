@@ -41,6 +41,8 @@ namespace
 	}
 }
 
+bool CStarRatingCtrl::s_halfStep = false;
+
 BEGIN_MESSAGE_MAP(CStarRatingCtrl, CWnd)
 	ON_WM_PAINT()
 	ON_WM_ERASEBKGND()
@@ -64,7 +66,7 @@ bool CStarRatingCtrl::Create(CWnd* parent, UINT id, int maxStars)
 
 void CStarRatingCtrl::SetRating(int rating)
 {
-	m_rating = (std::max)(0, (std::min)(m_max, rating));
+	m_rating = (std::max)(0, (std::min)(m_max * 2, rating));
 	if (GetSafeHwnd()) Invalidate(FALSE);
 }
 
@@ -95,12 +97,14 @@ int CStarRatingCtrl::HitStar(CPoint pt) const
 	const int i = (pt.x + gap / 2) / step;   // 별 사이 틈은 가까운 별로
 	if (i >= m_max)
 		return 0;
-	return i + 1;
+	if (s_halfStep && pt.x < i * step + size / 2)
+		return i * 2 + 1;   // 별의 왼쪽 절반 (X 가운데 기준) = 반 별
+	return i * 2 + 2;
 }
 
 void CStarRatingCtrl::ChangeTo(int rating)
 {
-	rating = (std::max)(0, (std::min)(m_max, rating));
+	rating = (std::max)(0, (std::min)(m_max * 2, rating));
 	if (rating == m_rating)
 		return;
 	m_rating = rating;
@@ -139,9 +143,18 @@ void CStarRatingCtrl::OnPaint()
 		{
 			Gdiplus::GraphicsPath path;
 			const float pad = size * 0.06f;
-			StarPath(path, static_cast<float>(i * (size + gap)) + pad, top + pad, size - pad * 2);
-			if (i < shown)
+			const float sx = static_cast<float>(i * (size + gap));
+			StarPath(path, sx + pad, top + pad, size - pad * 2);
+			if (shown >= i * 2 + 2)
+				g.FillPath(&fill, &path);          // 별 하나
+			else if (shown == i * 2 + 1)
+			{
+				// 반 별: 별 영역을 X 가운데로 나눠 왼쪽 절반만 채우고 테두리는 전체
+				g.DrawPath(&outline, &path);
+				g.SetClip(Gdiplus::RectF(sx, 0.0f, size / 2.0f, static_cast<Gdiplus::REAL>(rc.Height())));
 				g.FillPath(&fill, &path);
+				g.ResetClip();
+			}
 			else
 				g.DrawPath(&outline, &path);
 		}
@@ -151,7 +164,10 @@ void CStarRatingCtrl::OnPaint()
 	if (shown > 0)
 	{
 		CString num;
-		num.Format(L"%d", shown);
+		if (shown % 2)
+			num.Format(L"%d.5", shown / 2);
+		else
+			num.Format(L"%d", shown / 2);
 		CFont* oldFont = mem.SelectObject(GetParent() ? GetParent()->GetFont() : nullptr);
 		mem.SetBkMode(TRANSPARENT);
 		mem.SetTextColor(enabled ? m_text : RGB(0x80, 0x8C, 0x96));
@@ -211,24 +227,26 @@ LRESULT CStarRatingCtrl::OnMouseLeave(WPARAM, LPARAM)
 
 BOOL CStarRatingCtrl::OnMouseWheel(UINT, short zDelta, CPoint)
 {
-	ChangeTo(m_rating + (zDelta > 0 ? 1 : -1));
+	const int step = s_halfStep ? 1 : 2;
+	ChangeTo(m_rating + (zDelta > 0 ? step : -step));
 	return TRUE;
 }
 
 void CStarRatingCtrl::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 {
+	const int step = s_halfStep ? 1 : 2;   // 0.5점 방식이면 반 별씩
 	if (nChar == VK_LEFT || nChar == VK_DOWN)
-		ChangeTo(m_rating - 1);
+		ChangeTo(m_rating - step);
 	else if (nChar == VK_RIGHT || nChar == VK_UP)
-		ChangeTo(m_rating + 1);
+		ChangeTo(m_rating + step);
 	else if (nChar == VK_HOME || nChar == VK_DELETE || nChar == VK_BACK)
 		ChangeTo(0);
 	else if (nChar == VK_END)
-		ChangeTo(m_max);
+		ChangeTo(m_max * 2);
 	else if (nChar >= L'0' && nChar <= L'9')
-		ChangeTo(static_cast<int>(nChar - L'0'));
+		ChangeTo(static_cast<int>(nChar - L'0') * 2);   // 숫자 = 별 수
 	else if (nChar >= VK_NUMPAD0 && nChar <= VK_NUMPAD9)
-		ChangeTo(static_cast<int>(nChar - VK_NUMPAD0));
+		ChangeTo(static_cast<int>(nChar - VK_NUMPAD0) * 2);
 	else
 		CWnd::OnKeyDown(nChar, nRepCnt, nFlags);
 }

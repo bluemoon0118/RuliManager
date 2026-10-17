@@ -19,6 +19,8 @@ public:
 	std::function<CString(const CString&)> m_displayText;
 	// 칩(× 제외)을 클릭함: (칩 번호, 화면 좌표)
 	std::function<void(int, CPoint)> m_onChipClick;
+	// 칩(× 제외)을 더블클릭함: (칩 번호) - 정해 두면 한 번 클릭은 더블클릭 시간만큼 기다렸다가 m_onChipClick
+	std::function<void(int)> m_onChipDblClick;
 	// 칩 위에 마우스가 올라감 / 벗어남: (칩 번호 - 없으면 -1, 칩 영역 화면 좌표)
 	std::function<void(int, const CRect&)> m_onChipHover;
 	// 칩 이름 왼쪽 아이콘 (예: 스튜디오 이미지): 높이 h 일 때 필요한 폭 (0 = 아이콘 없음) / 그리기
@@ -57,6 +59,10 @@ protected:
 	afx_msg BOOL OnEraseBkgnd(CDC*) { return TRUE; }
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
+	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	int    m_pendingClick = -1;   // 더블클릭을 기다리는 한 번 클릭 (칩 번호)
+	CPoint m_pendingPt;           // 그 칩의 화면 좌표 (메뉴 위치)
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg LRESULT OnMouseLeave(WPARAM, LPARAM);
 	int  m_hoverChip = -1;

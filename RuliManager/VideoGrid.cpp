@@ -8,6 +8,7 @@ BEGIN_MESSAGE_MAP(CVideoGrid, CWnd)
 	ON_WM_ERASEBKGND()
 	ON_WM_SIZE()
 	ON_WM_VSCROLL()
+	ON_WM_HSCROLL()
 	ON_WM_MOUSEWHEEL()
 	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONDBLCLK()
@@ -98,6 +99,153 @@ void CVideoGrid::SetFixedTile(int cardW, int cardH)
 	}
 }
 
+void CVideoGrid::SetLines(const std::vector<GridLine>& lines)
+{
+	m_lines = lines;
+	m_pos.clear();
+	m_cellItem.clear();
+	m_lineRows = 0;
+	m_lineCols = 0;
+}
+
+void CVideoGrid::BuildLinePositions(int count)
+{
+	// 줄마다 새 화면 줄에서 시작: 첫 카드는 firstCol, 넘치면 다음 화면 줄의 wrapCol 부터
+	m_pos.assign((std::max)(0, count), POINT{ 0, 0 });
+	m_lineRows = 0;
+	if (m_lines.empty() || count <= 0)
+	{
+		m_cellItem.clear();
+		return;
+	}
+	int r = -1;
+	for (size_t li = 0; li < m_lines.size(); ++li)
+	{
+		const int s = (std::max)(0, m_lines[li].start);
+		const int e = (li + 1 < m_lines.size()) ? (std::min)(count, m_lines[li + 1].start) : count;
+		if (s >= e)
+			continue;
+		++r;
+		int c = (std::max)(0, m_lines[li].firstCol);
+		for (int i = s; i < e; ++i)   // 한 화면 줄에 모두 (줄 바꿈 없음)
+		{
+			m_pos[i].x = c;
+			m_pos[i].y = r;
+			++c;
+		}
+	}
+	if (r < 0)
+		r = 0;
+	// 첫 줄 앞에 빠진 카드(시작이 0 이 아닌 경우)는 맨 앞 줄로
+	if (!m_lines.empty() && m_lines[0].start > 0)
+		for (int i = 0; i < (std::min)(count, m_lines[0].start); ++i)
+			m_pos[i] = POINT{ i, 0 };
+	m_lineRows = r + 1;
+	m_lineCols = 1;
+	for (int i = 0; i < count; ++i)
+		m_lineCols = (std::max)(m_lineCols, static_cast<int>(m_pos[i].x) + 1);
+	m_cellItem.assign(static_cast<size_t>(m_lineRows) * m_lineCols, -1);
+	for (int i = 0; i < count; ++i)
+	{
+		const size_t k = static_cast<size_t>(m_pos[i].y) * m_lineCols + m_pos[i].x;
+		if (k < m_cellItem.size() && m_cellItem[k] < 0)
+			m_cellItem[k] = i;
+	}
+}
+
+int CVideoGrid::RowCount(int count) const
+{
+	if (LineReady(count))
+		return m_lineRows;
+	return (count + m_cols - 1) / m_cols;
+}
+
+bool CVideoGrid::PosOf(int row, int& r, int& c) const
+{
+	const int count = m_owner ? m_owner->GridGetCount() : 0;
+	if (row < 0 || row >= count)
+		return false;
+	if (LineReady(count))
+	{
+		r = m_pos[row].y;
+		c = m_pos[row].x;
+		return true;
+	}
+	r = row / m_cols;
+	c = row % m_cols;
+	return true;
+}
+
+int CVideoGrid::ItemAt(int r, int c) const
+{
+	const int count = m_owner ? m_owner->GridGetCount() : 0;
+	if (r < 0 || c < 0 || c >= Cols(count))
+		return -1;
+	if (LineReady(count))
+	{
+		const size_t k = static_cast<size_t>(r) * m_lineCols + c;
+		return (k < m_cellItem.size()) ? m_cellItem[k] : -1;
+	}
+	const int row = r * m_cols + c;
+	return (row < count) ? row : -1;
+}
+
+void CVideoGrid::ItemRangeOfRows(int r0, int r1, int& first, int& last) const
+{
+	// 카드 순서와 화면 줄 순서가 같으므로 범위로 구함
+	first = 0;
+	last = -1;
+	const int count = m_owner ? m_owner->GridGetCount() : 0;
+	if (count <= 0 || r1 < r0)
+		return;
+	if (!LineReady(count))
+	{
+		first = (std::max)(0, r0 * m_cols);
+		last = (std::min)(count - 1, (r1 + 1) * m_cols - 1);
+		return;
+	}
+	first = count;
+	for (int i = 0; i < count; ++i)
+	{
+		if (m_pos[i].y < r0)
+			continue;
+		if (m_pos[i].y > r1)
+			break;
+		first = (std::min)(first, i);
+		last = i;
+	}
+	if (last < 0)
+		first = 0;
+}
+
+void CVideoGrid::MoveVert(int rows)
+{
+	if (!m_owner) return;
+	const int count = m_owner->GridGetCount();
+	if (count == 0) return;
+	int sel = m_owner->GridGetSel();
+	int r = 0, c = 0;
+	if (sel < 0 || !PosOf(sel, r, c))
+	{
+		MoveSel(0);
+		return;
+	}
+	const int total = RowCount(count);
+	const int tr = (std::max)(0, (std::min)(total - 1, r + rows));
+	if (tr == r)
+		return;
+	// 같은 칸에 카드가 없으면 그 줄에서 왼쪽으로 가장 가까운 카드 (없으면 오른쪽)
+	int target = -1;
+	for (int cc = c; cc >= 0 && target < 0; --cc)
+		target = ItemAt(tr, cc);
+	for (int cc = c + 1; cc < Cols(count) && target < 0; ++cc)
+		target = ItemAt(tr, cc);
+	if (target < 0)
+		return;
+	m_owner->GridSetSel(target);
+	EnsureVisible(target);
+}
+
 void CVideoGrid::UpdateLayout()
 {
 	CRect rc;
@@ -121,7 +269,14 @@ void CVideoGrid::UpdateLayout()
 	}
 
 	const int count = m_owner ? m_owner->GridGetCount() : 0;
-	const int rows = (count + m_cols - 1) / m_cols;
+	if (!m_lines.empty())
+	{
+		BuildLinePositions(count);   // 줄 배치: 칸 수가 바뀌면 다시 배치
+		if (LineReady(count) && m_lineCols * m_cellW > rc.Width())
+			m_offsetX = 0;           // 화면보다 긴 줄이 있으면 왼쪽부터 (좌우 스크롤)
+	}
+	UpdateHorzBar();
+	const int rows = RowCount(count);
 	const int total = m_headerH + rows * m_tileH;
 
 	SCROLLINFO si = { sizeof(si) };
@@ -133,12 +288,79 @@ void CVideoGrid::UpdateLayout()
 	SetScroll(m_scroll);   // 범위 안으로 보정
 }
 
+void CVideoGrid::UpdateHorzBar()
+{
+	// 줄 배치에서 가장 긴 줄이 화면보다 길면 가로 스크롤바 (아니면 숨김)
+	CRect rc;
+	GetClientRect(&rc);
+	const int count = m_owner ? m_owner->GridGetCount() : 0;
+	const int contentW = LineReady(count) ? m_offsetX + m_lineCols * m_cellW : 0;
+	SCROLLINFO si = { sizeof(si) };
+	si.fMask = SIF_RANGE | SIF_PAGE;
+	si.nMin = 0;
+	if (contentW > rc.Width())
+	{
+		si.nMax = contentW - 1;
+		si.nPage = static_cast<UINT>((std::max)(1, static_cast<int>(rc.Width())));
+	}
+	else
+	{
+		si.nMax = 0;
+		si.nPage = 1;   // 범위 없음 → 스크롤바 숨김
+	}
+	SetScrollInfo(SB_HORZ, &si, TRUE);
+	SetScrollX(m_scrollX);   // 범위 안으로 보정
+}
+
+void CVideoGrid::SetScrollX(int pos)
+{
+	CRect rc;
+	GetClientRect(&rc);
+	const int count = m_owner ? m_owner->GridGetCount() : 0;
+	const int contentW = LineReady(count) ? m_offsetX + m_lineCols * m_cellW : 0;
+	const int maxPos = (std::max)(0, contentW - static_cast<int>(rc.Width()));
+	pos = (std::max)(0, (std::min)(pos, maxPos));
+	if (pos != m_scrollX)
+	{
+		m_scrollX = pos;
+		Invalidate(FALSE);   // 머리 영역(도구줄)은 그대로 두고 카드만 옮김
+		UpdateHot();
+	}
+	SetScrollPos(SB_HORZ, m_scrollX, TRUE);
+}
+
+void CVideoGrid::OnHScroll(UINT nSBCode, UINT /*nPos*/, CScrollBar* /*pScrollBar*/)
+{
+	CRect rc;
+	GetClientRect(&rc);
+	int pos = m_scrollX;
+	switch (nSBCode)
+	{
+	case SB_LINELEFT:  pos -= m_cellW / 2; break;
+	case SB_LINERIGHT: pos += m_cellW / 2; break;
+	case SB_PAGELEFT:  pos -= rc.Width(); break;
+	case SB_PAGERIGHT: pos += rc.Width(); break;
+	case SB_LEFT:      pos = 0; break;
+	case SB_RIGHT:     pos = INT_MAX / 2; break;
+	case SB_THUMBTRACK:
+	case SB_THUMBPOSITION:
+	{
+		SCROLLINFO si = { sizeof(si), SIF_TRACKPOS };
+		GetScrollInfo(SB_HORZ, &si);
+		pos = si.nTrackPos;
+		break;
+	}
+	default: return;
+	}
+	SetScrollX(pos);
+}
+
 void CVideoGrid::SetScroll(int pos)
 {
 	CRect rc;
 	GetClientRect(&rc);
 	const int count = m_owner ? m_owner->GridGetCount() : 0;
-	const int rows = (count + m_cols - 1) / m_cols;
+	const int rows = RowCount(count);
 	const int maxPos = (std::max)(0, m_headerH + rows * m_tileH - rc.Height());
 	pos = (std::max)(0, (std::min)(pos, maxPos));
 	if (pos != m_scroll)
@@ -334,27 +556,22 @@ void CVideoGrid::Refresh()
 
 bool CVideoGrid::GetTileRect(int row, CRect& rc) const
 {
-	const int count = m_owner ? m_owner->GridGetCount() : 0;
-	if (row < 0 || row >= count)
+	int r = 0, c = 0;
+	if (!PosOf(row, r, c))
 		return false;
-	const int r = row / m_cols;
-	const int c = row % m_cols;
 	const int y0 = m_headerH + r * m_tileH - m_scroll;
-	rc.SetRect(m_offsetX + c * m_cellW, y0, m_offsetX + (c + 1) * m_cellW, y0 + m_tileH);
+	const int x0 = m_offsetX + c * m_cellW - m_scrollX;   // 줄 배치만 가로 스크롤 (보통은 0)
+	rc.SetRect(x0, y0, x0 + m_cellW, y0 + m_tileH);
 	return true;
 }
 
 int CVideoGrid::HitTest(CPoint pt) const
 {
-	if (pt.x < m_offsetX || pt.y < 0 || pt.y + m_scroll < m_headerH)
+	if (pt.x + m_scrollX < m_offsetX || pt.y < 0 || pt.y + m_scroll < m_headerH)
 		return -1;   // 머리 영역 (도구줄)
-	const int c = (pt.x - m_offsetX) / m_cellW;
+	const int c = (pt.x + m_scrollX - m_offsetX) / m_cellW;
 	const int r = (pt.y + m_scroll - m_headerH) / m_tileH;
-	if (c >= m_cols)
-		return -1;
-	const int row = r * m_cols + c;
-	const int count = m_owner ? m_owner->GridGetCount() : 0;
-	return (row >= 0 && row < count) ? row : -1;
+	return ItemAt(r, c);
 }
 
 void CVideoGrid::EnsureVisible(int row)
@@ -363,9 +580,20 @@ void CVideoGrid::EnsureVisible(int row)
 		return;
 	CRect client;
 	GetClientRect(&client);
-	const int top = m_headerH + (row / m_cols) * m_tileH;
+	int r = 0, c = 0;
+	if (!PosOf(row, r, c))
+		return;
+	{
+		// 줄 배치: 가로로도 보이게
+		const int left = m_offsetX + c * m_cellW;
+		if (left < m_scrollX)
+			SetScrollX(left);
+		else if (left + m_cellW > m_scrollX + client.Width())
+			SetScrollX(left + m_cellW - client.Width());
+	}
+	const int top = m_headerH + r * m_tileH;
 	const int bottom = top + m_tileH;
-	if (row / m_cols == 0)
+	if (r == 0)
 		SetScroll(0);   // 첫 줄이면 머리 영역(도구줄)까지 보이게
 	else if (top < m_scroll)
 		SetScroll(top);
@@ -436,11 +664,22 @@ void CVideoGrid::OnPaint()
 		: (m_scroll + static_cast<int>(paintRc.bottom) - m_headerH) / m_tileH;   // 머리 영역만 다시 그리면 카드 없음
 	for (int r = firstRow; r <= lastRow; ++r)
 	{
-		for (int c = 0; c < m_cols; ++c)
+		const int cols = Cols(count);
+		for (int c = 0; c < cols; ++c)
 		{
-			const int row = r * m_cols + c;
-			if (row >= count)
+			{
+				// 줄 배치: 화면 밖(좌우) 칸은 건너뜀
+				const int x0 = m_offsetX + c * m_cellW - m_scrollX;
+				if (x0 + m_cellW <= paintRc.left || x0 >= paintRc.right)
+					continue;
+			}
+			const int row = ItemAt(r, c);
+			if (row < 0)
+			{
+				if (LineReady(count))
+					continue;   // 줄 배치: 빈 칸
 				break;
+			}
 
 			CRect tile;
 			GetTileRect(row, tile);
@@ -513,12 +752,11 @@ void CVideoGrid::OnPaint()
 		const int visFirst = (std::max)(0, m_scroll - m_headerH) / m_tileH;
 		const int visLast = (std::max)(0, m_scroll + static_cast<int>(client.Height()) - m_headerH) / m_tileH;
 		const int screenRows = (std::max)(1, visLast - visFirst + 1);
-		const int below0 = (visLast + 1) * m_cols;
-		const int below1 = (std::min)(count - 1, (visLast + screenRows + 1) * m_cols - 1);
+		int below0 = 0, below1 = -1, above0 = 0, above1 = -1;
+		ItemRangeOfRows(visLast + 1, visLast + screenRows, below0, below1);
 		if (below0 <= below1)
 			m_owner->GridPrefetch(below0, below1);
-		const int above0 = (std::max)(0, (visFirst - screenRows) * m_cols);
-		const int above1 = (std::min)(count - 1, visFirst * m_cols - 1);
+		ItemRangeOfRows((std::max)(0, visFirst - screenRows), visFirst - 1, above0, above1);
 		if (above0 <= above1)
 			m_owner->GridPrefetch(above0, above1);
 	}
@@ -550,8 +788,13 @@ void CVideoGrid::OnVScroll(UINT nSBCode, UINT /*nPos*/, CScrollBar* /*pScrollBar
 	SetScroll(pos);
 }
 
-BOOL CVideoGrid::OnMouseWheel(UINT /*nFlags*/, short zDelta, CPoint /*pt*/)
+BOOL CVideoGrid::OnMouseWheel(UINT nFlags, short zDelta, CPoint /*pt*/)
 {
+	if ((nFlags & MK_SHIFT) && LineReady(m_owner ? m_owner->GridGetCount() : 0))
+	{
+		SetScrollX(m_scrollX - zDelta * m_cellW / WHEEL_DELTA);   // Shift + 휠 = 좌우 (줄 배치)
+		return TRUE;
+	}
 	SetScroll(m_scroll - zDelta * m_tileH / (WHEEL_DELTA * 2));   // 한 칸에 반 줄
 	return TRUE;
 }
@@ -607,14 +850,15 @@ void CVideoGrid::MoveSel(int delta)
 void CVideoGrid::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 {
 	const int page = VisibleRows() * m_cols;
+	const bool lines = LineReady(m_owner ? m_owner->GridGetCount() : 0);   // 줄 배치: 위 · 아래는 화면 줄 단위
 	switch (nChar)
 	{
 	case VK_LEFT:  MoveSel(-1); return;
 	case VK_RIGHT: MoveSel(+1); return;
-	case VK_UP:    MoveSel(-m_cols); return;
-	case VK_DOWN:  MoveSel(+m_cols); return;
-	case VK_PRIOR: MoveSel(-page); return;
-	case VK_NEXT:  MoveSel(+page); return;
+	case VK_UP:    if (lines) MoveVert(-1); else MoveSel(-m_cols); return;
+	case VK_DOWN:  if (lines) MoveVert(+1); else MoveSel(+m_cols); return;
+	case VK_PRIOR: if (lines) MoveVert(-VisibleRows()); else MoveSel(-page); return;
+	case VK_NEXT:  if (lines) MoveVert(+VisibleRows()); else MoveSel(+page); return;
 	case VK_HOME:  MoveSel(-INT_MAX / 2); return;
 	case VK_END:   MoveSel(+INT_MAX / 2); return;
 	default:
@@ -642,8 +886,13 @@ void CVideoGrid::OnKillFocus(CWnd* pNewWnd)
 	Invalidate(FALSE);
 }
 
-LRESULT CVideoGrid::OnDarkScrollSetPos(WPARAM wParam, LPARAM /*lParam*/)
+LRESULT CVideoGrid::OnDarkScrollSetPos(WPARAM wParam, LPARAM lParam)
 {
+	if (lParam == 1)
+	{
+		SetScrollX(static_cast<int>(wParam));   // 가로 스크롤바 (줄 배치)
+		return 0;
+	}
 	SetScroll(static_cast<int>(wParam));   // 직접 그린 스크롤바에서 끌기
 	return 0;
 }

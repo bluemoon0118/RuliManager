@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <memory>
+#include <set>
 #include "VideoLibrary.h"
 #include "ImagePreview.h"
 #include "ImageViewerWnd.h"
@@ -57,7 +58,7 @@ protected:
 	void UpdateModeButtons();
 	static inline const COLORREF& kScrollColor = TCOL(TC_SCROLL); // #6C7478 (스크롤바 배경)
 	static inline const COLORREF& kThumbBackColor = TCOL(TC_THUMB); // #2A353D (격자 이미지 배경)
-	CDarkScrollBar m_scrollBars[10];
+	CDarkScrollBar m_scrollBars[11];
 	void CreateScrollBars();
 	CListCtrl  m_list;
 	CEdit      m_editSearch;
@@ -84,6 +85,13 @@ protected:
 	void ShowVideoContextMenu(int row, CPoint point);   // 영상 오른쪽 클릭 메뉴 (격자 · 목록 · 연도별 공통)
 	afx_msg void OnBnClickedDrillViewGrid();
 	afx_msg void OnBnClickedDrillViewYear();
+	// 제작사 탭 보기: [격자] (바둑판) / [리스트] (줄마다 제작사 + 그 레이블) - 레지스트리 Settings\StudioView
+	CDarkButton m_studioViewBtns[2];
+	int  m_studioView = 0;              // 0 = 격자, 1 = 리스트
+	bool StudioListView() const { return m_mode == MODE_STUDIO && m_drill.IsEmpty() && m_studioView == 1; }
+	void SetStudioView(int mode);
+	afx_msg void OnBnClickedStudioViewGrid();
+	afx_msg void OnBnClickedStudioViewList();
 	bool DrillHeaderShown() const { return m_mode == MODE_ACTOR && !m_drill.IsEmpty() && m_drillActorIdx >= 0; }
 	void UpdateDrillHeader();        // 출연작 화면 위 배우 사진 · 정보 갱신
 	void ToggleActorFavorite(int actorIdx);
@@ -101,6 +109,8 @@ protected:
 	void ShowNewItemMenu(CPoint screenPt);   // 지금 탭에 맞는 [새 …] 메뉴
 	bool AskNewName(const CString& caption, const CString& prompt, CString& name);   // 영상 카드 오른쪽 클릭 → 웹페이지 내용 붙여넣기 (txt 와 연동 없음)
 	void ApplyTextToVideo(int idx, const CString& text);   // "항목: 값" 글자로 영상 정보 교체 (텍스트로 정보 입력 / 사이트에서 가져오기)   // 영상 카드 오른쪽 클릭 → 텍스트로 정보 입력 (정보 txt 와 같은 규칙)
+	afx_msg void OnActorMerge();      // 배우 카드 오른쪽 클릭 → 다른 배우와 합치기
+	void MergeActorInto(int src, int dst, const CString& past);   // src 배우를 dst 배우로 합침 (src 항목 삭제, 영상 참여 별칭 = past, 비우면 그 영상에서 쓰던 이름)
 	afx_msg void OnActorPasteInfo();  // 배우 카드 오른쪽 클릭 → 웹페이지 내용 붙여넣기 (프로필 화면 복사 글)
 	afx_msg void OnActorTextInfo();   // 배우 카드 오른쪽 클릭 → 텍스트로 정보 입력   // 배우 탭 우클릭 → 배우 삭제 (Del)   // 태그 탭 우클릭 → 삭제
 	void ToggleTagFavorite(const CString& tag);   // 태그 즐겨찾기 (태그 목록에 없으면 추가)
@@ -161,6 +171,7 @@ protected:
 	void RefreshActorStrip();                                        // 숨긴 배우 칸 값으로 카드 띠 갱신
 	void DrawStripCard(CDC* dc, int i, const CRect& rc, bool hot);   // 카드 띠의 배우 카드 하나
 	void OpenActorFromStrip(int i);                                  // 더블클릭: 배우 탭에서 그 배우 선택
+	void GoToActor(int actorIdx);                                    // 배우 탭(배우 목록)으로 가서 그 배우 선택
 	CRect StripHeartRect(const CRect& card);                          // 카드 띠 카드의 즐겨찾기 하트 자리
 	afx_msg void OnBnClickedApplyDb();
 	afx_msg void OnBnClickedRescan();
@@ -193,7 +204,8 @@ protected:
 	ULONGLONG m_totalVideoBytes = 0;   // 필터된 영상 전체 크기
 	int& CurPageRef();             // 지금 보이는 목록의 페이지 번호
 	int  CurTotal() const;         // 지금 보이는 목록의 전체 개수
-	int  PageCount(int total, int size = -1) const { if (size < 0) size = m_pageSize; return (size <= 0 || total <= 0) ? 1 : (total + size - 1) / size; }
+	int  EffPageSize() const { return StudioListView() ? 0 : m_pageSize; }   // 제작사 탭 [리스트]: 페이지 나누지 않음 (전체)
+	int  PageCount(int total, int size = -1) const { if (size < 0) size = EffPageSize(); return (size <= 0 || total <= 0) ? 1 : (total + size - 1) / size; }
 	void SlicePage(int& page, int total, int& first, int& last, int size = -1) const;   // 페이지 범위 [first, last) (size < 0: 지금 탭 값)
 	void ResetCurPage() { CurPageRef() = 0; }
 	void UpdatePager();            // 페이지 버튼 · 개수 요약 갱신
@@ -224,6 +236,11 @@ protected:
 	CSuggestEdit m_editVAliases;   // 이 작품에서 쓴 배우 별칭 (배우 칸 아래)
 	CSuggestEdit m_editStudio;
 	CDarkDateTime m_dateRelease;  // 발매일 (체크 해제 = 없음)
+	void ExportListText(int what, CWnd* owner);   // 설정 창: 배우 / 제작사 / 태그 DB → 암호화 안 한 텍스트 파일
+	void ImportListText(int what, CWnd* owner);   // 설정 창: 그 텍스트 파일 → 일괄 등록 (있는 항목은 값이 있는 칸만 덮어씀)
+	CDarkCombo    m_comboCensor;  // 검열 정보 (발매일 오른쪽): 해당없음 / 검열됨 / 모자이크파괴 / 무수정 / 무수정-유출
+	void FillCensorCombo();       // 설정 언어로 항목 다시 채움 (고른 값 유지)
+	afx_msg void OnCbnSelchangeCensor();
 	CListCtrl  m_listCat;         // 배우/스튜디오/태그 목록
 	CSuggestEdit m_editTags;        // 태그 값 보관용 (숨김) - 화면에는 m_tagChips 로 표시
 	CTagChipCtrl m_tagChips;        // 태그 칩 입력 ([태그 ×] ... × ⌄)
@@ -246,6 +263,7 @@ protected:
 	afx_msg void OnEnChangeVAliases();
 	void ApplyDefaultAliases(const CString& oldActors, const CString& newActors);   // 새로 넣은 배우는 마지막 고른 별칭으로
 	CString ActorChipDisplay(const CString& tag);       // 배우 칩에 보일 이름 (이 작품의 별칭 우선)
+	bool    ActorChipGender(const CString& tag, CString& sym, COLORREF& col);   // 배우 칩 왼쪽 성별 기호 (♀ ♂ …, 성별 미지정 · 등록 안 된 배우는 false)
 	void    OnActorChipMenu(int index, CPoint screenPt);  // 배우 칩 클릭: 이름/별칭 중 고르기
 	bool         m_syncingTags = false;
 	afx_msg void OnEnChangeTags();
@@ -272,11 +290,20 @@ protected:
 		void GridActivate(int row) override;
 		void GridKey(UINT vk) override;
 		bool GridDrawCard(CDC* dc, int row, const CRect& card, bool selected, bool focused) override;
-		bool GridClick(int row, const CRect& card, CPoint pt) override;   // 하트 → 즐겨찾기 전환
-		int  GridHitPart(int row, const CRect& card, CPoint pt) override; // 1 = 하트 위
+		bool GridClick(int row, const CRect& card, CPoint pt) override;   // 하트 → 즐겨찾기 전환, 체크 칸 → 체크 전환
+		int  GridHitPart(int row, const CRect& card, CPoint pt) override; // 1 = 하트 위, 2 = 왼쪽 위 체크 칸 위
+		bool GridDblClick(int row, const CRect& card, CPoint pt) override; // 체크 칸 빠른 두 번 클릭 = 두 번 전환 (출연작으로 안 들어감)
 	};
 	ActorGridOwner m_actorOwner;
 	CRect ActorHeartRect(const CRect& card) const;   // 배우 카드 오른쪽 위 즐겨찾기 하트 자리
+	CRect ActorCheckRect(const CRect& card) const;   // 배우 카드 왼쪽 위 체크 칸 자리
+	std::set<CString> m_actorChecked;                // 체크한 배우 (소문자 이름, 목록을 다시 만들어도 유지)
+	bool IsActorChecked(int actorIdx) const;
+	void ToggleActorCheck(int actorIdx);
+	std::vector<int> CheckedActorIndices() const;    // 체크한 배우 번호 (지금 있는 배우만)
+	afx_msg void OnActorDeleteChecked();             // 체크한 배우 모두 삭제
+	afx_msg void OnActorUncheckAll();                // 체크 모두 해제
+	afx_msg void OnActorMergeChecked();              // 체크한 배우들을 오른쪽 클릭한(선택한) 배우로 병합
 
 	// 배우 카드 (세로 사진 + 국기 / 성별 기호 + 이름(별칭) / 나이 / ▶ 출연 수)
 	CFont m_cardNameFont;
@@ -365,7 +392,11 @@ protected:
 	bool  m_sortAsc = true;
 	int   m_actorSortCol = 0;        // 배우 격자 정렬: 0 = 이름, 1 = 작품 수 (즐겨찾기는 항상 먼저)
 	bool  m_actorSortAsc = true;
-	int   m_sortComboKind = -1;      // 정렬 콤보 항목: 0 = 영상, 1 = 배우 (탭이 바뀌면 다시 채움)
+	int   m_tagSortCol = 0;          // 태그 카드 정렬: 0 = 이름, 1 = 영상 수 (즐겨찾기는 항상 먼저)
+	bool  m_tagSortAsc = true;
+	int   m_studioSortCol = 0;       // 제작사 카드 정렬: 0 = 이름, 1 = 영상 수 (레이블은 상위 제작사 바로 뒤, 같은 기준)
+	bool  m_studioSortAsc = true;
+	int   m_sortComboKind = -1;      // 정렬 콤보 항목: 0 = 영상, 1 = 배우, 2 = 태그 (탭이 바뀌면 다시 채움)
 	int   m_curItem = -1;             // 상세 정보에 표시 중인 항목
 	bool  m_detailsDirty = false;
 	bool  m_loadingDetails = false;
@@ -435,6 +466,9 @@ protected:
 	// 영상 상세 정보(편집 칸) 표시: 영상 탭 + 배우 탭에서 배우를 더블클릭해 들어간 출연작 화면
 	bool ShowVideoDetail() const { return m_mode == MODE_VIDEO || ((m_mode == MODE_ACTOR || m_mode == MODE_STUDIO) && !m_drill.IsEmpty()); }   // 영상 탭 + 배우 출연작 · 제작사(레이블) 영상 화면
 	bool IsCategoryListMode() const { return (m_mode == MODE_STUDIO || m_mode == MODE_TAG) && m_drill.IsEmpty(); }
+	bool IsCatCardMode() const { return IsCategoryListMode(); }   // 제작사 · 태그 카드 목록 (정렬 콤보 사용)
+	int&  CatSortCol() { return (m_mode == MODE_STUDIO) ? m_studioSortCol : m_tagSortCol; }
+	bool& CatSortAsc() { return (m_mode == MODE_STUDIO) ? m_studioSortAsc : m_tagSortAsc; }
 	int  NamedKind() const { return m_mode == MODE_STUDIO ? LIST_STUDIO : LIST_TAG; }
 	// 스튜디오/태그는 항상 격자 표시
 	bool CatGridActive() const { return true; }

@@ -41,6 +41,44 @@ namespace
 		return hay.Find(lowerQuery) >= 0;
 	}
 
+	// 이름 첫 글자의 문자 종류: 0 = 한글, 1 = 영문 · 숫자, 2 = 일본어(가나 · 한자), 3 = 기타 (앞의 공백 · 기호는 건너뜀)
+	int NameScript(const CString& s)
+	{
+		for (int i = 0; i < s.GetLength(); ++i)
+		{
+			const wchar_t c = s[i];
+			if ((c >= 0xAC00 && c <= 0xD7A3) || (c >= 0x1100 && c <= 0x11FF) || (c >= 0x3130 && c <= 0x318F))
+				return 0;
+			if ((c >= L'0' && c <= L'9') || (c >= L'A' && c <= L'Z') || (c >= L'a' && c <= L'z') ||
+			    (c >= 0x00C0 && c <= 0x024F) || (c >= 0xFF10 && c <= 0xFF19) || (c >= 0xFF21 && c <= 0xFF3A) || (c >= 0xFF41 && c <= 0xFF5A))
+				return 1;
+			if ((c >= 0x3040 && c <= 0x30FF) || (c >= 0x31F0 && c <= 0x31FF) || (c >= 0xFF66 && c <= 0xFF9F) ||
+			    (c >= 0x4E00 && c <= 0x9FFF) || (c >= 0x3400 && c <= 0x4DBF) || (c >= 0xF900 && c <= 0xFAFF))
+				return 2;
+			if (::iswspace(c) || ::iswpunct(c))
+				continue;
+			return 3;
+		}
+		return 3;
+	}
+
+	// 배우 이름 비교: 한글 → 영문 · 숫자 → 일본어 → 기타 순으로 묶고, 묶음 안에서는
+	//  한글 · 영문 = 탐색기식 자연 정렬, 일본어 = 일본어 기준(가나 오십음 · 한자) - 한국어 기준이면 한자가 한글 독음 순으로 한글 사이에 섞임
+	int CompareActorNames(const CString& a, const CString& b)
+	{
+		const int sa = NameScript(a), sb = NameScript(b);
+		if (sa != sb)
+			return sa < sb ? -1 : 1;
+		if (sa == 2)
+		{
+			const int r = ::CompareStringEx(L"ja-JP", NORM_IGNORECASE | NORM_IGNOREWIDTH | NORM_IGNOREKANATYPE | SORT_DIGITSASNUMBERS,
+				a, a.GetLength(), b, b.GetLength(), nullptr, nullptr, 0);
+			if (r != 0)
+				return r - CSTR_EQUAL;   // CSTR_LESS_THAN(1) / CSTR_EQUAL(2) / CSTR_GREATER_THAN(3)
+		}
+		return ::StrCmpLogicalW(a, b);
+	}
+
 	std::vector<int> SortedActorIndices(const CVideoLibrary& lib, const CString& lowerQuery)
 	{
 		std::vector<int> rows;
@@ -51,7 +89,7 @@ namespace
 		}
 		std::sort(rows.begin(), rows.end(), [&](int a, int b)
 		{
-			return ::StrCmpLogicalW(lib.actors[a].name, lib.actors[b].name) < 0;
+			return CompareActorNames(lib.actors[a].name, lib.actors[b].name) < 0;
 		});
 		return rows;
 	}
@@ -108,6 +146,7 @@ BEGIN_MESSAGE_MAP(CActorDlg, CDialogEx)
 	ON_CBN_SELCHANGE(IDC_ACT_CUP, &CActorDlg::OnFieldChanged)
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_ACT_LIST, &CActorDlg::OnLvnItemChanged)
 	ON_NOTIFY(NM_CUSTOMDRAW, IDC_ACT_LIST, &CActorDlg::OnNmCustomDrawList)
+	ON_NOTIFY(LVN_COLUMNCLICK, IDC_ACT_LIST, &CActorDlg::OnLvnColumnClick)
 	ON_WM_SIZE()
 	ON_WM_GETMINMAXINFO()
 	ON_MESSAGE(WM_APP_MERGE_ACTORS, &CActorDlg::OnMergeActors)
@@ -169,6 +208,7 @@ BOOL CActorDlg::OnInitDialog()
 	m_list.InsertColumn(COL_RETIRE,  L"은퇴일",   LVCFMT_LEFT,  dlu * 48 / 100);
 	m_list.InsertColumn(COL_RATING,  L"별점",     LVCFMT_LEFT,  dlu * 40 / 100);
 	m_list.InsertColumn(COL_COUNT,   L"출연",     LVCFMT_RIGHT, dlu * 26 / 100);
+	UpdateSortHeader();   // 처음: 이름 오름차순
 	{
 		// 국적 칸: 글자 앞에 국기(24px + 여백)가 들어갈 만큼 공백을 넣고, 그 자리에 국기를 그림
 		CClientDC dc(&m_list);
@@ -261,6 +301,7 @@ void CActorDlg::FillList(const CString& selectName)
 				++counts[key];
 		}
 	}
+	SortRows(counts);   // 머리글에서 고른 열 · 방향으로 (처음 = 이름 오름차순)
 
 	m_loading = true;
 	m_list.SetRedraw(FALSE);
@@ -297,6 +338,13 @@ void CActorDlg::ShowActor(int idx)
 	m_loading = true;
 	m_cur = (idx >= 0 && idx < static_cast<int>(m_lib.actors.size())) ? idx : -1;
 	const BOOL enable = (m_cur >= 0);
+	// 사진 아래: (배우 고유 번호) - 번호가 아직 없는 새 배우는 지금 부여
+	if (CWnd* idText = GetDlgItem(IDC_ACT_ID))
+	{
+		if (m_cur >= 0)
+			m_lib.AssignActorIds();
+		idText->SetWindowText(m_cur >= 0 ? L"(" + CVideoLibrary::ActorIdText(m_lib.actors[m_cur].id) + L")" : CString());
+	}
 
 	if (m_cur >= 0)
 	{
@@ -634,8 +682,8 @@ void CActorDlg::SetRowText(int row, const ActorInfo& a)
 	m_list.SetItemText(row, COL_RETIRE, a.retire);
 	{
 		CString stars;
-		for (int i = 0; i < 5 && a.rating > 0; ++i)
-			stars += (i < a.rating) ? L'★' : L'☆';
+		for (int i = 0; i < 5 && a.rating > 0; ++i)   // 반 별 단위: ★★★½☆
+			stars += (a.rating >= i * 2 + 2) ? L'★' : (a.rating == i * 2 + 1 ? L'½' : L'☆');
 		m_list.SetItemText(row, COL_RATING, stars);
 	}
 }
@@ -720,6 +768,96 @@ void CActorDlg::OnNmCustomDrawList(NMHDR* pNMHDR, LRESULT* pResult)
 		}
 		break;
 	}
+}
+
+void CActorDlg::SortRows(const std::map<CString, int>& counts)
+{
+	auto countOf = [&](const ActorInfo& a)
+	{
+		CString key = a.name;
+		key.MakeLower();
+		auto it = counts.find(key);
+		return it != counts.end() ? it->second : 0;
+	};
+	// 열 값: 숫자 열은 number (없으면 hasValue = false), 글자 열은 text
+	auto valueOf = [&](const ActorInfo& a, bool& has, double& num, CString& text)
+	{
+		has = true; num = 0; text.Empty();
+		switch (m_sortCol)
+		{
+		case COL_GENDER:  text = a.gender; break;
+		case COL_AGE:     { const int age = CVideoLibrary::CalcAge(a.birth); has = age >= 0; num = age; break; }
+		case COL_BIRTH:   text = a.birth; break;
+		case COL_NATION:  text = a.nationality; break;
+		case COL_HEIGHT:  has = !a.height.IsEmpty(); num = _wtof(a.height); break;
+		case COL_DEBUT:   text = a.debut; break;
+		case COL_RETIRE:  text = a.retire; break;
+		case COL_RATING:  has = a.rating > 0; num = a.rating; break;
+		case COL_COUNT:   num = countOf(a); break;
+		default:          text = a.name; break;
+		}
+		const bool numeric = (m_sortCol == COL_AGE || m_sortCol == COL_HEIGHT || m_sortCol == COL_RATING || m_sortCol == COL_COUNT);
+		if (!numeric)
+			has = !text.IsEmpty();
+		return numeric;
+	};
+	std::stable_sort(m_rows.begin(), m_rows.end(), [&](int x, int y)
+	{
+		const ActorInfo& a = m_lib.actors[x];
+		const ActorInfo& b = m_lib.actors[y];
+		bool ha, hb;
+		double na, nb;
+		CString ta, tb;
+		const bool numeric = valueOf(a, ha, na, ta);
+		valueOf(b, hb, nb, tb);
+		if (ha != hb)
+			return ha;   // 빈 값은 방향과 관계없이 뒤로
+		int c = 0;
+		if (ha)
+			c = numeric ? (na < nb ? -1 : (na > nb ? 1 : 0)) : (m_sortCol == COL_NAME ? CompareActorNames(ta, tb) : ::StrCmpLogicalW(ta, tb));
+		if (c != 0)
+			return m_sortDesc ? c > 0 : c < 0;
+		return CompareActorNames(a.name, b.name) < 0;   // 같으면 이름순
+	});
+}
+
+void CActorDlg::UpdateSortHeader()
+{
+	// 정렬 열 머리글에만 "▲" (오름차순) / "▼" (내림차순)
+	static const LPCWSTR names[] = { L"이름", L"성별", L"나이", L"생년월일", L"국적", L"키", L"데뷔일", L"은퇴일", L"별점", L"출연" };
+	for (int c = 0; c <= COL_COUNT; ++c)
+	{
+		LVCOLUMN col = {};
+		col.mask = LVCF_TEXT;
+		CString text = names[c];
+		if (c == m_sortCol)
+			text += m_sortDesc ? L" ▼" : L" ▲";
+		col.pszText = text.GetBuffer();
+		m_list.SetColumn(c, &col);
+		text.ReleaseBuffer();
+	}
+	if (CHeaderCtrl* h = m_list.GetHeaderCtrl())
+		h->Invalidate();
+}
+
+void CActorDlg::OnLvnColumnClick(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	*pResult = 0;
+	const NMLISTVIEW* p = reinterpret_cast<NMLISTVIEW*>(pNMHDR);
+	if (p->iSubItem < 0 || p->iSubItem > COL_COUNT)
+		return;
+	if (!Commit())   // 편집 중인 내용 먼저 반영 (다시 채우면서 지워지지 않게)
+		return;
+	if (p->iSubItem == m_sortCol)
+		m_sortDesc = !m_sortDesc;   // 같은 열: 방향 전환
+	else
+	{
+		m_sortCol = p->iSubItem;
+		m_sortDesc = false;          // 다른 열: 오름차순부터
+	}
+	UpdateSortHeader();
+	const CString keep = (m_cur >= 0) ? m_lib.actors[m_cur].name : CString();
+	FillList(keep);
 }
 
 void CActorDlg::OnEnChangeSearch()
@@ -1069,6 +1207,21 @@ BOOL CActorPickDlg::OnInitDialog()
 
 	m_editSearch.SetCueBanner(L"이름 · 별칭 검색");
 	m_editNew.SetCueBanner(L"목록에 없는 배우 이름");
+	if (!m_caption.IsEmpty())
+		SetWindowText(m_caption);
+	if (m_single)
+	{
+		// 한 명만 고르기: 새 배우 추가 줄 숨김
+		m_editNew.ShowWindow(SW_HIDE);
+		if (CWnd* w = GetDlgItem(IDC_PICK_ADD)) w->ShowWindow(SW_HIDE);
+		for (CWnd* w = GetWindow(GW_CHILD); w; w = w->GetWindow(GW_HWNDNEXT))
+		{
+			CString t;
+			w->GetWindowText(t);
+			if (t == L"새 배우")
+				w->ShowWindow(SW_HIDE);
+		}
+	}
 
 	FillList();
 	UpdateSelectedText();
@@ -1120,8 +1273,10 @@ void CActorPickDlg::FillList()
 	for (size_t row = 0; row < rows.size(); ++row)
 	{
 		const ActorInfo& a = m_lib.actors[rows[row]];
+		if (!m_exclude.IsEmpty() && a.name.CompareNoCase(m_exclude) == 0)
+			continue;   // 합칠 원래 배우는 목록에서 뺌
 		// 대표 이름(배우 관리에서 마지막으로 고른 이름)만 표시 - 별칭은 검색에만 사용
-		const int i = m_list.InsertItem(static_cast<int>(row), a.name);
+		const int i = m_list.InsertItem(m_list.GetItemCount(), a.name);
 		m_list.SetItemData(i, static_cast<DWORD_PTR>(rows[row]));
 		m_list.SetCheck(i, IsChecked(a.name) ? TRUE : FALSE);
 	}
@@ -1158,16 +1313,36 @@ void CActorPickDlg::OnLvnItemChanged(NMHDR* pNMHDR, LRESULT* pResult)
 	if (idx < 0 || idx >= static_cast<int>(m_lib.actors.size()))
 		return;
 
-	SetChecked(m_lib.actors[idx].name, newImg == INDEXTOSTATEIMAGEMASK(2));
+	const bool checked = (newImg == INDEXTOSTATEIMAGEMASK(2));
+	if (m_single && checked)
+	{
+		// 한 명만: 다른 체크 해제
+		m_order.clear();
+		m_filling = true;
+		for (int i = 0; i < m_list.GetItemCount(); ++i)
+			if (i != p->iItem && m_list.GetCheck(i))
+				m_list.SetCheck(i, FALSE);
+		m_filling = false;
+	}
+	SetChecked(m_lib.actors[idx].name, checked);
 	UpdateSelectedText();
 }
 
 void CActorPickDlg::OnNmDblclk(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	NMITEMACTIVATE* p = reinterpret_cast<NMITEMACTIVATE*>(pNMHDR);
+	*pResult = 0;
+	if (p->iItem >= 0 && m_single)
+	{
+		// 한 명만 고르기: 더블클릭 = 그 배우로 확인
+		m_list.SetCheck(p->iItem, TRUE);
+		m_result = CVideoLibrary::JoinList(m_order);
+		if (!m_result.IsEmpty())
+			CDialogEx::OnOK();
+		return;
+	}
 	if (p->iItem >= 0)
 		m_list.SetCheck(p->iItem, !m_list.GetCheck(p->iItem));
-	*pResult = 0;
 }
 
 void CActorPickDlg::OnBnClickedAdd()
@@ -1230,6 +1405,11 @@ void CActorPickDlg::OnOK()
 		return;
 
 	m_result = CVideoLibrary::JoinList(m_order);
+	if (m_single && m_result.IsEmpty())
+	{
+		::MessageBeep(MB_ICONWARNING);   // 한 명은 골라야 함
+		return;
+	}
 	CDialogEx::OnOK();
 }
 

@@ -53,6 +53,11 @@ protected:
 	CEdit          m_editUrls;         // 링크 URL (한 줄에 하나)
 
 	std::vector<int> m_rows;           // 목록 행 → m_lib.actors 인덱스
+	int  m_sortCol = 0;                // 정렬 열 (처음 = 이름 오름차순)
+	bool m_sortDesc = false;
+	void SortRows(const std::map<CString, int>& counts);   // m_rows 를 정렬 열 · 방향으로 (빈 값은 항상 뒤, 같으면 이름순)
+	void UpdateSortHeader();           // 정렬 열 머리글에 ▲ / ▼
+	afx_msg void OnLvnColumnClick(NMHDR* pNMHDR, LRESULT* pResult);   // 머리글 클릭: 그 열로 정렬 (같은 열 = 방향 전환)
 	int     m_cur = -1;                // 편집 중인 배우
 	CString m_photoPath;               // 편집 중인 사진 경로
 	bool    m_dirty = false;
@@ -104,6 +109,9 @@ public:
 
 	CString m_result;         // 확인 시: 선택한 배우 이름 (쉼표 구분)
 	bool    m_added = false;  // 새 배우를 추가했는지
+	bool    m_single = false; // 한 명만 고르기 (배우 합치기 대상 선택 - 새 배우 추가 칸 숨김)
+	CString m_exclude;        // 목록에서 뺄 배우 이름 (합칠 원래 배우)
+	CString m_caption;        // 창 제목 (비우면 기본)
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);

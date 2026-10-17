@@ -10,6 +10,7 @@
 namespace
 {
 	const UINT kEditId = 100;
+	const UINT_PTR kChipClickTimer = 0x7C1;   // 칩 한 번 클릭 (더블클릭 기다림)
 	const int  kPad = 4;       // 바깥 여백
 	const int  kGap = 4;       // 칩 사이
 	const int  kChipPadL = 7;  // 칩 안 왼쪽 여백
@@ -43,6 +44,8 @@ BEGIN_MESSAGE_MAP(CTagChipCtrl, CWnd)
 	ON_WM_ERASEBKGND()
 	ON_WM_SIZE()
 	ON_WM_LBUTTONDOWN()
+	ON_WM_LBUTTONDBLCLK()
+	ON_WM_TIMER()
 	ON_WM_MOUSEMOVE()
 	ON_MESSAGE(WM_MOUSELEAVE, &CTagChipCtrl::OnMouseLeave)
 	ON_WM_SETCURSOR()
@@ -403,6 +406,41 @@ void CTagChipCtrl::OnPaint()
 	mem.SelectObject(oldBmp);
 }
 
+void CTagChipCtrl::OnLButtonDblClk(UINT nFlags, CPoint point)
+{
+	if (!IsWindowEnabled())
+		return;
+	if (m_onChipDblClick)
+	{
+		bool onX = false;
+		for (const CRect& r : m_xRects)
+			if (r.PtInRect(point)) { onX = true; break; }
+		const int chip = onX ? -1 : ChipAt(point);
+		if (chip >= 0)
+		{
+			KillTimer(kChipClickTimer);
+			m_pendingClick = -1;
+			m_onChipDblClick(chip);
+			return;
+		}
+	}
+	OnLButtonDown(nFlags, point);   // 칩이 아닌 곳: 두 번째 클릭도 보통 클릭으로 (× · 지우기 등)
+}
+
+void CTagChipCtrl::OnTimer(UINT_PTR nIDEvent)
+{
+	if (nIDEvent != kChipClickTimer)
+	{
+		CWnd::OnTimer(nIDEvent);
+		return;
+	}
+	KillTimer(kChipClickTimer);
+	const int chip = m_pendingClick;
+	m_pendingClick = -1;
+	if (chip >= 0 && chip < static_cast<int>(m_tags.size()) && m_onChipClick)
+		m_onChipClick(chip, m_pendingPt);
+}
+
 int CTagChipCtrl::ChipAt(CPoint client) const
 {
 	for (size_t i = 0; i < m_chipRects.size() && i < m_tags.size(); ++i)
@@ -443,6 +481,14 @@ void CTagChipCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 			{
 				CPoint screen(m_chipRects[i].left, m_chipRects[i].bottom);
 				ClientToScreen(&screen);
+				if (m_onChipDblClick)
+				{
+					// 더블클릭일 수 있으니 기다렸다가 (그 사이 더블클릭이 오면 취소)
+					m_pendingClick = static_cast<int>(i);
+					m_pendingPt = screen;
+					SetTimer(kChipClickTimer, ::GetDoubleClickTime(), nullptr);
+					return;
+				}
 				m_onChipClick(static_cast<int>(i), screen);
 				return;
 			}
@@ -462,7 +508,7 @@ BOOL CTagChipCtrl::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 		bool hand = m_clearRect.PtInRect(pt) || m_dropRect.PtInRect(pt);
 		for (const CRect& r : m_xRects)
 			if (r.PtInRect(pt)) { hand = true; break; }
-		if (m_onChipClick)
+		if (m_onChipClick || m_onChipDblClick)
 			for (const CRect& r : m_chipRects)
 				if (r.PtInRect(pt)) { hand = true; break; }
 		::SetCursor(::LoadCursor(nullptr, hand ? IDC_HAND : IDC_ARROW));
