@@ -1139,9 +1139,18 @@ BOOL CNamePickDlg::OnInitDialog()
 
 	const CString kindName = (m_kind == LIST_STUDIO) ? L"제작사" : L"태그";
 	SetWindowText(!m_caption.IsEmpty() ? m_caption :
-		(m_kind == LIST_STUDIO ? CString(L"제작사 / 레이블") : kindName) + (m_multi ? L" 선택 (여러 개 가능)" : L" 선택 (하나만)"));
+		(m_kind == LIST_STUDIO ? CString(L"제작사 / 레이블 선택 (제작사 + 공용 레이블 함께 가능)") :
+		 kindName + (m_multi ? L" 선택 (여러 개 가능)" : L" 선택 (하나만)")));
 	SetDlgItemText(IDC_PICK_NEWLABEL, L"새 " + kindName);
 
+	// 공용 레이블 (제작사와 함께 선택된 상태로)
+	if (m_kind == LIST_STUDIO && IsPublicLabel(m_curLabel))
+	{
+		const int li = m_lib.FindLabel(m_curLabel);
+		m_pubLabel = m_lib.labelInfos[li].name;
+		if (!m_order.empty() && m_order[0].CompareNoCase(m_pubLabel) == 0)
+			m_order.clear();
+	}
 	// 현재 값이 목록에 없으면 추가 (보통은 이미 동기화되어 있음)
 	for (const CString& n : m_order)
 	{
@@ -1168,8 +1177,38 @@ BOOL CNamePickDlg::OnInitDialog()
 	return FALSE;
 }
 
+bool CNamePickDlg::IsPublicLabel(const CString& name) const
+{
+	if (m_kind != LIST_STUDIO || name.IsEmpty() || m_lib.FindNamed(LIST_STUDIO, name) >= 0)
+		return false;
+	const int li = m_lib.FindLabel(name);
+	return li >= 0 && m_lib.FindNamed(LIST_STUDIO, m_lib.labelInfos[li].parent) < 0;
+}
+
+bool CNamePickDlg::IsChildLabel(const CString& name) const
+{
+	if (m_kind != LIST_STUDIO || name.IsEmpty() || m_lib.FindNamed(LIST_STUDIO, name) >= 0)
+		return false;
+	const int li = m_lib.FindLabel(name);
+	return li >= 0 && m_lib.FindNamed(LIST_STUDIO, m_lib.labelInfos[li].parent) >= 0;
+}
+
+void CNamePickDlg::SyncChecks()
+{
+	m_filling = true;
+	for (int i = 0; i < m_list.GetItemCount(); ++i)
+	{
+		const BOOL want = IsChecked(NameOfData(static_cast<int>(m_list.GetItemData(i)))) ? TRUE : FALSE;
+		if (m_list.GetCheck(i) != want)
+			m_list.SetCheck(i, want);
+	}
+	m_filling = false;
+}
+
 bool CNamePickDlg::IsChecked(const CString& name) const
 {
+	if (!m_pubLabel.IsEmpty() && m_pubLabel.CompareNoCase(name) == 0)
+		return true;
 	for (const CString& n : m_order)
 	{
 		if (n.CompareNoCase(name) == 0)
@@ -1180,6 +1219,35 @@ bool CNamePickDlg::IsChecked(const CString& name) const
 
 void CNamePickDlg::SetChecked(const CString& name, bool checked)
 {
+	if (m_kind == LIST_STUDIO)
+	{
+		// 제작사 선택: [제작사 하나] + [공용 레이블 하나] 함께 가능, 제작사 소속 레이블은 그것 하나만 (상위 제작사가 정해짐)
+		if (checked)
+		{
+			if (IsPublicLabel(name))
+			{
+				m_pubLabel = name;
+				if (!m_order.empty() && IsChildLabel(m_order[0]))
+					m_order.clear();   // 레이블은 하나만 → 제작사 소속 레이블은 해제
+			}
+			else
+			{
+				m_order.clear();
+				m_order.push_back(name);
+				if (IsChildLabel(name))
+					m_pubLabel.Empty();
+			}
+		}
+		else
+		{
+			if (!m_pubLabel.IsEmpty() && m_pubLabel.CompareNoCase(name) == 0)
+				m_pubLabel.Empty();
+			else
+				m_order.erase(std::remove_if(m_order.begin(), m_order.end(),
+					[&](const CString& n) { return n.CompareNoCase(name) == 0; }), m_order.end());
+		}
+		return;
+	}
 	if (checked)
 	{
 		if (!m_multi)
@@ -1270,7 +1338,9 @@ CString CNamePickDlg::NameOfData(int data) const
 void CNamePickDlg::UpdateSelectedText()
 {
 	CString s = L"선택: ";
-	s += m_order.empty() ? CString(L"(없음)") : CVideoLibrary::JoinList(m_order);
+	s += m_order.empty() ? CString(m_pubLabel.IsEmpty() ? L"(없음)" : L"") : CVideoLibrary::JoinList(m_order);
+	if (!m_pubLabel.IsEmpty())
+		s += (m_order.empty() ? CString() : CString(L" + ")) + L"공용 레이블 " + m_pubLabel;
 	m_staticSelected.SetWindowText(s);
 }
 
@@ -1298,6 +1368,12 @@ void CNamePickDlg::OnLvnItemChanged(NMHDR* pNMHDR, LRESULT* pResult)
 	const bool checked = (newImg == INDEXTOSTATEIMAGEMASK(2));
 	SetChecked(itemName, checked);
 
+	if (m_kind == LIST_STUDIO)
+	{
+		SyncChecks();   // 제작사 + 공용 레이블 규칙대로 다른 체크 정리
+		UpdateSelectedText();
+		return;
+	}
 	// 하나만 선택: 다른 체크 해제
 	if (checked && !m_multi)
 	{
@@ -1375,6 +1451,7 @@ void CNamePickDlg::OnOK()
 		return;
 
 	m_result = CVideoLibrary::JoinList(m_order);
+	m_resultLabel = m_pubLabel;
 	CDialogEx::OnOK();
 }
 

@@ -23,6 +23,12 @@ public:
 	int  NeededWidth();                  // 지금 내용을 그리는 데 필요한 폭 (픽셀, 내용 없으면 0)
 
 	static Info    ReadInfo(const CString& path);               // 속성에서 읽기 (캐시 없음)
+	// 디스크 캐시(mediainfo.vmdb)를 거쳐 읽기: 파일 크기 · 수정 시각이 같으면 저장해 둔 값, 아니면 ReadInfo 후 기억 (스레드 안전)
+	static Info    ReadInfoCached(const CString& path);
+	// 디스크 캐시: 시작할 때 불러오고 끝날 때 저장 (암호화 - DbCrypt), keep 이 있으면 그 경로(소문자)만 남김
+	static void    LoadDiskCache(const CString& file);
+	static void    SaveDiskCache(const std::set<CString>* keep = nullptr);
+	static void    ForgetDisk(const CString& path);             // 그 경로를 디스크 캐시에서 지움 (영상 새로고침)
 	static CString ResolutionText(UINT width, UINT height);     // 1920x1080 → "1080p", 3840x2160 → "2160p"
 	// 해상도 마크: 반환 = 등급 "SD" / "HD" / "FHD" / "QHD" / "UHD", resText = 큰 글자 "480p" / "720p" / "1080p" / "1440p" / "4K" / "8K"
 	static CString GradeText(UINT width, UINT height, CString* resText = nullptr, COLORREF* color = nullptr);

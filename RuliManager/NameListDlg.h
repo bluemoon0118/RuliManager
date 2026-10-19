@@ -112,6 +112,9 @@ public:
 	bool    m_single = false;  // 태그도 하나만 고르기 (태그 병합 대상 선택)
 	CString m_exclude;         // 목록에서 뺄 이름 (병합할 원래 태그)
 	CString m_caption;         // 창 제목 (비우면 기본)
+	// 제작사 선택: 제작사와 함께 고를 수 있는 공용 레이블(상위 제작사가 없는 레이블) - 열 때 m_curLabel, 확인 시 m_resultLabel
+	CString m_curLabel;
+	CString m_resultLabel;
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);
@@ -127,7 +130,11 @@ protected:
 	CStatic   m_staticSelected;
 
 	std::vector<CString> m_order;
+	CString m_pubLabel;        // 제작사 선택: 지금 고른 공용 레이블 (m_order 의 제작사와 함께)
 	bool m_filling = false;
+	bool IsPublicLabel(const CString& name) const;   // 상위 제작사가 없는 등록 레이블
+	bool IsChildLabel(const CString& name) const;    // 상위 제작사가 있는 레이블 (제작사 이름이 아닐 때)
+	void SyncChecks();                               // 목록 체크 표시를 선택 상태에 맞춤
 
 	bool IsChecked(const CString& name) const;
 	void SetChecked(const CString& name, bool checked);

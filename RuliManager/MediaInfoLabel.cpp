@@ -7,6 +7,8 @@
 #include <mfidl.h>
 #include <mfreadwrite.h>
 #include <mutex>
+#include <string>
+#include "DbCrypt.h"
 #pragma comment(lib, "mfplat.lib")
 #pragma comment(lib, "mfreadwrite.lib")
 #pragma comment(lib, "mfuuid.lib")
@@ -131,6 +133,176 @@ namespace
 	}
 }
 
+// ---------------------------------------------------------------------------
+// 디스크 캐시 (mediainfo.vmdb): 영상마다 해상도 · fps · 재생 시간을 저장해 두고 다음 실행에 다시 씀
+//  - 파일 크기와 수정 시각이 저장할 때와 같으면 파일을 다시 열지 않음 (시작할 때 영상 카드마다 파일을 열던 CPU · 디스크 사용 줄임)
+//  - 형식: DbCrypt 암호화한 UTF-8 글자, 줄마다 "경로(소문자)\t크기\t수정시각\t가로\t세로\tfps*1000\t재생시간(100ns)"
+namespace
+{
+	struct DiskEntry { ULONGLONG size = 0, mtime = 0; CMediaInfoLabel::Info info; };
+	std::mutex g_diskMx;
+	std::map<CString, DiskEntry> g_disk;   // 경로(소문자) → 정보
+	CString g_diskFile;
+	bool g_diskDirty = false;
+
+	bool FileStamp(const CString& path, ULONGLONG& size, ULONGLONG& mtime)
+	{
+		WIN32_FILE_ATTRIBUTE_DATA fa = {};
+		if (!::GetFileAttributesExW(path, GetFileExInfoStandard, &fa) || (fa.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+			return false;
+		size = (static_cast<ULONGLONG>(fa.nFileSizeHigh) << 32) | fa.nFileSizeLow;
+		mtime = (static_cast<ULONGLONG>(fa.ftLastWriteTime.dwHighDateTime) << 32) | fa.ftLastWriteTime.dwLowDateTime;
+		return true;
+	}
+}
+
+void CMediaInfoLabel::LoadDiskCache(const CString& file)
+{
+	std::lock_guard<std::mutex> lock(g_diskMx);
+	g_diskFile = file;
+	g_disk.clear();
+	g_diskDirty = false;
+	CFile f;
+	if (!f.Open(file, CFile::modeRead | CFile::shareDenyWrite))
+		return;
+	const ULONGLONG len = f.GetLength();
+	if (len == 0 || len > 512ULL * 1024 * 1024)
+		return;
+	std::vector<BYTE> raw(static_cast<size_t>(len));
+	if (f.Read(raw.data(), static_cast<UINT>(raw.size())) != raw.size())
+		return;
+	f.Close();
+	std::vector<BYTE> plain;
+	if (!DbCrypt::Decrypt(raw.data(), raw.size(), plain) || plain.empty())
+		return;   // 못 풀면 빈 캐시로 시작 (끝날 때 새로 씀)
+	const CString text = CString(CA2W(std::string(reinterpret_cast<const char*>(plain.data()), plain.size()).c_str(), CP_UTF8));
+	int pos = 0;
+	while (pos < text.GetLength())
+	{
+		int nl = text.Find(L'\n', pos);
+		if (nl < 0) nl = text.GetLength();
+		const CString line = text.Mid(pos, nl - pos);
+		pos = nl + 1;
+		if (line.IsEmpty() || line[0] == L'#')
+			continue;
+		CString cols[7];
+		int c = 0, start = 0;
+		for (int i = 0; i <= line.GetLength() && c < 7; ++i)
+			if (i == line.GetLength() || line[i] == L'\t')
+			{
+				cols[c++] = line.Mid(start, i - start);
+				start = i + 1;
+			}
+		if (c < 7 || cols[0].IsEmpty())
+			continue;
+		DiskEntry e;
+		e.size = _wcstoui64(cols[1], nullptr, 10);
+		e.mtime = _wcstoui64(cols[2], nullptr, 10);
+		e.info.width = static_cast<UINT>(_wcstoui64(cols[3], nullptr, 10));
+		e.info.height = static_cast<UINT>(_wcstoui64(cols[4], nullptr, 10));
+		e.info.fps = static_cast<double>(_wcstoui64(cols[5], nullptr, 10)) / 1000.0;
+		e.info.duration100ns = _wcstoui64(cols[6], nullptr, 10);
+		e.info.ok = (e.info.width > 0 && e.info.height > 0) || e.info.fps > 0 || e.info.duration100ns > 0;
+		if (e.info.ok)
+			g_disk[cols[0]] = e;
+	}
+}
+
+void CMediaInfoLabel::SaveDiskCache(const std::set<CString>* keep)
+{
+	std::lock_guard<std::mutex> lock(g_diskMx);
+	if (g_diskFile.IsEmpty())
+		return;
+	if (keep)
+	{
+		// DB 에 없는 영상(지웠거나 옮긴 파일)의 기록은 버림
+		for (auto it = g_disk.begin(); it != g_disk.end();)
+		{
+			if (keep->count(it->first) == 0)
+			{
+				it = g_disk.erase(it);
+				g_diskDirty = true;
+			}
+			else
+				++it;
+		}
+	}
+	if (!g_diskDirty)
+		return;
+	CString text = L"#MediaInfo\t1\n";
+	for (const auto& kv : g_disk)
+	{
+		const DiskEntry& e = kv.second;
+		text.AppendFormat(L"%s\t%llu\t%llu\t%u\t%u\t%llu\t%llu\n", static_cast<LPCWSTR>(kv.first), e.size, e.mtime,
+			e.info.width, e.info.height, static_cast<ULONGLONG>(e.info.fps * 1000.0 + 0.5), e.info.duration100ns);
+	}
+	const CW2A utf8(text, CP_UTF8);
+	const size_t n = strlen(utf8);
+	std::vector<BYTE> enc;
+	if (!DbCrypt::Encrypt(reinterpret_cast<const BYTE*>(static_cast<LPCSTR>(utf8)), n, enc))
+		return;
+	// 임시 파일에 쓰고 바꿔치기 (쓰는 도중 끊겨도 예전 캐시는 남음)
+	const CString tmp = g_diskFile + L".tmp";
+	try
+	{
+		CFile f(tmp, CFile::modeCreate | CFile::modeWrite);
+		f.Write(enc.data(), static_cast<UINT>(enc.size()));
+		f.Close();
+	}
+	catch (CException* ex)
+	{
+		ex->Delete();
+		::DeleteFileW(tmp);
+		return;
+	}
+	if (::MoveFileExW(tmp, g_diskFile, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+		g_diskDirty = false;
+	else
+		::DeleteFileW(tmp);
+}
+
+void CMediaInfoLabel::ForgetDisk(const CString& path)
+{
+	CString key = path;
+	key.MakeLower();
+	std::lock_guard<std::mutex> lock(g_diskMx);
+	if (g_disk.erase(key))
+		g_diskDirty = true;
+}
+
+CMediaInfoLabel::Info CMediaInfoLabel::ReadInfoCached(const CString& path)
+{
+	CString key = path;
+	key.MakeLower();
+	ULONGLONG size = 0, mtime = 0;
+	const bool stamped = FileStamp(path, size, mtime);
+	if (!stamped)
+		return Info();   // 파일 없음
+	{
+		std::lock_guard<std::mutex> lock(g_diskMx);
+		auto it = g_disk.find(key);
+		if (it != g_disk.end())
+		{
+			if (it->second.size == size && it->second.mtime == mtime)
+				return it->second.info;   // 저장해 둔 값 (파일을 열지 않음)
+			g_disk.erase(it);             // 파일이 바뀜 → 다시 읽음
+			g_diskDirty = true;
+		}
+	}
+	const Info info = ReadInfo(path);
+	if (info.ok)
+	{
+		std::lock_guard<std::mutex> lock(g_diskMx);
+		DiskEntry e;
+		e.size = size;
+		e.mtime = mtime;
+		e.info = info;
+		g_disk[key] = e;
+		g_diskDirty = true;
+	}
+	return info;
+}
+
 CMediaInfoLabel::Info CMediaInfoLabel::ReadInfo(const CString& path)
 {
 	Info info;
@@ -250,7 +422,7 @@ void CMediaInfoLabel::SetFile(const CString& path)
 			m_info = it->second;
 		else
 		{
-			m_info = ReadInfo(path);
+			m_info = ReadInfoCached(path);   // 디스크 캐시 먼저
 			m_cache[key] = m_info;
 		}
 	}
@@ -263,6 +435,7 @@ void CMediaInfoLabel::Forget(const CString& path)
 	CString key = path;
 	key.MakeLower();
 	m_cache.erase(key);
+	ForgetDisk(path);   // 디스크 캐시도 (다음에 파일을 다시 읽음)
 	if (m_path.CompareNoCase(path) == 0)
 		m_path.Empty();   // 같은 경로로 SetFile 해도 다시 읽게
 }

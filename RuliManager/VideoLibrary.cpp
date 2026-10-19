@@ -449,6 +449,8 @@ bool CVideoLibrary::MigrateImagesToStore()
 		fix(n.image, L"studios");
 	for (NamedInfo& n : labelInfos)
 		fix(n.image, L"studios");   // 레이블 이미지도 제작사 폴더에
+	for (NamedInfo& n : collectionInfos)
+		fix(n.image, L"studios");   // 컬렉션 커버도 제작사 폴더에
 	// 태그는 이미지 없음
 	return changed;
 }
@@ -486,6 +488,8 @@ bool CVideoLibrary::DecryptImageStore()
 		fix(n.image, L"studios");
 	for (NamedInfo& n : labelInfos)
 		fix(n.image, L"studios");
+	for (NamedInfo& n : collectionInfos)
+		fix(n.image, L"studios");
 	return changed;
 }
 
@@ -498,6 +502,8 @@ int CVideoLibrary::CleanupImageStore() const
 		for (const NamedInfo& n : NamedList(kind))
 			if (!n.image.IsEmpty()) used.insert(MakeKey(n.image));
 	for (const NamedInfo& n : labelInfos)
+		if (!n.image.IsEmpty()) used.insert(MakeKey(n.image));
+	for (const NamedInfo& n : collectionInfos)   // 컬렉션 커버
 		if (!n.image.IsEmpty()) used.insert(MakeKey(n.image));
 
 	// 보관소 하위 폴더의 파일 중 연결되지 않은 것 모으기
@@ -1518,13 +1524,15 @@ namespace
 			v.seriesTitle = Unescape(fields[16]);
 		if (fields.size() >= 18)         // 검열 정보 (0 ~ 4)
 			v.censor = (std::max)(0, (std::min)(CVideoLibrary::kCensorCount - 1, _wtoi(fields[17])));
+		if (fields.size() >= 19)         // 컬렉션 (쉼표 구분)
+			v.collections = Unescape(fields[18]);
 	}
 
 	// 영상 줄 (내보내기용: 배우 칸은 번호가 아닌 이름 그대로)
 	CString VideoExportLine(const VideoItem& v)
 	{
 		CString line;
-		line.Format(L"V\t%s\t%llu\t%llu\t%s\t%s\t\t%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\n",
+		line.Format(L"V\t%s\t%llu\t%llu\t%s\t%s\t\t%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\n",
 			static_cast<LPCWSTR>(Escape(v.path)), v.size, v.modified,
 			static_cast<LPCWSTR>(CVideoLibrary::RatingValueText(v.rating)),
 			static_cast<LPCWSTR>(Escape(v.tags)),
@@ -1538,7 +1546,8 @@ namespace
 			static_cast<LPCWSTR>(Escape(v.label)),
 			static_cast<LPCWSTR>(Escape(v.series)),
 			static_cast<LPCWSTR>(Escape(v.seriesTitle)),
-			v.censor);
+			v.censor,
+			static_cast<LPCWSTR>(Escape(v.collections)));
 		return line;
 	}
 
@@ -1581,6 +1590,7 @@ bool CVideoLibrary::Load()
 	studios.clear();
 	tagInfos.clear();
 	labelInfos.clear();
+	collectionInfos.clear();
 	std::vector<std::pair<CString, CString>> legacyLabels;   // 예전 형식: S 줄 7번째 칸의 레이블 목록 (제작사, 레이블)
 
 	CString text, pendingText;
@@ -1677,6 +1687,17 @@ bool CVideoLibrary::Load()
 			ParseNamedFields(kind, fields, n, &legacyLabels);
 			if (!n.name.IsEmpty() && FindNamed(kind, n.name) < 0)
 				NamedList(kind).push_back(n);
+		}
+		else if (fields[0] == L"C" && fields.size() >= 2)   // 컬렉션
+		{
+			NamedInfo n;
+			n.name = Unescape(fields[1]);
+			n.name.Trim();
+			if (fields.size() >= 3) n.memo = Unescape(fields[2]);
+			if (fields.size() >= 4) n.favorite = (_wtoi(fields[3]) != 0);
+			if (fields.size() >= 5) n.image = FromStoredPath(Unescape(fields[4]));   // 컬렉션 커버 (이미지 보관소 studios 폴더)
+			if (!n.name.IsEmpty() && FindCollection(n.name) < 0)
+				collectionInfos.push_back(n);
 		}
 		else if (fields[0] == L"L" && fields.size() >= 2)
 		{
@@ -2040,6 +2061,8 @@ bool CVideoLibrary::Save() const
 			text += NamedDbLine(kind, n);
 	for (const NamedInfo& n : labelInfos)
 		text += LabelDbLine(n);
+	for (const NamedInfo& n : collectionInfos)   // 컬렉션: C<탭>이름(제목)<탭>메모<탭>즐겨찾기<탭>커버 이미지
+		text += L"C\t" + Escape(n.name) + L"\t" + Escape(n.memo) + (n.favorite ? L"\t1\t" : L"\t0\t") + Escape(ToStoredPath(n.image)) + L"\n";
 	CString pendingText = L"#VideoManager pending v1 (스캔으로 찾은 새 파일 - 정보를 저장하면 library.tsv 로 옮겨짐)\n";
 	for (const VideoItem& v : items)
 	{
@@ -2052,7 +2075,7 @@ bool CVideoLibrary::Save() const
 		}
 		CString line;
 		const CString ratingText = v.rating > 0 ? RatingValueText(v.rating) : CString(L"0");   // 별점 "3.5" (예전 프로그램도 정수 부분은 읽음)
-		line.Format(L"V\t%s\t%llu\t%llu\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\n",   // 15번째 칸: 레이블, 16번째 칸: 시리즈(품번), 17번째 칸: 시리즈 이름, 18번째 칸: 검열
+		line.Format(L"V\t%s\t%llu\t%llu\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\n",   // 15번째 칸: 레이블, 16번째 칸: 시리즈(품번), 17번째 칸: 시리즈 이름, 18번째 칸: 검열, 19번째 칸: 컬렉션
 			static_cast<LPCWSTR>(Escape(v.path)),
 			v.size, v.modified, static_cast<LPCWSTR>(ratingText),
 			static_cast<LPCWSTR>(Escape(v.tags)),
@@ -2067,7 +2090,8 @@ bool CVideoLibrary::Save() const
 			static_cast<LPCWSTR>(Escape(v.label)),
 			static_cast<LPCWSTR>(Escape(v.series)),
 			static_cast<LPCWSTR>(Escape(v.seriesTitle)),
-			v.censor);
+			v.censor,
+			static_cast<LPCWSTR>(Escape(v.collections)));
 		text += line;
 	}
 
@@ -2337,12 +2361,13 @@ namespace
 		dst.label        = src.label;
 		dst.series       = src.series;
 		dst.tags         = src.tags;
+		dst.collections  = src.collections;   // 컬렉션도 묶음 전체
 	}
 	bool SamePartInfo(const VideoItem& a, const VideoItem& b)
 	{
 		return a.code == b.code && a.title == b.title && a.rating == b.rating && a.censor == b.censor && a.oCount == b.oCount &&
 			a.release == b.release && a.actors == b.actors && a.actorAliases == b.actorAliases &&
-			a.studio == b.studio && a.label == b.label && a.series == b.series && a.tags == b.tags;
+			a.studio == b.studio && a.label == b.label && a.series == b.series && a.tags == b.tags && a.collections == b.collections;
 	}
 }
 
@@ -2407,6 +2432,7 @@ int CVideoLibrary::UnifyPartGroups()
 			if (merged.series.IsEmpty() && merged.label == o.label) merged.series = o.series;
 			if (merged.tags.IsEmpty())         merged.tags = o.tags;
 			if (merged.seriesTitle.IsEmpty())  merged.seriesTitle = o.seriesTitle;
+			if (merged.collections.IsEmpty())  merged.collections = o.collections;
 		}
 		for (size_t i : list)
 		{
@@ -2692,9 +2718,35 @@ int CVideoLibrary::RelinkOnStartup()
 {
 	// 이동식 디스크: 드라이브 문자가 바뀌었으면 먼저 새 문자로 맞춤
 	const int remapped = RemapRemovableDrives();
+	// 등록 폴더마다 지금 접근할 수 있는지 (연결 안 된 이동식 디스크 · 분리한 외장 드라이브 = 접근 불가)
+	std::vector<bool> reachable(folders.size(), false);
+	for (size_t i = 0; i < folders.size(); ++i)
+		reachable[i] = RemovableConnected(folders[i]);
+	// 없어진 파일이 있는지: 접근할 수 없는 폴더(연결 안 된 디스크)의 영상은 "없어진 파일"로 보지 않음
+	//  (예전에는 이동식 디스크를 빼 두면 그 영상들 때문에 실행할 때마다 등록 폴더 전체를 스캔했음 - 목표개선작업_1-3)
 	bool anyMissing = false;
 	for (const VideoItem& v : items)
-		if (::GetFileAttributesW(v.path) == INVALID_FILE_ATTRIBUTES) { anyMissing = true; break; }
+	{
+		bool skip = false;
+		for (size_t i = 0; i < folders.size(); ++i)
+		{
+			if (IsUnder(v.path, folders[i]))
+			{
+				skip = !reachable[i];   // 폴더에 접근할 수 없으면 파일 확인도 하지 않음
+				break;
+			}
+		}
+		if (skip)
+			continue;
+		bool online = true;
+		if (IsRemovableItem(v.path, &online) && !online)
+			continue;
+		if (::GetFileAttributesW(v.path) == INVALID_FILE_ATTRIBUTES)
+		{
+			anyMissing = true;
+			break;
+		}
+	}
 	if (!anyMissing)
 		return remapped;   // 모두 제자리면 스캔하지 않음 (시작 속도)
 
@@ -3508,53 +3560,81 @@ bool CVideoLibrary::SyncNamedFromVideos()
 	for (VideoItem& v : items)
 	{
 		v.series.Trim();
+		bool fromCode = false;   // 이번에 품번으로 찾은 시리즈 (지금 제작사 · 레이블과 맞을 때만 씀)
 		if (v.series.IsEmpty() && !v.code.IsEmpty())
 		{
 			// 품번 접두어가 등록된 시리즈면 그 시리즈로 (레이블 · 제작사는 아래에서 채움)
 			const CString s = SeriesForCode(v.code);
-			if (!s.IsEmpty()) { v.series = s; added = true; }
+			if (!s.IsEmpty()) { v.series = s; fromCode = true; }
 		}
 		if (v.series.IsEmpty())
 			continue;
+		const int curStudio = v.studio.IsEmpty() ? -1 : FindStudioLoose(v.studio);
 		CString sname;
 		const int li = FindLabelOfSeries(v.series, &sname);
 		if (li < 0)
 		{
 			// 제작사의 시리즈: 표기 맞춤, 제작사가 비어 있으면 그 제작사로
 			const int sn = FindStudioOfSeries(v.series, &sname);
-			if (sn < 0)
+			if (sn < 0 || (fromCode && !v.studio.IsEmpty() && curStudio != sn))
+			{
+				if (fromCode) v.series.Empty();   // 품번 시리즈가 지금 제작사(사용자가 고른 값)와 다르면 쓰지 않음
 				continue;
+			}
+			if (fromCode) added = true;
 			if (v.series != sname) { v.series = sname; added = true; }
 			if (v.studio.IsEmpty()) { v.studio = studios[sn].name; added = true; }
 			continue;
 		}
+		const int owner = FindNamed(LIST_STUDIO, labelInfos[li].parent);
+		if (fromCode && ((!v.studio.IsEmpty() && owner >= 0 && curStudio != owner) ||
+		                 (!v.label.IsEmpty() && FindLabelLoose(v.label) != li)))
+		{
+			// 품번 시리즈의 레이블이 지금 제작사 · 레이블과 다름 → 쓰지 않음 (제작사를 바꿨는데 예전 레이블이 다시 채워지던 문제)
+			v.series.Empty();
+			continue;
+		}
+		if (fromCode) added = true;
 		if (v.series != sname) { v.series = sname; added = true; }
-		if (v.label.IsEmpty())
+		if (v.label.IsEmpty() && owner >= 0 && !v.studio.IsEmpty() && curStudio != owner)
+		{
+			// 고른 시리즈의 레이블이 다른 제작사 소속 → 레이블은 채우지 않음 (사용자가 고른 제작사 유지)
+		}
+		else if (v.label.IsEmpty())
 		{
 			v.label = labelInfos[li].name;
 			if (v.studio.IsEmpty())
 			{
-				const int owner = FindNamed(LIST_STUDIO, labelInfos[li].parent);
 				if (owner >= 0) v.studio = studios[owner].name;
 			}
 			added = true;
 		}
 	}
-	// 영상의 레이블 → 그 영상 스튜디오의 레이블 목록에 추가 (없을 때만)
+	// 영상에 적힌 컬렉션이 목록에 없으면 추가 (텍스트 일괄 등록 등)
+	for (const VideoItem& v : items)
+		for (const CString& c : SplitList(v.collections))
+			if (FindCollection(c) < 0)
+			{
+				NamedInfo n;
+				n.name = c;
+				collectionInfos.push_back(n);
+				added = true;
+			}
+	// 영상의 새 레이블 (파일 · 정보 txt 로딩, 웹페이지 붙여넣기, 직접 입력) → 레이블 목록에 **공용 레이블(상위 제작사 없음)** 로 추가
+	//  - 어느 제작사의 레이블인지 판단하기 어려우므로 상위는 비워 둠 (레이블 관리 창에서 상위 제작사 지정)
+	//  - 예전에는 그 영상의 제작사를 상위로 넣었음 (잘못된 제작사 아래 레이블이 생기던 원인)
 	for (const VideoItem& v : items)
 	{
 		CString lb = v.label;
 		lb.Trim();
-		if (lb.IsEmpty() || v.studio.IsEmpty())
+		if (lb.IsEmpty())
 			continue;
-		const int n = FindStudioLoose(v.studio);
-		if (n < 0 || lb.CompareNoCase(studios[n].name) == 0)
-			continue;
-		if (FindLabel(lb) < 0)   // 레이블 이름은 전체에서 하나 (이미 다른 제작사에 있으면 그대로)
+		if (FindStudioLoose(lb) >= 0)
+			continue;   // 제작사 이름과 같으면 레이블로 만들지 않음
+		if (FindLabel(lb) < 0)   // 레이블 이름은 전체에서 하나 (이미 있으면 그대로)
 		{
 			NamedInfo info;
-			info.name = lb;
-			info.parent = studios[n].name;
+			info.name = lb;   // 상위 제작사 없음 = 공용 레이블
 			labelInfos.push_back(info);
 			added = true;
 		}
@@ -3584,6 +3664,132 @@ bool CVideoLibrary::SyncNamedFromVideos()
 		added = true;
 	}
 	return added;
+}
+
+// ---------------------------------------------------------------------------
+// 컬렉션 (컬렉션 탭)
+
+int CVideoLibrary::FindCollection(const CString& name) const
+{
+	CString nm = name;
+	nm.Trim();
+	if (nm.IsEmpty())
+		return -1;
+	for (size_t i = 0; i < collectionInfos.size(); ++i)
+		if (collectionInfos[i].name.CompareNoCase(nm) == 0)
+			return static_cast<int>(i);
+	return -1;
+}
+
+bool CVideoLibrary::InCollection(const VideoItem& v, const CString& name) const
+{
+	for (const CString& c : SplitList(v.collections))
+		if (c.CompareNoCase(name) == 0)
+			return true;
+	return false;
+}
+
+bool CVideoLibrary::AddToCollection(size_t idx, const CString& name)
+{
+	CString nm = name;
+	nm.Trim();
+	RemoveListCommas(nm);   // 쉼표는 목록 구분자
+	if (idx >= items.size() || nm.IsEmpty())
+		return false;
+	const int ci = FindCollection(nm);
+	if (ci < 0)
+	{
+		NamedInfo n;
+		n.name = nm;
+		collectionInfos.push_back(n);
+	}
+	else
+		nm = collectionInfos[ci].name;   // 등록된 표기로
+	bool changed = (ci < 0);
+	std::vector<size_t> targets = PartSiblings(idx);   // 분할 파일 묶음도 함께
+	targets.insert(targets.begin(), idx);
+	for (size_t t : targets)
+	{
+		VideoItem& v = items[t];
+		if (InCollection(v, nm))
+			continue;
+		std::vector<CString> list = SplitList(v.collections);
+		list.push_back(nm);
+		v.collections = JoinList(list);
+		v.pending = false;   // 컬렉션에 넣으면 정식 등록 (임시 영상은 DB 에 정보가 저장되지 않으므로)
+		changed = true;
+	}
+	return changed;
+}
+
+bool CVideoLibrary::RemoveFromCollection(size_t idx, const CString& name)
+{
+	if (idx >= items.size())
+		return false;
+	bool changed = false;
+	std::vector<size_t> targets = PartSiblings(idx);
+	targets.insert(targets.begin(), idx);
+	for (size_t t : targets)
+	{
+		VideoItem& v = items[t];
+		std::vector<CString> list = SplitList(v.collections), out;
+		for (const CString& c : list)
+			if (c.CompareNoCase(name) != 0)
+				out.push_back(c);
+		if (out.size() != list.size())
+		{
+			v.collections = JoinList(out);
+			changed = true;
+		}
+	}
+	return changed;
+}
+
+bool CVideoLibrary::RenameCollection(const CString& oldName, const CString& newName)
+{
+	CString nm = newName;
+	nm.Trim();
+	RemoveListCommas(nm);
+	const int ci = FindCollection(oldName);
+	if (ci < 0 || nm.IsEmpty())
+		return false;
+	const int other = FindCollection(nm);
+	if (other >= 0 && other != ci)
+		return false;   // 같은 이름의 컬렉션이 이미 있음
+	const CString old = collectionInfos[ci].name;
+	collectionInfos[ci].name = nm;
+	for (VideoItem& v : items)
+	{
+		std::vector<CString> list = SplitList(v.collections);
+		bool hit = false;
+		for (CString& c : list)
+			if (c.CompareNoCase(old) == 0) { c = nm; hit = true; }
+		if (hit)
+			v.collections = JoinList(list);
+	}
+	return true;
+}
+
+int CVideoLibrary::DeleteCollection(const CString& name)
+{
+	const int ci = FindCollection(name);
+	const CString nm = (ci >= 0) ? collectionInfos[ci].name : name;
+	if (ci >= 0)
+		collectionInfos.erase(collectionInfos.begin() + ci);
+	int removed = 0;
+	for (VideoItem& v : items)
+	{
+		std::vector<CString> list = SplitList(v.collections), out;
+		for (const CString& c : list)
+			if (c.CompareNoCase(nm) != 0)
+				out.push_back(c);
+		if (out.size() != list.size())
+		{
+			v.collections = JoinList(out);
+			++removed;
+		}
+	}
+	return removed;
 }
 
 int CVideoLibrary::FindLabel(const CString& name) const
@@ -4499,6 +4705,7 @@ CString CVideoLibrary::VideoInfoText(const VideoItem& v)
 	AddLine(t, L"제작사", v.studio);
 	AddLine(t, L"레이블", v.label);
 	AddLine(t, L"시리즈", v.series);
+	AddLine(t, L"시리즈 이름", v.seriesTitle);
 	AddLine(t, L"태그", v.tags);
 	if (v.oCount > 0) { CString o; o.Format(L"%d", v.oCount); AddLine(t, L"물방울", o); }
 	return t;
@@ -4507,7 +4714,7 @@ CString CVideoLibrary::VideoInfoText(const VideoItem& v)
 void CVideoLibrary::ClearVideoTextFields(VideoItem& v)
 {
 	v.code.Empty(); v.title.Empty(); v.release.Empty(); v.rating = 0; v.oCount = 0; v.censor = 0;
-	v.actors.Empty(); v.actorAliases.Empty(); v.studio.Empty(); v.label.Empty(); v.series.Empty(); v.tags.Empty();
+	v.actors.Empty(); v.actorAliases.Empty(); v.studio.Empty(); v.label.Empty(); v.series.Empty(); v.seriesTitle.Empty(); v.tags.Empty();
 }
 
 CString CVideoLibrary::ActorInfoText(const ActorInfo& a)
@@ -4566,6 +4773,7 @@ int CVideoLibrary::ExportVideoInfoTxt(int& unchanged, int& failed) const
 		AddLine(t, L"제작사", v.studio);
 		AddLine(t, L"레이블", v.label);
 		AddLine(t, L"시리즈", v.series);
+		AddLine(t, L"시리즈 이름", v.seriesTitle);
 		AddLine(t, L"태그", v.tags);
 		if (v.oCount > 0) { CString o; o.Format(L"%d", v.oCount); AddLine(t, L"물방울", o); }
 		// 영상과 같은 폴더, 같은 이름 (ABC-123.mp4 → ABC-123.txt)
@@ -5142,6 +5350,7 @@ bool CVideoLibrary::ApplyVideoText(VideoItem& v, CString text, std::vector<CStri
 	};
 
 	bool actorsSet = false;
+	CString seriesAsTitle;   // "시리즈" 값을 이름 칸에 넣었으면 그 값 (같은 글에 "시리즈 이름" 줄이 있으면 품번 시리즈로 되돌림)
 	int pos = 0;
 	while (pos <= text.GetLength())
 	{
@@ -5225,10 +5434,34 @@ bool CVideoLibrary::ApplyVideoText(VideoItem& v, CString text, std::vector<CStri
 			setIfEmpty(v.actorAliases, toActorList(val));
 		else if (KeyIs(key, { L"시리즈", L"series", L"シリーズ" }))
 		{
+			// 등록된 시리즈(품번 접두어 - 제작사 · 레이블의 시리즈 목록)면 품번 시리즈, 아니면 영상 상세 아래 [시리즈] 이름 칸 (자유 글자)
+			//  (웹페이지의 "시리즈" 는 보통 이름 - 예: マジックミラー号 - 이라 품번 시리즈 칸에 넣으면 상세에 보이지 않았음)
 			CString s = val;
 			s.TrimLeft(L'#');
 			s.Trim();
-			setIfEmpty(v.series, s);
+			if (!s.IsEmpty() && (FindLabelOfSeries(s) >= 0 || FindStudioOfSeries(s) >= 0))
+				setIfEmpty(v.series, s);
+			else if (!s.IsEmpty() && v.seriesTitle.IsEmpty())
+			{
+				v.seriesTitle = s;
+				seriesAsTitle = s;
+				changed = true;
+			}
+		}
+		else if (KeyIs(key, { L"시리즈이름", L"시리즈명", L"seriestitle", L"seriesname" }))
+		{
+			CString s = val;
+			s.Trim();
+			if (!seriesAsTitle.IsEmpty() && v.seriesTitle == seriesAsTitle)
+			{
+				// 같은 글에 "시리즈"(품번 시리즈) 와 "시리즈 이름" 이 둘 다 있음 (정보 txt 형식) → 각각 제 칸으로
+				setIfEmpty(v.series, seriesAsTitle);
+				v.seriesTitle = s;
+				seriesAsTitle.Empty();
+				changed = true;
+			}
+			else
+				setIfEmpty(v.seriesTitle, s);   // 영상 상세 아래 [시리즈] 이름 칸 (정보 txt 의 "시리즈 이름")
 		}
 		else if (KeyIs(key, { L"레이블", L"상표", L"label", L"レーベル" }))
 		{
@@ -5816,7 +6049,7 @@ bool CVideoLibrary::ExportListFile(int what, const CString& path) const
 	}
 	else if (what == EXPORT_VIDEOS)
 	{
-		text += L"# V 칸: 1 파일 경로, 2 크기, 3 수정시각, 4 별점(3.5), 5 태그(쉼표), 7 배우(쉼표), 8 제작사, 9 발매일, 10 제목, 11 참여 별칭(과거 이름), 12 물방울, 13 품번, 14 레이블, 15 시리즈(품번), 16 시리즈 이름, 17 검열(0 해당없음 1 검열됨 2 모자이크파괴 3 무수정 4 무수정-유출)\n";
+		text += L"# V 칸: 1 파일 경로, 2 크기, 3 수정시각, 4 별점(3.5), 5 태그(쉼표), 7 배우(쉼표), 8 제작사, 9 발매일, 10 제목, 11 참여 별칭(과거 이름), 12 물방울, 13 품번, 14 레이블, 15 시리즈(품번), 16 시리즈 이름, 17 검열(0 해당없음 1 검열됨 2 모자이크파괴 3 무수정 4 무수정-유출), 18 컬렉션(쉼표)\n";
 		text += L"#   (정식 등록 영상만, 같은 영상 = 파일 경로)\n\n";
 		for (const VideoItem& v : items)
 			if (!v.pending)
@@ -6023,6 +6256,7 @@ bool CVideoLibrary::ImportListFile(int what, const CString& path, int& added, in
 			ch |= put(dst.release, src.release); ch |= put(dst.title, src.title); ch |= put(dst.actorAliases, src.actorAliases);
 			ch |= put(dst.code, src.code); ch |= put(dst.label, src.label); ch |= put(dst.series, src.series);
 			ch |= put(dst.seriesTitle, src.seriesTitle);
+			ch |= put(dst.collections, src.collections);
 			if (src.rating > 0 && src.rating != dst.rating) { dst.rating = src.rating; ch = true; }
 			if (src.oCount > 0 && src.oCount != dst.oCount) { dst.oCount = src.oCount; ch = true; }
 			if (src.censor > 0 && src.censor != dst.censor) { dst.censor = src.censor; ch = true; }
