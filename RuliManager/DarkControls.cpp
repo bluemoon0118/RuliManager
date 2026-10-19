@@ -260,6 +260,8 @@ void CDarkButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 			VectorIcon::Camera(&dc, sq, iconColor, 1.0);   // 제작사: 비디오 카메라 (제작사 기본 이미지)
 		else if (m_icon == ICON_TAG)
 			VectorIcon::Tag(&dc, sq, iconColor, 1.0);      // 태그: 꼬리표 (태그 기본 이미지)
+		else if (m_icon == ICON_COLLECTION)
+			VectorIcon::Collection(&dc, sq, iconColor, 1.0);   // 컬렉션: 겹친 화면 + 재생
 
 		CRect textRc(left + iconW + gap, tr.top, tr.right, tr.bottom);
 		dc.DrawText(text, &textRc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);

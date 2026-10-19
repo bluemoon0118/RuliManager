@@ -102,6 +102,34 @@ namespace VectorIcon
 		});
 	}
 
+	void Collection(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			// 필름 (Font Awesome "film" 과 비슷한 모양): 둥근 사각형 몸체 + 양옆 구멍(4개씩) + 가운데 화면 2칸 - 구멍 · 화면은 뚫림
+			auto roundRect = [&p](float x, float y, float w, float h, float r)
+			{
+				const float d = r * 2;
+				p.StartFigure();
+				p.AddArc(x, y, d, d, 180.0f, 90.0f);
+				p.AddArc(x + w - d, y, d, d, 270.0f, 90.0f);
+				p.AddArc(x + w - d, y + h - d, d, d, 0.0f, 90.0f);
+				p.AddArc(x, y + h - d, d, d, 90.0f, 90.0f);
+				p.CloseFigure();
+			};
+			roundRect(1.0f, 2.5f, 22.0f, 19.0f, 2.2f);           // 몸체
+			const float holeW = 2.4f, holeH = 2.4f, holeR = 0.5f;
+			const float holeY[4] = { 4.6f, 8.6f, 12.6f, 16.6f };  // 구멍 세로 위치 (위에서 아래로 4개)
+			for (float hy : holeY)
+			{
+				roundRect(2.6f, hy, holeW, holeH, holeR);               // 왼쪽 구멍
+				roundRect(23.0f - 1.6f - holeW, hy, holeW, holeH, holeR);   // 오른쪽 구멍
+			}
+			roundRect(6.9f, 4.6f, 10.2f, 6.4f, 0.8f);    // 위 화면
+			roundRect(6.9f, 12.6f, 10.2f, 6.4f, 0.8f);   // 아래 화면 (구멍 줄과 위아래 끝을 맞춤)
+		});
+	}
+
 	void Person(CDC* dc, const CRect& area, COLORREF col, double fill)
 	{
 		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)

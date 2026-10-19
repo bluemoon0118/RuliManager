@@ -7,6 +7,7 @@ namespace VectorIcon
 {
 	void Camera(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);      // 비디오 카메라 (스튜디오 기본 이미지, Font Awesome video)
 	void Tag(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);         // 꼬리표 (태그)
+	void Collection(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);  // 필름 (컬렉션 기본 이미지 · 탭 아이콘)
 	void Person(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);      // 사람 (배우)
 	void User(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);        // 사람 (성별 미지정 배우 기본 이미지, Font Awesome user)
 	void Movie(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);       // 원 + 재생 (영상 기본 이미지, Font Awesome circle-play)

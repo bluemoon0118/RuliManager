@@ -23,6 +23,37 @@
 #include "ScreenshotExtractor.h"
 #include "YearView.h"
 
+// 컬렉션 · 제작사 영상 화면 위쪽 정보 (배우 출연작 화면의 배우 정보 자리): 제목(크게) · 정보 줄 · 메모 + (제작사) 하위 레이블 이미지 칸
+//  - 더블클릭 = 편집 (m_onDblClick), 레이블 칸 더블클릭 = 그 레이블 영상 (m_onSubDblClick)
+class CCollectionInfoPanel : public CWnd
+{
+public:
+	struct SubItem { CString name; Gdiplus::Bitmap* img = nullptr; };
+	BOOL Create(CWnd* parent, UINT id);
+	void SetInfo(const CString& title, const CString& subLine, const CString& memo, bool favorite);
+	void SetSubItems(const CString& caption, const std::vector<SubItem>& items, COLORREF tileBack);   // 비우면 표시 안 함
+	std::function<void(int)> m_onSubDblClick;
+	void SetColors(COLORREF back, COLORREF text, COLORREF sub) { m_back = back; m_text = text; m_sub = sub; if (GetSafeHwnd()) Invalidate(FALSE); }
+	int  CalcHeight(int width);   // 지금 내용을 그리는 데 필요한 높이
+	std::function<void()> m_onDblClick;
+
+protected:
+	CString  m_title, m_memo, m_subLine;
+	bool     m_fav = false;
+	CString  m_subCaption;
+	std::vector<SubItem> m_subs;
+	std::vector<CRect>   m_subRects;   // 마지막 배치의 레이블 칸 (클라이언트 좌표)
+	COLORREF m_tileBack = RGB(0x3E, 0x37, 0x56);
+	COLORREF m_back = RGB(0x20, 0x2B, 0x33), m_text = RGB(255, 255, 255), m_sub = RGB(160, 170, 180);
+	CFont    m_bigFont;
+	void     EnsureFont();
+	int      Layout(CDC* dc, int width, CRect* titleRc, CRect* countRc, CRect* memoRc, CRect* capRc = nullptr);
+	afx_msg void OnPaint();
+	afx_msg BOOL OnEraseBkgnd(CDC*) { return TRUE; }
+	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
+	DECLARE_MESSAGE_MAP()
+};
+
 class CRuliManagerDlg : public CDialogEx, public IVideoGridOwner
 {
 public:
@@ -53,7 +84,7 @@ protected:
 	static inline const COLORREF& kDangerColor = TCOL(TC_DANGER); // #DB3737 (삭제/제거 버튼 배경)
 	CDarkButton m_darkButtons[20];
 	CDarkButton m_btnSettings;      // 오른쪽 위 톱니바퀴 (설정 창)
-	CDarkButton m_modeButtons[4];   // 영상 / 배우 / 스튜디오 / 태그 토글 버튼
+	CDarkButton m_modeButtons[5];   // 영상 / 배우 / 스튜디오 / 태그 / 컬렉션 토글 버튼
 	CDarkButton m_pageButtons[9];   // 페이지: « < 1 2 3 4 5 > »
 	void UpdateModeButtons();
 	static inline const COLORREF& kScrollColor = TCOL(TC_SCROLL); // #6C7478 (스크롤바 배경)
@@ -94,6 +125,16 @@ protected:
 	afx_msg void OnBnClickedStudioViewList();
 	bool DrillHeaderShown() const { return m_mode == MODE_ACTOR && !m_drill.IsEmpty() && m_drillActorIdx >= 0; }
 	void UpdateDrillHeader();        // 출연작 화면 위 배우 사진 · 정보 갱신
+	// 컬렉션 · 제작사(레이블) 영상 화면 위쪽 (배우 출연작 화면처럼): 왼쪽 커버 · 로고(16:9) + 오른쪽 제목 · 정보 · 메모 (+ 제작사는 하위 레이블 이미지)
+	CImagePreview        m_colCover;
+	CCollectionInfoPanel m_colInfo;
+	CString              m_drillCount;      // 들어간 카드의 영상 수 (글자)
+	std::vector<CString> m_headerLabels;    // 위쪽 정보의 칸 순서 (더블클릭 = 그 레이블 / 제작사 영상)
+	bool                 m_headerSubIsStudio = false;   // 칸이 상위 제작사 (레이블 영상 화면) - 아니면 하위 레이블
+	bool CollectionHeaderShown() const { return m_mode == MODE_COLLECTION && !m_drill.IsEmpty(); }
+	bool NamedHeaderShown() const { return (m_mode == MODE_COLLECTION || m_mode == MODE_STUDIO) && !m_drill.IsEmpty(); }
+	void UpdateCollectionHeader();   // 컬렉션 · 제작사 · 레이블 위쪽 정보 갱신
+	void OnNamedHeaderEdit();        // 위쪽 커버 · 정보 더블클릭: 컬렉션 편집 / 제작사 · 레이블 관리 창
 	void ToggleActorFavorite(int actorIdx);
 	afx_msg void OnCatDelete();
 	afx_msg void OnCatMerge();
@@ -113,6 +154,18 @@ protected:
 	void MergeActorInto(int src, int dst, const CString& past);   // src 배우를 dst 배우로 합침 (src 항목 삭제, 영상 참여 별칭 = past, 비우면 그 영상에서 쓰던 이름)
 	afx_msg void OnActorPasteInfo();  // 배우 카드 오른쪽 클릭 → 웹페이지 내용 붙여넣기 (프로필 화면 복사 글)
 	afx_msg void OnActorTextInfo();   // 배우 카드 오른쪽 클릭 → 텍스트로 정보 입력   // 배우 탭 우클릭 → 배우 삭제 (Del)   // 태그 탭 우클릭 → 삭제
+	// 컬렉션 탭
+	std::map<CString, int> m_collectionCover;   // 컬렉션(소문자) → 대표 영상(카드 이미지, 처음 들어 있는 영상)
+	int  m_ctxVideoItem = -1;                    // 영상 오른쪽 클릭 메뉴의 대상 영상 (컬렉션에 추가 / 빼기)
+	std::vector<CString> m_ctxCollections;      // 그 메뉴의 [컬렉션에 추가 ▸] 항목 순서
+	void ToggleCollectionFavorite(const CString& name);
+	bool IsCollectionFavorite(const CString& name) const;
+	void RenameSelectedCollection();
+	void DrawCollectionCover(CDC* dc, const CString& name, const CRect& area, COLORREF back);
+	afx_msg void OnNewCollection();
+	afx_msg void OnCollectionAddNew();
+	afx_msg void OnCollectionRemove();
+	afx_msg void OnCollectionAdd(UINT nID);
 	void ToggleTagFavorite(const CString& tag);   // 태그 즐겨찾기 (태그 목록에 없으면 추가)
 	bool IsTagFavorite(const CString& tag) const;
 	CDropCounter m_dropCounter;      // 영상 상세 정보: 별점 오른쪽 물방울 카운트
@@ -165,7 +218,7 @@ protected:
 	int  m_stripCardCurH = 0;        // 배우 카드 띠의 지금 카드 높이 (제작사 탭 = 제작 당시 나이 줄 없음)
 	int  StripAgeH() const { return 1 + m_cardPad / 2 + m_cardLine + m_cardPad / 2; }   // 구분선 + 제작 당시 나이 줄 높이
 	bool StripShowsAge() const { return m_mode != MODE_STUDIO || !m_drill.IsEmpty(); }   // 제작사 탭 상세(제작사 · 레이블의 출연 배우)는 영상이 없으므로 나이 줄 없음 (제작사 영상 화면은 있음)
-	bool VideoStripShown() const { return m_mode == MODE_VIDEO || (m_mode == MODE_STUDIO && !m_drill.IsEmpty()); }   // 영상 상세 태그 아래 출연 배우 카드: 영상 탭 + 제작사(레이블) 영상 화면
+	bool VideoStripShown() const { return m_mode == MODE_VIDEO || ((m_mode == MODE_STUDIO || m_mode == MODE_COLLECTION) && !m_drill.IsEmpty()); }   // 영상 상세 태그 아래 출연 배우 카드: 영상 탭 + 제작사(레이블) 영상 화면
 	bool m_namedActors = false;      // 제작사 탭 상세: 배우 카드 띠를 (하위 레이블 없는) 제작사 / 레이블의 출연 배우로 사용 중
 	void UpdateNamedActorStrip(int kind, const CString& name);   // 제작사 탭 상세 하단 배우 카드 (kind: 0 = 숨김, 1 = 제작사, 2 = 레이블)
 	void RefreshActorStrip();                                        // 숨긴 배우 칸 값으로 카드 띠 갱신
@@ -183,7 +236,7 @@ protected:
 	CDarkCombo m_comboPageSize;    // 페이지당 개수 (전체 / 50 / 100 / 250 / 500 / 1000)
 	// 페이지 나누기: 목록(영상 · 배우 · 제작사/태그)마다 지금 페이지, 전체 개수
 	int  m_pageSize = 250;         // 지금 탭의 페이지당 개수 (0 = 전체)
-	int  m_pageSizes[4] = { 250, 250, 250, 250 };   // 탭(영상 / 배우 / 제작사 / 태그)마다 따로 (레지스트리 Settings\PageSize0 ~ 3)
+	int  m_pageSizes[5] = { 250, 250, 250, 250, 250 };   // 탭(영상 / 배우 / 제작사 / 태그 / 컬렉션)마다 따로 (레지스트리 Settings\PageSize0 ~ 4)
 	void ApplyTabPageSize();       // 지금 탭의 페이지당 개수를 m_pageSize 와 콤보에 반영
 	// 배우 출연작 화면(배우 카드 더블클릭)의 필터 값은 따로 저장: 정렬 · 오름/내림 · 별점 · 페이지당 개수
 	//  (레지스트리 Settings\ActorDrillSortColumn / ActorDrillSortAsc / ActorDrillRating / ActorDrillPageSize)
@@ -326,11 +379,12 @@ protected:
 
 	// 격자 확대 (탭마다 4단계, 슬라이더)
 	CZoomSlider m_zoomSlider;
-	int  m_zoom[6] = { 0, 0, 0, 0, 0, 0 };   // 영상 / 배우 / 스튜디오 / 태그 / 배우 출연작 화면 / 제작사 영상 화면 (레지스트리 Settings\Zoom0 ~ 5)
+	int  m_zoom[7] = { 0, 0, 0, 0, 0, 0, 0 };   // 영상 / 배우 / 스튜디오 / 태그 / 배우 출연작 화면 / 제작사 영상 화면 / 컬렉션 (레지스트리 Settings\Zoom0 ~ 6)
 	int  ZoomSlot() const   // 배우 탭: 배우 격자 / 출연작 화면, 제작사 탭: 제작사 목록 / 영상 화면 따로
 	{
 		if (m_mode == MODE_ACTOR && !m_drill.IsEmpty()) return 4;
 		if (m_mode == MODE_STUDIO && !m_drill.IsEmpty()) return 5;
+		if (m_mode == MODE_COLLECTION) return 6;   // 컬렉션 탭 (목록 · 영상 화면 같이)
 		return (m_mode >= MODE_VIDEO && m_mode <= MODE_TAG) ? m_mode : MODE_VIDEO;
 	}
 	double ZoomFactor() const;
@@ -354,6 +408,7 @@ protected:
 		bool GridDrawCard(CDC* dc, int row, const CRect& card, bool selected, bool focused) override;   // 스튜디오 카드
 		bool GridClick(int row, const CRect& card, CPoint pt) override;   // 태그 카드 하트 → 즐겨찾기 전환
 		int  GridHitPart(int row, const CRect& card, CPoint pt) override; // 1 = 태그 카드 하트 위
+		CString GridTipText(int row, const CRect& card, CPoint pt) override;   // 컬렉션 카드: 제목 + 메모
 	};
 	CatGridOwner m_catOwner;
 
@@ -394,6 +449,8 @@ protected:
 	bool  m_actorSortAsc = true;
 	int   m_tagSortCol = 0;          // 태그 카드 정렬: 0 = 이름, 1 = 영상 수 (즐겨찾기는 항상 먼저)
 	bool  m_tagSortAsc = true;
+	int   m_colSortCol = 0;          // 컬렉션 카드 정렬: 0 = 이름, 1 = 영상 수 (즐겨찾기는 항상 먼저)
+	bool  m_colSortAsc = true;
 	int   m_studioSortCol = 0;       // 제작사 카드 정렬: 0 = 이름, 1 = 영상 수 (레이블은 상위 제작사 바로 뒤, 같은 기준)
 	bool  m_studioSortAsc = true;
 	int   m_sortComboKind = -1;      // 정렬 콤보 항목: 0 = 영상, 1 = 배우, 2 = 태그 (탭이 바뀌면 다시 채움)
@@ -404,7 +461,7 @@ protected:
 	bool  m_allowLabelEdit = false;
 
 	// 보기 모드 (상단 라디오 버튼)
-	enum ViewMode { MODE_VIDEO = 0, MODE_ACTOR, MODE_STUDIO, MODE_TAG };
+	enum ViewMode { MODE_VIDEO = 0, MODE_ACTOR, MODE_STUDIO, MODE_TAG, MODE_COLLECTION, MODE_COUNT };
 	enum CatKind  { CAT_ALL = 0, CAT_NONE, CAT_VALUE, CAT_LABEL };   // CAT_LABEL: 제작사 탭의 레이블 항목 (value = 레이블 이름)
 	struct CatRow { int kind; CString value; };
 	int     m_mode = MODE_VIDEO;
@@ -464,11 +521,13 @@ protected:
 	// 배우 보기
 	bool IsActorGridMode() const { return m_mode == MODE_ACTOR && m_drill.IsEmpty(); }
 	// 영상 상세 정보(편집 칸) 표시: 영상 탭 + 배우 탭에서 배우를 더블클릭해 들어간 출연작 화면
-	bool ShowVideoDetail() const { return m_mode == MODE_VIDEO || ((m_mode == MODE_ACTOR || m_mode == MODE_STUDIO) && !m_drill.IsEmpty()); }   // 영상 탭 + 배우 출연작 · 제작사(레이블) 영상 화면
-	bool IsCategoryListMode() const { return (m_mode == MODE_STUDIO || m_mode == MODE_TAG) && m_drill.IsEmpty(); }
+	bool ShowVideoDetail() const { return m_mode == MODE_VIDEO || ((m_mode == MODE_ACTOR || m_mode == MODE_STUDIO || m_mode == MODE_COLLECTION) && !m_drill.IsEmpty()); }   // + 컬렉션 영상 화면   // 영상 탭 + 배우 출연작 · 제작사(레이블) 영상 화면
+	bool IsCategoryListMode() const { return (m_mode == MODE_STUDIO || m_mode == MODE_TAG || m_mode == MODE_COLLECTION) && m_drill.IsEmpty(); }
+	bool TagLikeMode() const { return m_mode == MODE_TAG || (m_mode == MODE_COLLECTION && m_drill.IsEmpty()); }   // 오른쪽 상세 페이지 없이 격자 전체 폭 (태그 · 컬렉션 목록 - 컬렉션 영상 화면은 영상 상세 표시)
 	bool IsCatCardMode() const { return IsCategoryListMode(); }   // 제작사 · 태그 카드 목록 (정렬 콤보 사용)
-	int&  CatSortCol() { return (m_mode == MODE_STUDIO) ? m_studioSortCol : m_tagSortCol; }
-	bool& CatSortAsc() { return (m_mode == MODE_STUDIO) ? m_studioSortAsc : m_tagSortAsc; }
+	int&  CatSortCol() { return (m_mode == MODE_STUDIO) ? m_studioSortCol : (m_mode == MODE_COLLECTION ? m_colSortCol : m_tagSortCol); }
+	bool& CatSortAsc() { return (m_mode == MODE_STUDIO) ? m_studioSortAsc : (m_mode == MODE_COLLECTION ? m_colSortAsc : m_tagSortAsc); }
+	LPCWSTR CatSortKey() const { return (m_mode == MODE_STUDIO) ? L"StudioSort" : (m_mode == MODE_COLLECTION ? L"CollectionSort" : L"TagSort"); }   // 레지스트리 이름 앞부분
 	int  NamedKind() const { return m_mode == MODE_STUDIO ? LIST_STUDIO : LIST_TAG; }
 	// 스튜디오/태그는 항상 격자 표시
 	bool CatGridActive() const { return true; }

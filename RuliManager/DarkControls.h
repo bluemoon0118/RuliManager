@@ -97,7 +97,7 @@ public:
 	bool IsChecked() const { return m_checked; }
 
 	// 글자 왼쪽 아이콘
-	enum Icon { ICON_NONE = 0, ICON_PLAY, ICON_PERSON, ICON_CAMERA, ICON_TAG, ICON_GEAR };   // GEAR: 글자 없이 가운데 톱니바퀴   // PLAY: 원 안의 재생(▶), PERSON: 사람, CAMERA: 비디오 카메라, TAG: 꼬리표
+	enum Icon { ICON_NONE = 0, ICON_PLAY, ICON_PERSON, ICON_CAMERA, ICON_TAG, ICON_GEAR, ICON_COLLECTION };   // COLLECTION: 겹친 화면 (컬렉션 탭)   // GEAR: 글자 없이 가운데 톱니바퀴   // PLAY: 원 안의 재생(▶), PERSON: 사람, CAMERA: 비디오 카메라, TAG: 꼬리표
 	void SetIcon(int icon) { m_icon = icon; if (GetSafeHwnd()) Invalidate(FALSE); }
 
 	// 붙은 버튼 묶음(세그먼트 컨트롤)의 한 칸: 안쪽 모서리는 각지게, 칸 사이에 가는 구분선, 묶음 전체에 테두리

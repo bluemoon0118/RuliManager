@@ -22,6 +22,7 @@ struct VideoItem
 	CString   release;       // 발매일 "YYYY-MM-DD" (없으면 빈 문자열)
 	CString   tags;          // 쉼표로 구분된 태그
 	CString   memo;          // 메모 (여러 줄)
+	CString   collections;   // 이 영상이 들어 있는 컬렉션 (쉼표 구분, DB V 줄 19번째 칸)
 	bool      pending = false; // 임시 항목: 스캔으로 찾았지만 아직 정보를 저장하지 않음 (pending.tsv 에 기록)
 
 	CString FileName() const { return CString(::PathFindFileNameW(path)); }
@@ -92,6 +93,7 @@ public:
 	std::vector<ActorInfo> actors;
 	std::vector<NamedInfo> studios;
 	std::vector<NamedInfo> tagInfos;
+	std::vector<NamedInfo> collectionInfos;   // 컬렉션 (컬렉션 탭 - 이름(제목) · 커버 이미지(image) · 메모 · 즐겨찾기, 영상은 VideoItem::collections 에 이름으로)
 	std::vector<NamedInfo> labelInfos;   // 레이블 (제작사 하위, parent = 상위 제작사 이름) - 이름 · 서브이름 · 이미지 · 메모
 
 	bool Load();
@@ -186,6 +188,13 @@ public:
 	const std::vector<NamedInfo>& NamedList(int kind) const { return kind == LIST_STUDIO ? studios : tagInfos; }
 	int  FindNamed(int kind, const CString& name) const;
 	// 레이블 (제작사 하위)
+	// 컬렉션: 영상의 collections 칸에 이름으로 (분할 파일 묶음은 함께), 임시 영상을 넣으면 정식 등록
+	int  FindCollection(const CString& name) const;              // 이름으로 찾기 (대소문자 무시, 없으면 -1)
+	bool AddToCollection(size_t idx, const CString& name);       // 영상을 컬렉션에 (없는 컬렉션이면 만듦) - 바뀌었으면 true
+	bool RemoveFromCollection(size_t idx, const CString& name);  // 영상을 컬렉션에서 뺌
+	bool RenameCollection(const CString& oldName, const CString& newName);   // 이름 변경 (영상 쪽도), 같은 이름이 있으면 false
+	int  DeleteCollection(const CString& name);                  // 컬렉션 삭제 (영상에서도 빠짐, 영상 파일은 그대로) - 빠진 영상 수
+	bool InCollection(const VideoItem& v, const CString& name) const;
 	int  FindLabel(const CString& name) const;                   // 레이블 이름 · 서브이름으로 찾기 (대소문자 무시, 없으면 -1)
 	std::vector<int> LabelsOf(const CString& studioName) const;   // 이 제작사의 레이블 (labelInfos 인덱스, 이름 순)
 	std::vector<CString> LabelNamesOf(const CString& studioName) const;
