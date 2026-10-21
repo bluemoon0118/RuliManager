@@ -256,6 +256,7 @@
 #define IDC_SET_THEME_PREVIEW           1288
 #define IDC_SET_RATING_ONE              1289
 #define IDC_SET_RATING_HALF             1290
+#define IDC_SET_RATING_TEN              1291
 #define IDC_COMBO_CENSOR                1292
 #define IDC_SET_CENSOR_LANG             1293
 #define IDC_SET_IO_KIND                 1294

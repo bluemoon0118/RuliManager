@@ -41,7 +41,29 @@ namespace
 	}
 }
 
-bool CStarRatingCtrl::s_halfStep = false;
+int CStarRatingCtrl::s_mode = CStarRatingCtrl::MODE_ONE5;
+
+CString CStarRatingCtrl::ScoreText(int halfUnits)
+{
+	CString t;
+	if (halfUnits <= 0)
+		return t;
+	if (s_mode == MODE_ONE10)
+		t.Format(L"%d", halfUnits);                 // 10점 만점: 반 별 = 1점
+	else if (halfUnits % 2)
+		t.Format(L"%d.5", halfUnits / 2);           // 5점 만점 (예전 0.5점 별점은 1점 방식에서도 그대로)
+	else
+		t.Format(L"%d", halfUnits / 2);
+	return t;
+}
+
+CString CStarRatingCtrl::ScoreLabel(int halfUnits)
+{
+	CString t = ScoreText(halfUnits);
+	if (!t.IsEmpty() && s_mode == MODE_ONE10)
+		t += L"/10";
+	return t;
+}
 
 BEGIN_MESSAGE_MAP(CStarRatingCtrl, CWnd)
 	ON_WM_PAINT()
@@ -97,7 +119,7 @@ int CStarRatingCtrl::HitStar(CPoint pt) const
 	const int i = (pt.x + gap / 2) / step;   // 별 사이 틈은 가까운 별로
 	if (i >= m_max)
 		return 0;
-	if (s_halfStep && pt.x < i * step + size / 2)
+	if (HalfStep() && pt.x < i * step + size / 2)
 		return i * 2 + 1;   // 별의 왼쪽 절반 (X 가운데 기준) = 반 별
 	return i * 2 + 2;
 }
@@ -163,11 +185,7 @@ void CStarRatingCtrl::OnPaint()
 	// 오른쪽 숫자
 	if (shown > 0)
 	{
-		CString num;
-		if (shown % 2)
-			num.Format(L"%d.5", shown / 2);
-		else
-			num.Format(L"%d", shown / 2);
+		const CString num = ScoreText(shown);   // 5점 만점 "3.5" / 10점 만점 "7"
 		CFont* oldFont = mem.SelectObject(GetParent() ? GetParent()->GetFont() : nullptr);
 		mem.SetBkMode(TRANSPARENT);
 		mem.SetTextColor(enabled ? m_text : RGB(0x80, 0x8C, 0x96));
@@ -227,14 +245,14 @@ LRESULT CStarRatingCtrl::OnMouseLeave(WPARAM, LPARAM)
 
 BOOL CStarRatingCtrl::OnMouseWheel(UINT, short zDelta, CPoint)
 {
-	const int step = s_halfStep ? 1 : 2;
+	const int step = HalfStep() ? 1 : 2;
 	ChangeTo(m_rating + (zDelta > 0 ? step : -step));
 	return TRUE;
 }
 
 void CStarRatingCtrl::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 {
-	const int step = s_halfStep ? 1 : 2;   // 0.5점 방식이면 반 별씩
+	const int step = HalfStep() ? 1 : 2;   // 0.5점 · 10점 만점 방식이면 반 별씩
 	if (nChar == VK_LEFT || nChar == VK_DOWN)
 		ChangeTo(m_rating - step);
 	else if (nChar == VK_RIGHT || nChar == VK_UP)
@@ -244,9 +262,9 @@ void CStarRatingCtrl::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 	else if (nChar == VK_END)
 		ChangeTo(m_max * 2);
 	else if (nChar >= L'0' && nChar <= L'9')
-		ChangeTo(static_cast<int>(nChar - L'0') * 2);   // 숫자 = 별 수
+		ChangeTo(static_cast<int>(nChar - L'0') * (s_mode == MODE_ONE10 ? 1 : 2));   // 숫자 = 별 수 (10점 만점이면 점수)
 	else if (nChar >= VK_NUMPAD0 && nChar <= VK_NUMPAD9)
-		ChangeTo(static_cast<int>(nChar - VK_NUMPAD0) * 2);
+		ChangeTo(static_cast<int>(nChar - VK_NUMPAD0) * (s_mode == MODE_ONE10 ? 1 : 2));
 	else
 		CWnd::OnKeyDown(nChar, nRepCnt, nFlags);
 }

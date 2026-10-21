@@ -53,6 +53,7 @@ namespace
 	};
 
 	enum Column { COL_NAME = 0, COL_TITLE, COL_SIZE, COL_DATE, COL_RATING, COL_RELEASE, COL_ACTORS, COL_STUDIO, COL_TAGS, COL_PATH, COL_COUNT };
+	const int SORT_ACTORCOUNT = COL_COUNT;   // 정렬 콤보 전용 (목록 열 없음): 참여 배우 수
 
 	CString FormatSize(ULONGLONG b)
 	{
@@ -607,7 +608,11 @@ BOOL CRuliManagerDlg::OnInitDialog()
 	// 영상 스크린샷 격자 (설정에서 고르면 출연 배우 카드 자리에)
 	m_detailStripMode = (AfxGetApp()->GetProfileInt(L"Settings", L"DetailStrip", 0) == 1) ? 1 : 0;
 	m_mergeParts = AfxGetApp()->GetProfileInt(L"Settings", L"MergeParts", 0) != 0;
-	CStarRatingCtrl::SetHalfStep(AfxGetApp()->GetProfileInt(L"Settings", L"RatingHalf", 0) != 0);   // 별점 단위 (설정 창: 1점 / 0.5점)
+	{
+		// 별점 체계 (설정 창): 0 = 1점 · 5점 만점, 1 = 0.5점 · 5점 만점, 2 = 1점 · 10점 만점 (처음에는 예전 RatingHalf 값)
+		const int oldHalf = AfxGetApp()->GetProfileInt(L"Settings", L"RatingHalf", 0) != 0 ? 1 : 0;
+		CStarRatingCtrl::SetRatingMode(AfxGetApp()->GetProfileInt(L"Settings", L"RatingMode", oldHalf));
+	}
 	CVideoLibrary::SetCensorLang(AfxGetApp()->GetProfileInt(L"Settings", L"CensorLang", 0));          // 검열 정보 표시 언어 (설정 창)
 	FillCensorCombo();
 	m_detailLeft = AfxGetApp()->GetProfileInt(L"Settings", L"DetailLeft", 0) != 0;
@@ -785,7 +790,7 @@ BOOL CRuliManagerDlg::OnInitDialog()
 	// 영상 정렬 기준 (Column 순서와 같음)
 	{
 		const wchar_t* const sortNames[] = { L"이름", L"제목", L"크기", L"수정일", L"별점",
-		                                     L"발매일", L"배우", L"제작사", L"태그", L"경로" };
+		                                     L"발매일", L"배우", L"제작사", L"태그", L"경로", L"배우수" };   // 배우수 = 참여 배우 수 (SORT_ACTORCOUNT)
 		for (const wchar_t* n : sortNames)
 			m_comboSort.AddString(n);
 		m_sortColumn = AfxGetApp()->GetProfileInt(L"Settings", L"SortColumn", COL_NAME);
@@ -887,6 +892,7 @@ BOOL CRuliManagerDlg::OnInitDialog()
 			return handled;
 		};
 		m_yearView.m_onContext = [this](int item, CPoint pt) { if (item >= 0) ShowVideoContextMenu(item, pt); };
+		m_yearView.m_onKey = [this](UINT vk) { HandleListKey(vk); };   // F5 새로고침 · Del · F2 · Space · Backspace · Ctrl+F (격자와 같게)
 		{
 			const wchar_t* labels[2] = { L"격자", L"연도별" };
 			for (int i = 0; i < 2; ++i)
@@ -2603,6 +2609,15 @@ void CRuliManagerDlg::SortView()
 	const auto& items = m_lib.items;
 	const int col = m_sortColumn;
 	const bool asc = m_sortAsc;
+	// 배우수 정렬: 영상마다 참여 배우 수를 미리 셈 (비교할 때마다 나누지 않게)
+	std::vector<int> actorCount;
+	if (col == SORT_ACTORCOUNT)
+	{
+		actorCount.assign(items.size(), 0);
+		for (int i : m_view)
+			if (i >= 0 && i < static_cast<int>(items.size()))
+				actorCount[i] = static_cast<int>(CVideoLibrary::SplitList(items[i].actors).size());
+	}
 
 	std::stable_sort(m_view.begin(), m_view.end(), [&](int a, int b)
 	{
@@ -2623,7 +2638,10 @@ void CRuliManagerDlg::SortView()
 		case COL_STUDIO: c = ::StrCmpLogicalW(x.studio, y.studio); break;
 		case COL_TAGS:   c = ::StrCmpLogicalW(x.tags, y.tags); break;
 		case COL_PATH:   c = ::StrCmpLogicalW(x.path, y.path); break;
-		default: break;
+		default:
+			if (col == SORT_ACTORCOUNT)
+				c = actorCount[a] - actorCount[b];   // 참여 배우 수
+			break;
 		}
 		if (c == 0)
 			c = ::StrCmpLogicalW(::PathFindFileNameW(x.path), ::PathFindFileNameW(y.path));
@@ -2953,7 +2971,7 @@ void CRuliManagerDlg::UpdateSortUI()
 		else
 		{
 			const wchar_t* const sortNames[] = { L"이름", L"제목", L"크기", L"수정일", L"별점",
-			                                     L"발매일", L"배우", L"제작사", L"태그", L"경로" };
+			                                     L"발매일", L"배우", L"제작사", L"태그", L"경로", L"배우수" };   // 배우수 = 참여 배우 수 (SORT_ACTORCOUNT)
 			for (const wchar_t* n : sortNames)
 				m_comboSort.AddString(n);
 		}
@@ -3014,7 +3032,7 @@ void CRuliManagerDlg::OnCbnSelchangeSort()
 	m_sortColumn = sel;
 	// 날짜/크기/별점은 큰 값(최신)부터, 나머지는 가나다순부터
 	m_sortAsc = (m_sortColumn != COL_DATE && m_sortColumn != COL_RATING &&
-	             m_sortColumn != COL_SIZE && m_sortColumn != COL_RELEASE);
+	             m_sortColumn != COL_SIZE && m_sortColumn != COL_RELEASE && m_sortColumn != SORT_ACTORCOUNT);   // 배우수도 많은 순부터
 	ResetCurPage();
 	UpdateSortArrows();
 	UpdateSortUI();
@@ -4697,7 +4715,7 @@ void CRuliManagerDlg::OnBnClickedSettings()
 	dlg.m_cardMedia = m_showCardMedia;
 	dlg.m_sfw = IsSfwMosaic();
 	dlg.m_mergeParts = m_mergeParts;
-	dlg.m_ratingHalf = CStarRatingCtrl::HalfStep();
+	dlg.m_ratingMode = CStarRatingCtrl::RatingMode();
 	dlg.m_censorLang = CVideoLibrary::CensorLang();
 	dlg.m_detailLeft = m_detailLeft;
 	dlg.m_detailStrip = m_detailStripMode;
@@ -4722,11 +4740,16 @@ void CRuliManagerDlg::OnBnClickedSettings()
 		if (DrillHeaderShown())
 			UpdateDrillHeader();
 	}
-	if (result == IDOK && dlg.m_ratingHalf != CStarRatingCtrl::HalfStep())
+	if (result == IDOK && dlg.m_ratingMode != CStarRatingCtrl::RatingMode())
 	{
-		// 별점 단위 (1점 / 0.5점): 별점 입력 방식만 바뀜 (이미 있는 0.5점 별점은 그대로 표시)
-		CStarRatingCtrl::SetHalfStep(dlg.m_ratingHalf);
-		AfxGetApp()->WriteProfileInt(L"Settings", L"RatingHalf", dlg.m_ratingHalf ? 1 : 0);
+		// 별점 체계: 입력 단위 · 숫자 표시만 바뀜 (저장된 값은 반 별 단위 그대로 - 7 = 3.5점 = 7/10)
+		CStarRatingCtrl::SetRatingMode(dlg.m_ratingMode);
+		AfxGetApp()->WriteProfileInt(L"Settings", L"RatingMode", CStarRatingCtrl::RatingMode());
+		AfxGetApp()->WriteProfileInt(L"Settings", L"RatingHalf", CStarRatingCtrl::HalfStep() ? 1 : 0);   // 예전 버전 호환
+		Invalidate(FALSE);   // 별점 칸 숫자 · 카드 리본
+		if (m_grid.GetSafeHwnd()) m_grid.Invalidate(FALSE);
+		if (m_actorGrid.GetSafeHwnd()) m_actorGrid.Invalidate(FALSE);
+		if (m_starRating.GetSafeHwnd()) m_starRating.Invalidate(FALSE);
 	}
 	if (result == IDOK && dlg.m_censorLang != CVideoLibrary::CensorLang())
 	{
@@ -5705,7 +5728,7 @@ void CRuliManagerDlg::EnterActorDrillFilters(int ctx)
 	// 출연작 화면 값 (처음이면 영상 탭 값으로 시작)
 	CWinApp* app = AfxGetApp();
 	int col = app->GetProfileInt(L"Settings", DrillKey(L"SortColumn"), m_sortColumn);
-	if (col < COL_NAME || col > COL_PATH)
+	if (col < COL_NAME || col > SORT_ACTORCOUNT)
 		col = m_sortColumn;
 	m_sortColumn = col;
 	m_sortAsc = app->GetProfileInt(L"Settings", DrillKey(L"SortAsc"), m_sortAsc ? 1 : 0) != 0;
@@ -6228,7 +6251,7 @@ namespace
 		if (rating <= 0 || !font)
 			return;
 		CString text;
-		text = L"별점: " + CVideoLibrary::RatingValueText(rating);   // 반 별 단위 → "3.5"
+		text = L"별점: " + CStarRatingCtrl::ScoreLabel(rating);   // 반 별 단위 → "3.5" (5점 만점) / "7/10" (10점 만점)
 
 		LOGFONTW lf = {};
 		font->GetLogFont(&lf);

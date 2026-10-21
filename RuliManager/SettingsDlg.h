@@ -39,7 +39,7 @@ public:
 	bool m_cardMedia = true;
 	bool m_sfw = false;   // SFW: 배우 · 영상 이미지 모자이크
 	bool m_mergeParts = false;   // 분할 영상 합쳐서 보기 (격자에 첫 파트 카드 하나만)
-	bool m_ratingHalf = false;   // 별점 단위: false = 1점, true = 0.5점
+	int  m_ratingMode = 0;       // 별점 체계: 0 = 1점 · 5점 만점, 1 = 0.5점 · 5점 만점, 2 = 1점 · 10점 만점
 	int  m_censorLang = 0;       // 검열 정보 표시 언어: 0 한글, 1 영어, 2 일본어
 	bool m_detailLeft = false;   // 상세 화면 위치: false = 오른쪽, true = 왼쪽
 	int  m_detailStrip = 0;  // [영상 상세 태그 아래] 0 = 출연 배우 카드, 1 = 영상 스크린샷
