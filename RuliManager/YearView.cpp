@@ -15,6 +15,8 @@ BEGIN_MESSAGE_MAP(CYearView, CWnd)
 	ON_WM_LBUTTONDBLCLK()
 	ON_WM_RBUTTONDOWN()
 	ON_WM_CONTEXTMENU()
+	ON_WM_KEYDOWN()
+	ON_WM_GETDLGCODE()
 	ON_WM_MOUSEMOVE()
 	ON_MESSAGE(WM_MOUSELEAVE, &CYearView::OnMouseLeave)
 	ON_MESSAGE(WM_DARKSCROLL_SETPOS, &CYearView::OnDarkScrollSetPos)
@@ -636,4 +638,15 @@ void CYearView::OnContextMenu(CWnd* /*pWnd*/, CPoint point)
 	}
 	if (m_onContext)
 		m_onContext(item, point);
+}
+
+void CYearView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+{
+	// 연도별 보기에 포커스가 있을 때도 격자와 같은 키 (F5 새로고침 등) - 주인에게 넘김
+	if (m_onKey)
+	{
+		m_onKey(nChar);
+		return;
+	}
+	CWnd::OnKeyDown(nChar, nRepCnt, nFlags);
 }

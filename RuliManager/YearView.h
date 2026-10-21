@@ -32,6 +32,7 @@ public:
 	std::function<void(int item)> m_onActivate;               // 더블클릭
 	std::function<bool(int item, const CRect& card, CPoint pt)> m_onDblClickAt;   // 더블클릭 먼저 (카드 · 점 = 클라이언트 좌표, true = 처리함 → 열기 안 함)
 	std::function<void(int item, CPoint screenPt)> m_onContext;   // 오른쪽 클릭 (item = -1 이면 빈곳)
+	std::function<void(UINT vk)> m_onKey;                     // 키 (F5 새로고침 · Del · F2 · Space · Backspace · Ctrl+F - 격자와 같게)
 
 	bool Create(CWnd* parent, UINT id);
 	void SetColors(COLORREF back, COLORREF title, COLORREF label, COLORREF line);
@@ -91,5 +92,7 @@ protected:
 	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
 	afx_msg void OnRButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnContextMenu(CWnd* pWnd, CPoint point);
+	afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
+	afx_msg UINT OnGetDlgCode() { return DLGC_WANTARROWS | DLGC_WANTCHARS; }
 	DECLARE_MESSAGE_MAP()
 };

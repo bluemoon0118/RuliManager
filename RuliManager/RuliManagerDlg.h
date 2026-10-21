@@ -218,7 +218,7 @@ protected:
 	int  m_stripCardCurH = 0;        // 배우 카드 띠의 지금 카드 높이 (제작사 탭 = 제작 당시 나이 줄 없음)
 	int  StripAgeH() const { return 1 + m_cardPad / 2 + m_cardLine + m_cardPad / 2; }   // 구분선 + 제작 당시 나이 줄 높이
 	bool StripShowsAge() const { return m_mode != MODE_STUDIO || !m_drill.IsEmpty(); }   // 제작사 탭 상세(제작사 · 레이블의 출연 배우)는 영상이 없으므로 나이 줄 없음 (제작사 영상 화면은 있음)
-	bool VideoStripShown() const { return m_mode == MODE_VIDEO || ((m_mode == MODE_STUDIO || m_mode == MODE_COLLECTION) && !m_drill.IsEmpty()); }   // 영상 상세 태그 아래 출연 배우 카드: 영상 탭 + 제작사(레이블) 영상 화면
+	bool VideoStripShown() const { return m_mode == MODE_VIDEO || ((m_mode == MODE_STUDIO || m_mode == MODE_COLLECTION || m_mode == MODE_TAG) && !m_drill.IsEmpty()); }   // 영상 상세 태그 아래 출연 배우 카드: 영상 탭 + 제작사(레이블) 영상 화면
 	bool m_namedActors = false;      // 제작사 탭 상세: 배우 카드 띠를 (하위 레이블 없는) 제작사 / 레이블의 출연 배우로 사용 중
 	void UpdateNamedActorStrip(int kind, const CString& name);   // 제작사 탭 상세 하단 배우 카드 (kind: 0 = 숨김, 1 = 제작사, 2 = 레이블)
 	void RefreshActorStrip();                                        // 숨긴 배우 칸 값으로 카드 띠 갱신
@@ -521,9 +521,9 @@ protected:
 	// 배우 보기
 	bool IsActorGridMode() const { return m_mode == MODE_ACTOR && m_drill.IsEmpty(); }
 	// 영상 상세 정보(편집 칸) 표시: 영상 탭 + 배우 탭에서 배우를 더블클릭해 들어간 출연작 화면
-	bool ShowVideoDetail() const { return m_mode == MODE_VIDEO || ((m_mode == MODE_ACTOR || m_mode == MODE_STUDIO || m_mode == MODE_COLLECTION) && !m_drill.IsEmpty()); }   // + 컬렉션 영상 화면   // 영상 탭 + 배우 출연작 · 제작사(레이블) 영상 화면
+	bool ShowVideoDetail() const { return m_mode == MODE_VIDEO || ((m_mode == MODE_ACTOR || m_mode == MODE_STUDIO || m_mode == MODE_COLLECTION || m_mode == MODE_TAG) && !m_drill.IsEmpty()); }   // + 컬렉션 · 태그 영상 화면   // 영상 탭 + 배우 출연작 · 제작사(레이블) 영상 화면
 	bool IsCategoryListMode() const { return (m_mode == MODE_STUDIO || m_mode == MODE_TAG || m_mode == MODE_COLLECTION) && m_drill.IsEmpty(); }
-	bool TagLikeMode() const { return m_mode == MODE_TAG || (m_mode == MODE_COLLECTION && m_drill.IsEmpty()); }   // 오른쪽 상세 페이지 없이 격자 전체 폭 (태그 · 컬렉션 목록 - 컬렉션 영상 화면은 영상 상세 표시)
+	bool TagLikeMode() const { return (m_mode == MODE_TAG || m_mode == MODE_COLLECTION) && m_drill.IsEmpty(); }   // 태그 · 컬렉션 목록만 (영상 화면은 영상 상세 표시)   // 오른쪽 상세 페이지 없이 격자 전체 폭 (태그 · 컬렉션 목록 - 컬렉션 영상 화면은 영상 상세 표시)
 	bool IsCatCardMode() const { return IsCategoryListMode(); }   // 제작사 · 태그 카드 목록 (정렬 콤보 사용)
 	int&  CatSortCol() { return (m_mode == MODE_STUDIO) ? m_studioSortCol : (m_mode == MODE_COLLECTION ? m_colSortCol : m_tagSortCol); }
 	bool& CatSortAsc() { return (m_mode == MODE_STUDIO) ? m_studioSortAsc : (m_mode == MODE_COLLECTION ? m_colSortAsc : m_tagSortAsc); }

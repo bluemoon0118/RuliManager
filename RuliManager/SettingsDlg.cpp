@@ -203,7 +203,7 @@ BOOL CSettingsDlg::OnInitDialog()
 	CheckDlgButton(IDC_SET_CARD_MEDIA, m_cardMedia ? BST_CHECKED : BST_UNCHECKED);
 	CheckDlgButton(IDC_SET_SFW, m_sfw ? BST_CHECKED : BST_UNCHECKED);
 	CheckDlgButton(IDC_SET_MERGE_PARTS, m_mergeParts ? BST_CHECKED : BST_UNCHECKED);
-	CheckRadioButton(IDC_SET_RATING_ONE, IDC_SET_RATING_HALF, m_ratingHalf ? IDC_SET_RATING_HALF : IDC_SET_RATING_ONE);
+	CheckRadioButton(IDC_SET_RATING_ONE, IDC_SET_RATING_TEN, m_ratingMode == 2 ? IDC_SET_RATING_TEN : (m_ratingMode == 1 ? IDC_SET_RATING_HALF : IDC_SET_RATING_ONE));
 	if (CComboBox* combo = static_cast<CComboBox*>(GetDlgItem(IDC_SET_IO_KIND)))
 	{
 		// 텍스트 내보내기 / 가져오기 대상 (탭 · DB 삭제와 같은 순서: 영상 / 배우 / 제작사 / 태그)
@@ -374,7 +374,7 @@ void CSettingsDlg::OnOK()
 	m_cardMedia = IsDlgButtonChecked(IDC_SET_CARD_MEDIA) == BST_CHECKED;
 	m_sfw = IsDlgButtonChecked(IDC_SET_SFW) == BST_CHECKED;
 	m_mergeParts = IsDlgButtonChecked(IDC_SET_MERGE_PARTS) == BST_CHECKED;
-	m_ratingHalf = IsDlgButtonChecked(IDC_SET_RATING_HALF) == BST_CHECKED;
+	m_ratingMode = IsDlgButtonChecked(IDC_SET_RATING_TEN) == BST_CHECKED ? 2 : (IsDlgButtonChecked(IDC_SET_RATING_HALF) == BST_CHECKED ? 1 : 0);
 	if (CComboBox* combo = static_cast<CComboBox*>(GetDlgItem(IDC_SET_CENSOR_LANG)))
 		if (combo->GetCurSel() >= 0)
 			m_censorLang = combo->GetCurSel();
