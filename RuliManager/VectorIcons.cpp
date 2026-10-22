@@ -130,6 +130,65 @@ namespace VectorIcon
 		});
 	}
 
+	// 폴더 외곽 (탭이 왼쪽 위에 붙은 한 덩어리 - 겹치는 도형이 없어 구멍이 생기지 않음)
+	void AddFolderShape(Gdiplus::GraphicsPath& p)
+	{
+		const float r = 1.6f, d = r * 2;
+		p.StartFigure();
+		p.AddArc(1.0f, 3.0f, d, d, 180.0f, 90.0f);              // 탭 왼쪽 위
+		p.AddLine(1.0f + r, 3.0f, 8.2f, 3.0f);
+		p.AddLine(8.2f, 3.0f, 10.4f, 5.6f);                      // 탭 비스듬한 끝
+		p.AddLine(10.4f, 5.6f, 23.0f - r, 5.6f);
+		p.AddArc(23.0f - d, 5.6f, d, d, 270.0f, 90.0f);         // 오른쪽 위
+		p.AddArc(23.0f - d, 21.0f - d, d, d, 0.0f, 90.0f);      // 오른쪽 아래
+		p.AddArc(1.0f, 21.0f - d, d, d, 90.0f, 90.0f);          // 왼쪽 아래
+		p.CloseFigure();
+	}
+
+	void FolderPlay(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddFolderShape(p);
+			p.StartFigure();                                         // 재생 삼각형 (구멍)
+			p.AddLine(9.6f, 9.0f, 9.6f, 17.6f);
+			p.AddLine(9.6f, 17.6f, 16.6f, 13.3f);
+			p.CloseFigure();
+		});
+	}
+
+	void FolderWarn(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddFolderShape(p);
+			AddRoundRect(p, 10.9f, 8.0f, 2.2f, 7.0f, 1.0f);          // 느낌표 막대 (구멍)
+			p.AddEllipse(10.75f, 16.2f, 2.5f, 2.5f);                 // 느낌표 점 (구멍)
+		});
+	}
+
+	void UsbDrive(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			// 커넥터(위) + 몸체(아래) - 맞닿기만 하고 겹치지 않게
+			p.StartFigure();
+			p.AddLine(8.6f, 1.5f, 15.4f, 1.5f);
+			p.AddLine(15.4f, 1.5f, 15.4f, 8.0f);
+			p.AddLine(15.4f, 8.0f, 8.6f, 8.0f);
+			p.CloseFigure();
+			AddRoundRect(p, 10.0f, 3.2f, 1.5f, 1.9f, 0.3f);          // 커넥터 구멍 2개
+			AddRoundRect(p, 12.5f, 3.2f, 1.5f, 1.9f, 0.3f);
+			const float r = 2.2f, d = r * 2;                         // 몸체 (위쪽은 각지게 커넥터에 붙음)
+			p.StartFigure();
+			p.AddLine(6.4f, 8.0f, 17.6f, 8.0f);
+			p.AddArc(17.6f - d, 22.5f - d, d, d, 0.0f, 90.0f);
+			p.AddArc(6.4f, 22.5f - d, d, d, 90.0f, 90.0f);
+			p.CloseFigure();
+			AddRoundRect(p, 10.6f, 17.6f, 2.8f, 2.6f, 0.6f);          // 표시등 (구멍)
+		});
+	}
+
 	void Person(CDC* dc, const CRect& area, COLORREF col, double fill)
 	{
 		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
@@ -187,6 +246,20 @@ namespace VectorIcon
 			Gdiplus::PointF play[3] = { { 9.6f, 7.4f }, { 16.6f, 12.0f }, { 9.6f, 16.6f } };
 			p.StartFigure();
 			p.AddPolygon(play, 3);                                        // 재생 (구멍)
+		});
+	}
+
+	void Copy(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		// 뒤 장: 테두리만 (왼쪽 위), 앞 장: 꽉 찬 둥근 사각형 (오른쪽 아래) - 따로 칠해 겹친 곳이 구멍 나지 않게
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddRoundRect(p, 2.5f, 2.5f, 13.0f, 13.0f, 2.2f);
+			AddRoundRect(p, 4.6f, 4.6f, 8.8f, 8.8f, 1.0f);   // 안쪽 (구멍)
+		});
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddRoundRect(p, 8.5f, 8.5f, 13.0f, 13.0f, 2.2f);
 		});
 	}
 

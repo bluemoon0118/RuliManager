@@ -8,6 +8,7 @@
 #define IDD_ACTOR_PICK                  131
 #define IDD_INPUT                       132
 #define IDD_COLLECTION_EDIT             143
+#define IDD_FOLDER_MANAGE               144
 #define IDD_NAMELIST                    133
 #define IDD_NAME_PICK                   134
 #define IDB_FLAGS                       135
@@ -242,6 +243,13 @@
 #define IDC_COL_COVER_CLEAR             1303
 #define IDC_COL_HDR_COVER               1304
 #define IDC_COL_HDR_INFO                1305
+#define IDC_FM_INFO                     1307
+#define IDC_FM_LIST                     1308
+#define IDC_FM_ADD                      1309
+#define IDC_GENRE_HIDE                  1310
+#define IDC_GENRE_ALL                   1311
+#define IDC_GENRE_CHIPS                 1312
+#define IDC_BTN_COPYCODE                1313
 #define IDC_SET_MERGE_PARTS             1277
 #define IDC_SET_DETAIL_RIGHT            1278
 #define IDC_SET_DETAIL_LEFT             1279
@@ -295,9 +303,9 @@
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        144
+#define _APS_NEXT_RESOURCE_VALUE        145
 #define _APS_NEXT_COMMAND_VALUE         33040
-#define _APS_NEXT_CONTROL_VALUE         1307
+#define _APS_NEXT_CONTROL_VALUE         1314
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
