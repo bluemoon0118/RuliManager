@@ -79,3 +79,40 @@ protected:
 	HFONT m_hFont = nullptr;
 	DECLARE_MESSAGE_MAP()
 };
+
+// 장르(태그) 선택 칩 줄: [전체 XX건] [태그 N] [태그 N] ... (폭이 모자라면 다음 줄로)
+//  - 선택만 가능 (하나만): 칩을 누르면 그 태그, [전체] 를 누르면 해제 → m_onSelect (빈 문자열 = 전체)
+//  - 영상 탭 격자 머리 영역(도구줄 아래)에 놓임, 높이는 CalcHeight
+class CGenreChipBar : public CWnd
+{
+public:
+	struct Item { CString name; int count = 0; };
+	std::function<void(const CString&)> m_onSelect;
+
+	bool Create(CWnd* parent, UINT id);
+	void SetFontPtr(CFont* f) { m_font = f; }
+	void SetItems(const std::vector<Item>& items, int total, const CString& selected);
+	int  CalcHeight(int width);   // 이 폭에서 필요한 높이 (픽셀)
+
+protected:
+	std::vector<Item>  m_items;    // 태그 칩 (전체 칩 제외)
+	std::vector<CRect> m_rects;    // [0] = 전체, [1..] = m_items
+	int     m_total = 0;
+	CString m_sel;
+	int     m_hot = -1;
+	bool    m_tracking = false;
+	CFont*  m_font = nullptr;
+
+	CString ChipText(int i, CString& count) const;   // 칩 이름 · 건수 글자
+	int  DoLayout(CDC* dc, int width);
+	int  HitTest(CPoint pt) const;
+
+	afx_msg void OnPaint();
+	afx_msg BOOL OnEraseBkgnd(CDC*) { return TRUE; }
+	afx_msg void OnSize(UINT nType, int cx, int cy);
+	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
+	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
+	afx_msg LRESULT OnMouseLeave(WPARAM, LPARAM);
+	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
+	DECLARE_MESSAGE_MAP()
+};

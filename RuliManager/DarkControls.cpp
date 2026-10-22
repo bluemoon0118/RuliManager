@@ -149,6 +149,8 @@ void CDarkButton::OnMouseMove(UINT nFlags, CPoint point)
 		TRACKMOUSEEVENT tme = { sizeof(tme), TME_LEAVE, m_hWnd, 0 };
 		::TrackMouseEvent(&tme);
 		Invalidate(FALSE);
+		if (m_onHover)
+			m_onHover(true);
 	}
 	CButton::OnMouseMove(nFlags, point);
 }
@@ -157,6 +159,8 @@ void CDarkButton::OnMouseLeave()
 {
 	m_hover = false;
 	Invalidate(FALSE);
+	if (m_onHover)
+		m_onHover(false);
 	CButton::OnMouseLeave();
 }
 
@@ -233,6 +237,11 @@ void CDarkButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	{
 		// 설정 버튼: 글자 없이 가운데 톱니바퀴 (벡터)
 		VectorIcon::Gear(&dc, tr, disabled ? Dim(textColor) : textColor, 0.72);
+	}
+	else if (m_icon == ICON_COPY)
+	{
+		// 복사 버튼: 글자 없이 가운데 겹친 두 장 (벡터)
+		VectorIcon::Copy(&dc, tr, disabled ? Dim(textColor) : textColor, 0.62);
 	}
 	else if (m_icon != ICON_NONE)
 	{

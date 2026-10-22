@@ -598,3 +598,241 @@ BOOL CTagChipCtrl::PreTranslateMessage(MSG* pMsg)
 	}
 	return CWnd::PreTranslateMessage(pMsg);
 }
+
+// ---------------------------------------------------------------------------
+// CGenreChipBar
+
+namespace
+{
+	const int kGenreGapX = 6, kGenreGapY = 6, kGenrePadX = 10, kGenreCountGap = 6;
+}
+
+BEGIN_MESSAGE_MAP(CGenreChipBar, CWnd)
+	ON_WM_PAINT()
+	ON_WM_ERASEBKGND()
+	ON_WM_SIZE()
+	ON_WM_LBUTTONDOWN()
+	ON_WM_MOUSEMOVE()
+	ON_MESSAGE(WM_MOUSELEAVE, &CGenreChipBar::OnMouseLeave)
+	ON_WM_SETCURSOR()
+END_MESSAGE_MAP()
+
+bool CGenreChipBar::Create(CWnd* parent, UINT id)
+{
+	const CString cls = AfxRegisterWndClass(0, ::LoadCursor(nullptr, IDC_ARROW), nullptr, nullptr);   // 더블클릭 없음 (빠르게 두 번 = 두 번 클릭)
+	return CWnd::CreateEx(0, cls, L"", WS_CHILD, CRect(0, 0, 10, 10), parent, id) != FALSE;
+}
+
+void CGenreChipBar::SetItems(const std::vector<Item>& items, int total, const CString& selected)
+{
+	m_items = items;
+	m_total = total;
+	m_sel = selected;
+	m_hot = -1;
+	if (GetSafeHwnd())
+	{
+		CRect rc;
+		GetClientRect(&rc);
+		CClientDC dc(this);
+		CFont* old = m_font ? dc.SelectObject(m_font) : nullptr;
+		DoLayout(&dc, rc.Width());
+		if (old) dc.SelectObject(old);
+		Invalidate(FALSE);
+	}
+}
+
+CString CGenreChipBar::ChipText(int i, CString& count) const
+{
+	if (i == 0)
+	{
+		CString n;
+		n.Format(L"%d", m_total);
+		// 천 단위 쉼표
+		for (int p = n.GetLength() - 3; p > 0; p -= 3)
+			n.Insert(p, L',');
+		count.Empty();
+		return L"전체 " + n + L"건";
+	}
+	const Item& it = m_items[i - 1];
+	count.Format(L"%d", it.count);
+	return it.name;
+}
+
+int CGenreChipBar::DoLayout(CDC* dc, int width)
+{
+	m_rects.clear();
+	const int lineH = dc->GetTextExtent(L"Ag가").cy;
+	const int chipH = lineH + 10;
+	int x = 0, y = 0;
+	const int n = static_cast<int>(m_items.size()) + 1;
+	for (int i = 0; i < n; ++i)
+	{
+		CString count;
+		const CString name = ChipText(i, count);
+		int w = kGenrePadX * 2 + dc->GetTextExtent(name).cx;
+		if (!count.IsEmpty())
+			w += kGenreCountGap + dc->GetTextExtent(count).cx;
+		w = (std::min)(w, (std::max)(40, width));
+		if (x > 0 && x + w > width)
+		{
+			x = 0;
+			y += chipH + kGenreGapY;
+		}
+		m_rects.push_back(CRect(x, y, x + w, y + chipH));
+		x += w + kGenreGapX;
+	}
+	// 줄마다 가운데 정렬
+	for (size_t a = 0; a < m_rects.size();)
+	{
+		size_t b = a;
+		while (b < m_rects.size() && m_rects[b].top == m_rects[a].top)
+			++b;
+		const int rowW = m_rects[b - 1].right - m_rects[a].left;
+		const int shift = (std::max)(0, (width - rowW) / 2);
+		for (size_t k = a; k < b; ++k)
+			m_rects[k].OffsetRect(shift, 0);
+		a = b;
+	}
+	return y + chipH;
+}
+
+int CGenreChipBar::CalcHeight(int width)
+{
+	if (!GetSafeHwnd())
+		return 0;
+	CClientDC dc(this);
+	CFont* old = m_font ? dc.SelectObject(m_font) : nullptr;
+	const int h = DoLayout(&dc, (std::max)(1, width));
+	if (old) dc.SelectObject(old);
+	return h;
+}
+
+int CGenreChipBar::HitTest(CPoint pt) const
+{
+	for (size_t i = 0; i < m_rects.size(); ++i)
+		if (m_rects[i].PtInRect(pt))
+			return static_cast<int>(i);
+	return -1;
+}
+
+void CGenreChipBar::OnSize(UINT nType, int cx, int cy)
+{
+	CWnd::OnSize(nType, cx, cy);
+	if (cx > 0)
+	{
+		CClientDC dc(this);
+		CFont* old = m_font ? dc.SelectObject(m_font) : nullptr;
+		DoLayout(&dc, cx);
+		if (old) dc.SelectObject(old);
+		Invalidate(FALSE);
+	}
+}
+
+void CGenreChipBar::OnPaint()
+{
+	CPaintDC paint(this);
+	CRect rc;
+	GetClientRect(&rc);
+	CDC mem;
+	mem.CreateCompatibleDC(&paint);
+	CBitmap bmp;
+	bmp.CreateCompatibleBitmap(&paint, (std::max)(1, rc.Width()), (std::max)(1, rc.Height()));
+	CBitmap* oldBmp = mem.SelectObject(&bmp);
+	CFont* oldFont = m_font ? mem.SelectObject(m_font) : nullptr;
+	mem.FillSolidRect(rc, TCOL(TC_BACK));
+	mem.SetBkMode(TRANSPARENT);
+	for (int i = 0; i < static_cast<int>(m_rects.size()); ++i)
+	{
+		const CRect& r = m_rects[i];
+		const bool sel = (i == 0) ? m_sel.IsEmpty() : (m_sel.CompareNoCase(m_items[i - 1].name) == 0);
+		const bool hot = (i == m_hot);
+		// 선택 = 빨간 계열, 마우스 오버 = 바탕에 빨간 기운 (선택 칩은 조금 밝게)
+		auto mix = [](COLORREF a, COLORREF b, int pct)
+		{
+			return RGB((GetRValue(a) * (100 - pct) + GetRValue(b) * pct) / 100,
+				(GetGValue(a) * (100 - pct) + GetGValue(b) * pct) / 100,
+				(GetBValue(a) * (100 - pct) + GetBValue(b) * pct) / 100);
+		};
+		const COLORREF red = RGB(0xD9, 0x3B, 0x3B);
+		COLORREF fill = sel ? red : TCOL(TC_COMBO);
+		if (hot)
+			fill = sel ? mix(red, RGB(255, 255, 255), 15) : mix(TCOL(TC_COMBO), red, 35);
+		const COLORREF edge = hot ? mix(fill, red, 60) : fill;
+		CBrush br(fill);
+		CPen pen(PS_SOLID, 1, edge);
+		CBrush* ob = mem.SelectObject(&br);
+		CPen* op = mem.SelectObject(&pen);
+		mem.RoundRect(r, CPoint(8, 8));
+		mem.SelectObject(ob);
+		mem.SelectObject(op);
+
+		CString count;
+		const CString name = ChipText(i, count);
+		const int cw = count.IsEmpty() ? 0 : mem.GetTextExtent(count).cx;
+		CRect tr(r.left + kGenrePadX, r.top, r.right - kGenrePadX - (cw > 0 ? cw + kGenreCountGap : 0), r.bottom);
+		mem.SetTextColor((sel || hot) ? RGB(255, 255, 255) : TCOL(TC_TEXT));
+		mem.DrawText(name, tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+		if (cw > 0)
+		{
+			CRect cr(r.right - kGenrePadX - cw, r.top, r.right - kGenrePadX, r.bottom);
+			mem.SetTextColor((sel || hot) ? RGB(255, 225, 225) : TCOL(TC_SUB2));
+			mem.DrawText(count, cr, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+		}
+	}
+	paint.BitBlt(0, 0, rc.Width(), rc.Height(), &mem, 0, 0, SRCCOPY);
+	if (oldFont) mem.SelectObject(oldFont);
+	mem.SelectObject(oldBmp);
+}
+
+void CGenreChipBar::OnLButtonDown(UINT nFlags, CPoint point)
+{
+	const int i = HitTest(point);
+	if (i >= 0 && m_onSelect)
+	{
+		const CString pick = (i == 0) ? CString() : m_items[i - 1].name;
+		if (pick.CompareNoCase(m_sel) != 0)
+			m_onSelect(pick);   // 부모가 거르기 · SetItems 로 다시 표시
+		return;
+	}
+	CWnd::OnLButtonDown(nFlags, point);
+}
+
+void CGenreChipBar::OnMouseMove(UINT nFlags, CPoint point)
+{
+	if (!m_tracking)
+	{
+		TRACKMOUSEEVENT tme = { sizeof(tme), TME_LEAVE, m_hWnd, 0 };
+		m_tracking = ::TrackMouseEvent(&tme) != FALSE;
+	}
+	const int hot = HitTest(point);
+	if (hot != m_hot)
+	{
+		m_hot = hot;
+		Invalidate(FALSE);
+	}
+	CWnd::OnMouseMove(nFlags, point);
+}
+
+LRESULT CGenreChipBar::OnMouseLeave(WPARAM, LPARAM)
+{
+	m_tracking = false;
+	if (m_hot != -1)
+	{
+		m_hot = -1;
+		Invalidate(FALSE);
+	}
+	return 0;
+}
+
+BOOL CGenreChipBar::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
+{
+	CPoint pt;
+	::GetCursorPos(&pt);
+	ScreenToClient(&pt);
+	if (HitTest(pt) >= 0)
+	{
+		::SetCursor(::LoadCursor(nullptr, IDC_HAND));
+		return TRUE;
+	}
+	return CWnd::OnSetCursor(pWnd, nHitTest, message);
+}

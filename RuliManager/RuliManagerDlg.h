@@ -123,6 +123,31 @@ protected:
 	void SetStudioView(int mode);
 	afx_msg void OnBnClickedStudioViewGrid();
 	afx_msg void OnBnClickedStudioViewList();
+	// 장르(태그) 칩: [장르숨김][전체] (목록 도구줄) - [전체] 면 도구줄 아래에 태그 칩 줄, 칩 하나를 골라 그 태그 영상만
+	//  화면별(영상 탭 / 배우 출연작 / 제작사 · 레이블 영상)로 따로: 레지스트리 Settings\GenreBar · GenreBarActor · GenreBarStudio
+	CDarkButton   m_genreBtns[2];
+	CGenreChipBar m_genreBar;
+	bool    m_genreShow[3] = {};          // 화면별 [전체] 선택
+	CString m_genreSel[3];                // 화면별 고른 태그 (비면 전체)
+	CString m_genreKey[3];                // 화면별 고른 태그가 속한 대상 (배우 · 제작사가 바뀌면 고른 태그를 풂)
+	int     m_genreBarH = -1;             // 마지막 배치 때 칩 줄 높이
+	int  GenreSlot() const                // 0 = 영상 탭, 1 = 배우 출연작, 2 = 제작사 · 레이블 영상, -1 = 장르 칩 없는 화면
+	{
+		if (m_mode == MODE_VIDEO) return 0;
+		if (m_mode == MODE_ACTOR && !m_drill.IsEmpty()) return 1;
+		if (m_mode == MODE_STUDIO && !m_drill.IsEmpty()) return 2;
+		return -1;
+	}
+	bool GenreBarActive() const { const int s = GenreSlot(); return s >= 0 && m_genreShow[s] && !YearViewActive(); }   // 연도별 보기에서는 쓰지 않음
+	void SyncGenreKey();                  // 대상이 바뀌었으면 그 화면의 고른 태그를 풂
+	void SetGenreShow(bool show);
+	void UpdateGenreBar(const std::vector<int>& before);
+	void RelayoutToolbarHeader();   // 장르 거르기 전 영상(m_view) 기준 태그별 건수 → 칩 줄
+	afx_msg void OnBnClickedGenreHide();
+	// 영상 상세: 품번 칸 오른쪽 [복사] (품번을 클립보드로)
+	CDarkButton m_btnCopyCode;
+	afx_msg void OnBnClickedCopyCode();
+	afx_msg void OnBnClickedGenreAll();
 	bool DrillHeaderShown() const { return m_mode == MODE_ACTOR && !m_drill.IsEmpty() && m_drillActorIdx >= 0; }
 	void UpdateDrillHeader();        // 출연작 화면 위 배우 사진 · 정보 갱신
 	// 컬렉션 · 제작사(레이블) 영상 화면 위쪽 (배우 출연작 화면처럼): 왼쪽 커버 · 로고(16:9) + 오른쪽 제목 · 정보 · 메모 (+ 제작사는 하위 레이블 이미지)
@@ -302,6 +327,14 @@ protected:
 	CCardPopup   m_actorPopup;      // 영상 상세 배우 칩에 마우스를 올리면 그 배우 카드 (배우 탭 카드 모양)
 	int          m_actorPopupIdx = -1;
 	void DrawTagPopupCard(CDC* dc, const CRect& rc, const CString& tag);
+	// [폴더 관리] 버튼에 마우스를 올리면 등록 폴더 목록 팝업 (아이콘 · 경로 · 상태)
+	struct FolderRow { CString path; CString tag; bool removable = false; bool offline = false; };
+	std::vector<FolderRow> BuildFolderRows();
+	CCardPopup             m_folderPopup;
+	std::vector<FolderRow> m_folderPopupRows;
+	CSize FolderPopupLayout(CDC* dc);                    // 팝업 크기 계산 (dc 에 글꼴을 골라 둔 상태에서)
+	void  DrawFolderPopup(CDC* dc, const CRect& rc);
+	void  ShowFolderPopup();
 	CFont        m_detailFont;      // 영상 상세 글자 컨트롤 글꼴 (기본 + 1pt)
 	int          m_detailTmH = 0;   // m_detailFont 글자 높이 (픽셀)
 	void         ApplyDetailFonts();
@@ -606,6 +639,8 @@ protected:
 
 	afx_msg void OnBnClickedAddFolder();
 	afx_msg void OnBnClickedRemoveFolder();
+	bool AddFolderInteractive();     // 폴더 선택 → (이동식 디스크?) → 등록 · 스캔 (추가했으면 true)
+	bool RemoveFolderAt(int idx);    // 확인 후 등록 폴더 제거 (제거했으면 true)
 	afx_msg void OnBnClickedRefresh();
 	afx_msg void OnBnClickedSave();
 	afx_msg void OnBnClickedRename();

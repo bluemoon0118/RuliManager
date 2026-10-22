@@ -311,6 +311,287 @@ BEGIN_MESSAGE_MAP(CCollectionEditDlg, CDialogEx)
 END_MESSAGE_MAP()
 
 // ---------------------------------------------------------------------------
+// 폴더 관리 창: 등록 폴더를 칩 목록으로 (칩마다 폴더 아이콘 · 경로 · [이동식 디스크] 표시 · ×)
+
+class CFolderChipList : public CWnd
+{
+public:
+	struct Item { CString path; CString tag; bool removable = false; bool offline = false; };
+	std::function<void(int)> m_onRemove;   // × 클릭
+	std::function<void(int)> m_onOpen;     // 칩 더블클릭 (탐색기로 열기)
+
+	BOOL Create(CWnd* parent, const CRect& rc, UINT id)
+	{
+		const CString cls = AfxRegisterWndClass(CS_DBLCLKS, ::LoadCursor(nullptr, IDC_ARROW), nullptr, nullptr);
+		return CWnd::CreateEx(0, cls, L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP, rc, parent, id);
+	}
+	void SetItems(const std::vector<Item>& items) { m_items = items; m_scroll = 0; m_hotX = -1; if (GetSafeHwnd()) Invalidate(FALSE); }
+
+protected:
+	std::vector<Item>  m_items;
+	std::vector<CRect> m_chips, m_xs;   // 칩 · × 영역 (내용 좌표, 스크롤 전)
+	int  m_scroll = 0, m_contentH = 0;
+	int  m_hotX = -1, m_hotChip = -1;
+	bool m_tracking = false;
+
+	void DoLayout(CDC* dc, int width)
+	{
+		m_chips.clear();
+		m_xs.clear();
+		const int lineH = dc->GetTextExtent(L"Ag가").cy;
+		// 한 줄에 폴더 하나: 폭 전체를 채운 사각형 칸
+		const int chipH = lineH + 14, pad = 8, gap = 4, xW = lineH;
+		int y = pad;
+		for (size_t i = 0; i < m_items.size(); ++i)
+		{
+			const CRect chip(pad, y, width - pad, y + chipH);
+			m_chips.push_back(chip);
+			m_xs.push_back(CRect(chip.right - 10 - xW, chip.top + (chipH - xW) / 2, chip.right - 10, chip.top + (chipH + xW) / 2));
+			y += chipH + gap;
+		}
+		m_contentH = y - gap + pad;
+	}
+	int HitChip(CPoint pt, bool* onX) const
+	{
+		pt.y += m_scroll;
+		for (size_t i = 0; i < m_chips.size(); ++i)
+			if (m_chips[i].PtInRect(pt))
+			{
+				if (onX) *onX = m_xs[i].PtInRect(pt) != FALSE;
+				return static_cast<int>(i);
+			}
+		return -1;
+	}
+	afx_msg void OnPaint()
+	{
+		CPaintDC pdc(this);
+		CRect client;
+		GetClientRect(&client);
+		CDC mem;
+		mem.CreateCompatibleDC(&pdc);
+		CBitmap bmp;
+		bmp.CreateCompatibleBitmap(&pdc, (std::max)(1, client.Width()), (std::max)(1, client.Height()));
+		CBitmap* oldBmp = mem.SelectObject(&bmp);
+		mem.FillSolidRect(&client, TCOL(TC_EDIT));
+		{
+			CBrush border(TCOL(TC_BORDER));
+			mem.FrameRect(&client, &border);
+		}
+		CFont* oldFont = mem.SelectObject(GetParent()->GetFont());
+		mem.SetBkMode(TRANSPARENT);
+		DoLayout(&mem, client.Width());
+		m_scroll = (std::max)(0, (std::min)(m_scroll, m_contentH - client.Height()));
+		if (m_items.empty())
+		{
+			mem.SetTextColor(TCOL(TC_SUB2));
+			mem.DrawText(L"등록된 폴더가 없습니다.\n[폴더 추가...] 로 동영상 폴더를 등록하세요.", &client, DT_CENTER | DT_VCENTER | DT_WORDBREAK | DT_NOPREFIX);
+		}
+		const int lineH = mem.GetTextExtent(L"Ag가").cy;
+		for (size_t i = 0; i < m_items.size() && i < m_chips.size(); ++i)
+		{
+			CRect chip = m_chips[i];
+			chip.OffsetRect(0, -m_scroll);
+			if (chip.bottom < 0 || chip.top > client.bottom)
+				continue;
+			const Item& it = m_items[i];
+			const COLORREF back = it.removable ? TCOL(TC_LABELCARD) : TCOL(TC_COMBO);   // 이동식 디스크 = 보라빛
+			mem.FillSolidRect(&chip, back);   // 꽉 찬 사각형 칸
+			if (static_cast<int>(i) == m_hotChip)
+			{
+				CBrush hot(TCOL(TC_CARDHOT));
+				mem.FrameRect(&chip, &hot);   // 마우스 오버 테두리
+			}
+			const COLORREF text = it.offline ? TCOL(TC_SUB2) : TCOL(TC_TEXT);
+			// 종류별 아이콘: 이동식 디스크 = USB, 찾을 수 없음 = 폴더 + !, 일반 = 폴더 + 재생
+			{
+				const int isz = lineH + 4;
+				const int iy = chip.top + (chip.Height() - isz) / 2;
+				CRect icon(chip.left + 10, iy, chip.left + 10 + isz, iy + isz);
+				if (it.removable)    VectorIcon::UsbDrive(&mem, icon, text, 1.0);
+				else if (it.offline) VectorIcon::FolderWarn(&mem, icon, text, 1.0);
+				else                 VectorIcon::FolderPlay(&mem, icon, text, 1.0);
+			}
+			int x = chip.left + 10 + lineH + 4 + 10;
+			CRect xr = m_xs[i];
+			xr.OffsetRect(0, -m_scroll);
+			const int tagW = it.tag.IsEmpty() ? 0 : TextFB::Width(&mem, it.tag) + 8;
+			mem.SetTextColor(text);
+			TextFB::Draw(&mem, it.path, CRect(x, chip.top, xr.left - 8 - tagW, chip.bottom), DT_LEFT, true);
+			if (!it.tag.IsEmpty())
+			{
+				mem.SetTextColor(it.offline ? RGB(0xF2, 0x9B, 0x54) : TCOL(TC_SUB2));
+				TextFB::Draw(&mem, it.tag, CRect(xr.left - 8 - tagW + 8, chip.top, xr.left - 8, chip.bottom), DT_LEFT, true);
+			}
+			// × (마우스를 올리면 빨강)
+			const COLORREF xc = (static_cast<int>(i) == m_hotX) ? RGB(0xDB, 0x37, 0x37) : TCOL(TC_SUB2);
+			CPen xp(PS_SOLID, 2, xc);
+			CPen* op = mem.SelectObject(&xp);
+			const int m = xr.Width() / 4;
+			mem.MoveTo(xr.left + m, xr.top + m);
+			mem.LineTo(xr.right - m, xr.bottom - m);
+			mem.MoveTo(xr.right - m, xr.top + m);
+			mem.LineTo(xr.left + m, xr.bottom - m);
+			mem.SelectObject(op);
+		}
+		mem.SelectObject(oldFont);
+		pdc.BitBlt(0, 0, client.Width(), client.Height(), &mem, 0, 0, SRCCOPY);
+		mem.SelectObject(oldBmp);
+	}
+	afx_msg BOOL OnEraseBkgnd(CDC*) { return TRUE; }
+	afx_msg void OnLButtonDown(UINT, CPoint pt)
+	{
+		SetFocus();
+		bool onX = false;
+		const int i = HitChip(pt, &onX);
+		if (i >= 0 && onX && m_onRemove)
+			m_onRemove(i);
+	}
+	afx_msg void OnLButtonDblClk(UINT, CPoint pt)
+	{
+		bool onX = false;
+		const int i = HitChip(pt, &onX);
+		if (i >= 0 && !onX && m_onOpen)
+			m_onOpen(i);
+	}
+	afx_msg void OnMouseMove(UINT, CPoint pt)
+	{
+		if (!m_tracking)
+		{
+			TRACKMOUSEEVENT tme = { sizeof(tme), TME_LEAVE, m_hWnd, 0 };
+			m_tracking = ::TrackMouseEvent(&tme) != FALSE;
+		}
+		bool onX = false;
+		const int i = HitChip(pt, &onX);
+		const int hx = onX ? i : -1;
+		if (hx != m_hotX || i != m_hotChip)
+		{
+			m_hotX = hx;
+			m_hotChip = i;
+			Invalidate(FALSE);
+		}
+	}
+	afx_msg LRESULT OnMouseLeave(WPARAM, LPARAM)
+	{
+		m_tracking = false;
+		m_hotX = m_hotChip = -1;
+		Invalidate(FALSE);
+		return 0;
+	}
+	afx_msg BOOL OnMouseWheel(UINT, short zDelta, CPoint)
+	{
+		m_scroll -= zDelta / 3;
+		Invalidate(FALSE);
+		return TRUE;
+	}
+	DECLARE_MESSAGE_MAP()
+};
+
+BEGIN_MESSAGE_MAP(CFolderChipList, CWnd)
+	ON_WM_PAINT()
+	ON_WM_ERASEBKGND()
+	ON_WM_LBUTTONDOWN()
+	ON_WM_LBUTTONDBLCLK()
+	ON_WM_MOUSEMOVE()
+	ON_MESSAGE(WM_MOUSELEAVE, &CFolderChipList::OnMouseLeave)
+	ON_WM_MOUSEWHEEL()
+END_MESSAGE_MAP()
+
+class CFolderManageDlg : public CDialogEx
+{
+public:
+	explicit CFolderManageDlg(CWnd* parent) : CDialogEx(IDD_FOLDER_MANAGE, parent) {}
+	std::function<std::vector<CFolderChipList::Item>()> m_getItems;   // 지금 등록 폴더 목록
+	std::function<bool()> m_onAdd;                                     // [폴더 추가...] (추가했으면 true)
+	std::function<bool(int)> m_onRemove;                               // 칩 × (제거했으면 true)
+	std::function<void(int)> m_onOpen;                                 // 칩 더블클릭
+	std::function<void()> m_onRefreshState;                            // 연결 상태 다시 확인 (드라이브 문자 변경 · 연결 여부)
+
+protected:
+	CFolderChipList  m_chips;
+	CDarkDialogTheme m_theme;
+	CString m_lastSig;   // 마지막으로 표시한 목록 (경로 · 상태) - 바뀌었을 때만 다시 그림
+	void Reload(bool force = true)
+	{
+		const std::vector<CFolderChipList::Item> items = m_getItems ? m_getItems() : std::vector<CFolderChipList::Item>();
+		CString sig;
+		for (const CFolderChipList::Item& it : items)
+			sig += it.path + L"|" + it.tag + L"\n";
+		if (!force && sig == m_lastSig)
+			return;   // 상태 그대로 (스크롤 · 마우스 오버 유지)
+		m_lastSig = sig;
+		m_chips.SetItems(items);
+		CString info;
+		info.Format(L"등록 폴더 %d개 · 칩의 × = 목록에서 제거 (파일은 그대로), 칩 더블클릭 = 탐색기로 열기", static_cast<int>(items.size()));
+		SetDlgItemText(IDC_FM_INFO, info);
+	}
+	afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
+	{
+		if (HBRUSH br = m_theme.CtlColor(pDC, pWnd, nCtlColor))
+			return br;
+		return CDialogEx::OnCtlColor(pDC, pWnd, nCtlColor);
+	}
+	afx_msg void OnAdd()
+	{
+		if (m_onAdd && m_onAdd())
+			Reload();
+	}
+	// 이동식 디스크 연결 상태 실시간 반영: 장치 연결 / 분리 알림 + 2초마다 확인 (알림이 안 오는 장치 대비)
+	afx_msg BOOL OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
+	{
+		if (m_onRefreshState)
+			m_onRefreshState();
+		Reload(false);
+		return CDialogEx::OnDeviceChange(nEventType, dwData);
+	}
+	afx_msg void OnTimer(UINT_PTR id)
+	{
+		if (id == 1)
+		{
+			if (m_onRefreshState)
+				m_onRefreshState();
+			Reload(false);
+			return;
+		}
+		CDialogEx::OnTimer(id);
+	}
+	afx_msg void OnDestroy()
+	{
+		KillTimer(1);
+		CDialogEx::OnDestroy();
+	}
+	DECLARE_MESSAGE_MAP()
+
+	virtual BOOL OnInitDialog()
+	{
+		CDialogEx::OnInitDialog();
+		m_theme.Apply(this);
+		CRect rc;
+		CWnd* place = GetDlgItem(IDC_FM_LIST);
+		place->GetWindowRect(&rc);
+		ScreenToClient(&rc);
+		place->ShowWindow(SW_HIDE);
+		m_chips.Create(this, rc, IDC_FM_LIST + 1000);
+		m_chips.m_onRemove = [this](int i)
+		{
+			if (m_onRemove && m_onRemove(i))
+				Reload();
+		};
+		m_chips.m_onOpen = [this](int i) { if (m_onOpen) m_onOpen(i); };
+		Reload();
+		SetTimer(1, 2000, nullptr);   // 이동식 디스크 연결 상태 확인
+		return TRUE;
+	}
+};
+
+BEGIN_MESSAGE_MAP(CFolderManageDlg, CDialogEx)
+	ON_WM_CTLCOLOR()
+	ON_WM_DEVICECHANGE()
+	ON_WM_TIMER()
+	ON_WM_DESTROY()
+	ON_BN_CLICKED(IDC_FM_ADD, &CFolderManageDlg::OnAdd)
+END_MESSAGE_MAP()
+
+// ---------------------------------------------------------------------------
 
 CRuliManagerDlg::CRuliManagerDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_RULIMANAGER_DIALOG, pParent)
@@ -379,6 +660,9 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_DRILL_VIEW_YEAR, &CRuliManagerDlg::OnBnClickedDrillViewYear)
 	ON_BN_CLICKED(IDC_STUDIO_VIEW_GRID, &CRuliManagerDlg::OnBnClickedStudioViewGrid)
 	ON_BN_CLICKED(IDC_STUDIO_VIEW_LIST, &CRuliManagerDlg::OnBnClickedStudioViewList)
+	ON_BN_CLICKED(IDC_GENRE_HIDE, &CRuliManagerDlg::OnBnClickedGenreHide)
+	ON_BN_CLICKED(IDC_BTN_COPYCODE, &CRuliManagerDlg::OnBnClickedCopyCode)
+	ON_BN_CLICKED(IDC_GENRE_ALL, &CRuliManagerDlg::OnBnClickedGenreAll)
 	ON_COMMAND(ID_ACTOR_SHOWVIDEOS, &CRuliManagerDlg::OnActorShowVideos)
 	ON_COMMAND(ID_ACTOR_EDIT, &CRuliManagerDlg::OnActorEdit)
 	ON_COMMAND(ID_CAT_DELETE, &CRuliManagerDlg::OnCatDelete)
@@ -932,6 +1216,52 @@ BOOL CRuliManagerDlg::OnInitDialog()
 				}
 			}
 		}
+		{
+			// 영상 탭: [장르숨김] [전체] (목록 도구줄) + 태그 칩 줄 (도구줄 아래)
+			m_genreShow[0] = AfxGetApp()->GetProfileInt(L"Settings", L"GenreBar", 0) == 1;
+			m_genreShow[1] = AfxGetApp()->GetProfileInt(L"Settings", L"GenreBarActor", 0) == 1;
+			m_genreShow[2] = AfxGetApp()->GetProfileInt(L"Settings", L"GenreBarStudio", 0) == 1;
+			const wchar_t* labels[2] = { L"장르숨김", L"전체" };
+			for (int i = 0; i < 2; ++i)
+			{
+				const UINT id = IDC_GENRE_HIDE + i;
+				HWND h = ::CreateWindowExW(0, L"BUTTON", labels[i], WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON, 0, 0, 10, 10,
+					m_hWnd, reinterpret_cast<HMENU>(static_cast<UINT_PTR>(id)), AfxGetInstanceHandle(), nullptr);
+				if (!h)
+					continue;
+				::SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(GetFont()->GetSafeHandle()), TRUE);
+				if (m_genreBtns[i].Attach(id, this))
+				{
+					m_genreBtns[i].SetColors(kButtonColor, RGB(255, 255, 255), kBackColor);
+					m_genreBtns[i].SetToggle(kComboColor, TCOL(TC_TOGGLETEXT));
+					m_genreBtns[i].SetChecked((i == 1) == m_genreShow[0]);   // 화면이 바뀌면 UpdateLeftPane 이 그 화면 값으로
+					m_genreBtns[i].SetSegment(i == 0 ? CDarkButton::SEG_LEFT : CDarkButton::SEG_RIGHT);   // [장르숨김|전체] 한 묶음
+				}
+			}
+			// 영상 상세: 품번 칸 오른쪽 [복사] 버튼 (아이콘만)
+			if (HWND hc = ::CreateWindowExW(0, L"BUTTON", L"", WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON, 0, 0, 10, 10,
+				m_hWnd, reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_BTN_COPYCODE)), AfxGetInstanceHandle(), nullptr))
+			{
+				::SendMessageW(hc, WM_SETFONT, reinterpret_cast<WPARAM>(GetFont()->GetSafeHandle()), TRUE);
+				if (m_btnCopyCode.Attach(IDC_BTN_COPYCODE, this))
+				{
+					m_btnCopyCode.SetColors(TCOL(TC_COMBO), RGB(255, 255, 255), kBackColor);
+					m_btnCopyCode.SetIcon(CDarkButton::ICON_COPY);
+				}
+			}
+			m_genreBar.Create(this, IDC_GENRE_CHIPS);
+			m_genreBar.SetFontPtr(GetFont());
+			m_genreBar.m_onSelect = [this](const CString& tag)
+			{
+				const int s = GenreSlot();
+				if (s < 0)
+					return;
+				m_genreSel[s] = tag;
+				CurPageRef() = 0;   // 첫 페이지부터
+				ApplyFilter();
+				m_grid.ScrollToTop();
+			};
+		}
 		m_actorOwner.dlg = this;
 		m_actorGrid.Create(this, IDC_ACTOR_GRID, &m_actorOwner, &m_thumbs, m_thumbW, m_thumbH);
 		SetupActorCards();   // 배우 탭: 세로 사진 카드
@@ -986,6 +1316,11 @@ BOOL CRuliManagerDlg::OnInitDialog()
 			m_syncingTags = false;
 		};
 		m_tagChips.m_onDropDown = [this]() { OnBnClickedPickTags(); };
+		// [폴더 관리] 버튼 위에 마우스 → 등록 폴더 목록 팝업, 벗어나면 닫음
+		m_folderPopup.CreatePopup(this);
+		m_folderPopup.m_back = TCOL(TC_COMBO);
+		m_folderPopup.m_onDraw = [this](CDC* dc, const CRect& rc) { DrawFolderPopup(dc, rc); };
+		m_darkButtons[0].m_onHover = [this](bool in) { if (in) ShowFolderPopup(); else m_folderPopup.Hide(); };   // [0] = IDC_BTN_ADDFOLDER
 		// 태그 칩 위에 마우스 → 그 태그 카드 팝업 (태그 탭 카드와 같은 모양), 벗어나면 닫음
 		m_tagPopup.CreatePopup(this);
 		m_tagPopup.m_back = kBackColor;
@@ -1669,9 +2004,9 @@ int CRuliManagerDlg::LeftPaneWidth(int cx)
 const UINT* CRuliManagerDlg::ToolbarIds(int& count)
 {
 	static const UINT ids[] = {
-		IDC_EDIT_SEARCH, IDC_COMBO_FILTER, IDC_COMBO_SORT, IDC_BTN_SORTDIR, IDC_STUDIO_VIEW_GRID, IDC_STUDIO_VIEW_LIST, IDC_COMBO_PAGESIZE, IDC_ZOOM_SLIDER,
+		IDC_EDIT_SEARCH, IDC_COMBO_FILTER, IDC_COMBO_SORT, IDC_BTN_SORTDIR, IDC_STUDIO_VIEW_GRID, IDC_STUDIO_VIEW_LIST, IDC_GENRE_HIDE, IDC_GENRE_ALL, IDC_COMBO_PAGESIZE, IDC_ZOOM_SLIDER,
 		IDC_PAGE_FIRST, IDC_PAGE_PREV, IDC_PAGE_N1, IDC_PAGE_N2, IDC_PAGE_N3, IDC_PAGE_N4, IDC_PAGE_N5, IDC_PAGE_NEXT, IDC_PAGE_LAST,
-		IDC_STATIC_PAGEINFO
+		IDC_STATIC_PAGEINFO, IDC_GENRE_CHIPS   // 장르 칩 줄도 격자의 자식으로 (빠져 있어서 대화상자 자식으로 남아 격자와 겹쳐 그려졌음)
 	};
 	count = _countof(ids);
 	return ids;
@@ -1732,6 +2067,8 @@ int CRuliManagerDlg::LayoutListToolbar(int x, int y, int w)
 	if (visible(IDC_BTN_SORTDIR))  row1.push_back({ IDC_BTN_SORTDIR, DX(50), btnH, -DY(1) / 2 });
 	if (visible(IDC_STUDIO_VIEW_GRID)) row1.push_back({ IDC_STUDIO_VIEW_GRID, DX(28), btnH, -DY(1) / 2, visible(IDC_STUDIO_VIEW_LIST) });   // 제작사 탭 [격자|리스트] 붙은 한 묶음
 	if (visible(IDC_STUDIO_VIEW_LIST)) row1.push_back({ IDC_STUDIO_VIEW_LIST, DX(32), btnH, -DY(1) / 2 });
+	if (visible(IDC_GENRE_HIDE)) row1.push_back({ IDC_GENRE_HIDE, DX(40), btnH, -DY(1) / 2, visible(IDC_GENRE_ALL) });   // 영상 탭 [장르숨김|전체] 붙은 한 묶음
+	if (visible(IDC_GENRE_ALL))  row1.push_back({ IDC_GENRE_ALL, DX(28), btnH, -DY(1) / 2 });
 	if (visible(IDC_COMBO_PAGESIZE)) row1.push_back({ IDC_COMBO_PAGESIZE, DX(42), DY(120), 0 });
 	row1.push_back({ IDC_ZOOM_SLIDER, DX(56), btnH, 0 });
 	int total = 0;
@@ -1770,6 +2107,20 @@ int CRuliManagerDlg::LayoutListToolbar(int x, int y, int w)
 	yy += btnH + gap / 2;
 	place(IDC_STATIC_PAGEINFO, x, yy, w, DY(9));
 	yy += DY(9) + gap;
+	// 장르(태그) 칩 줄: 페이지 정보 아래 ~ 카드 위 (폭이 모자라면 여러 줄, 줄마다 가운데 정렬)
+	if (visible(IDC_GENRE_CHIPS) && m_genreBar.GetSafeHwnd())
+	{
+		const int side = DX(6);
+		const int cw = (std::max)(DX(60), w - side * 2);
+		const int ch = m_genreBar.CalcHeight(cw);
+		yy += gap / 2;
+		place(IDC_GENRE_CHIPS, x + side, yy, cw, ch);
+		m_genreBar.Invalidate(FALSE);   // 크기가 같아도 칩 배치(CalcHeight)가 바뀌었을 수 있음
+		m_genreBarH = ch;
+		yy += ch + gap;
+	}
+	else
+		m_genreBarH = -1;
 	return yy - y;
 }
 
@@ -1797,8 +2148,9 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 	MoveCtrl(IDC_RADIO_STUDIO, x, y, DX(60), radioH);  x += DX(60) + 2;
 	MoveCtrl(IDC_RADIO_TAG,    x, y, DX(52), radioH);  x += DX(52) + 2;
 	MoveCtrl(IDC_RADIO_COLLECTION, x, y, DX(60), radioH);  x += DX(60) + gap * 3;
-	MoveCtrl(IDC_BTN_ADDFOLDER,    x, y, DX(55), btnH);  x += DX(55) + gap;
-	MoveCtrl(IDC_BTN_REMOVEFOLDER, x, y, DX(55), btnH);  x += DX(55) + gap;
+	MoveCtrl(IDC_BTN_ADDFOLDER,    x, y, DX(55), btnH);  x += DX(55) + gap;   // [폴더 관리] (예전 [폴더 추가] [폴더 제거] 를 합침)
+	if (CWnd* rm = GetDlgItem(IDC_BTN_REMOVEFOLDER))
+		if (rm->IsWindowVisible()) rm->ShowWindow(SW_HIDE);
 	MoveCtrl(IDC_BTN_REFRESH,      x, y, DX(50), btnH);  x += DX(50) + gap;
 	MoveCtrl(IDC_BTN_RESCAN,       x, y, DX(40), btnH);  x += DX(40) + gap;
 	MoveCtrl(IDC_BTN_ACTORS,       x, y, DX(50), btnH);  x += DX(50) + gap * 3;
@@ -2079,9 +2431,12 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 			codeW = cdc.GetTextExtent(L"ABCDEFG-123456").cx + ::GetSystemMetrics(SM_CXEDGE) * 2 + DX(6);   // 14자
 			cdc.SelectObject(old);
 		}
-		codeW = (std::min)(codeW, rw - lblW);
+		const int copyW = dRowH;   // [복사] 정사각형
+		codeW = (std::min)(codeW, (std::max)(DX(30), rw - lblW - copyW - 2));
 		MoveCtrl(IDC_EDIT_CODE, rx + lblW, dy, codeW, dRowH);
-		MoveCtrl(IDC_STATIC_CODE_SERIES, rx + lblW + codeW + DX(6), dy, (std::max)(0, rw - lblW - codeW - DX(6)), dRowH);
+		MoveCtrl(IDC_BTN_COPYCODE, rx + lblW + codeW + 2, dy, copyW, dRowH);   // 품번 칸 바로 오른쪽
+		const int serX = lblW + codeW + 2 + copyW + DX(6);
+		MoveCtrl(IDC_STATIC_CODE_SERIES, rx + serX, dy, (std::max)(0, rw - serX), dRowH);
 	}
 	dy += dRowH + vGap;
 
@@ -2553,6 +2908,27 @@ void CRuliManagerDlg::ApplyFilter()
 		}
 		m_view.push_back(static_cast<int>(i));
 	}
+	// 영상 탭 장르 칩: 지금까지 걸러진 영상 기준으로 태그별 건수 → 고른 태그가 있으면 그 태그 영상만
+	if (GenreBarActive())
+	{
+		SyncGenreKey();
+		const CString& genreSel = m_genreSel[GenreSlot()];
+		const std::vector<int> before = m_view;
+		UpdateGenreBar(before);
+		if (!genreSel.IsEmpty())
+		{
+			m_view.clear();
+			for (int i : before)
+			{
+				for (const CString& t : CVideoLibrary::SplitList(m_lib.items[i].tags))
+				{
+					CString tt = t;
+					tt.Trim();
+					if (tt.CompareNoCase(genreSel) == 0) { m_view.push_back(i); break; }
+				}
+			}
+		}
+	}
 
 	SortView();
 	// 분할 영상 합쳐서 보기: 같은 묶음 파트를 첫 파트 자리에 번호 순으로 붙임 (페이지 · 격자는 카드 단위)
@@ -2600,6 +2976,8 @@ void CRuliManagerDlg::ApplyFilter()
 
 	UpdateStatus();
 	UpdatePager();
+	if (GenreBarActive())
+		RelayoutToolbarHeader();   // 장르 칩 줄 높이 · 페이지 버튼이 정해진 뒤 머리 영역 다시 (겹침 방지)
 	if (YearViewActive())
 		RebuildYearView();
 }
@@ -3629,6 +4007,11 @@ void CRuliManagerDlg::OnModeChanged(UINT nID)
 	m_pageActor = 0;   // 탭을 바꾸면 배우 · 제작사/태그 목록은 첫 페이지부터 (영상 탭은 보던 페이지 유지)
 	m_pageCat = 0;
 	m_pageDrill = 0;
+	// 탭을 바꾸면 모든 화면의 고른 장르 칩을 풂 ([장르숨김|전체] 선택은 그대로)
+	if (!m_genreSel[0].IsEmpty())
+		m_pageVideoMain = 0;   // 영상 탭은 거르던 목록의 페이지였으므로 첫 페이지부터
+	for (CString& s : m_genreSel)
+		s.Empty();
 	ApplyTabPageSize();   // 탭마다 따로 저장한 페이지당 개수
 	m_catSelKind = -1;
 	m_catSelValue.Empty();
@@ -5404,6 +5787,20 @@ void CRuliManagerDlg::UpdateLeftPane()
 	for (CDarkButton& b : m_studioViewBtns)
 		if (b.GetSafeHwnd())
 			b.ShowWindow(catList && m_mode == MODE_STUDIO ? SW_SHOW : SW_HIDE);   // [격자] [리스트] 는 제작사 카드 목록에서만
+	{
+		// [장르숨김] [전체]: 영상 탭 · 배우 출연작 · 제작사(레이블) 영상 화면 (연도별 보기 제외), 선택은 그 화면 값
+		const int gs = GenreSlot();
+		const bool genreBtns = gs >= 0 && !YearViewActive();
+		for (int i = 0; i < 2; ++i)
+			if (m_genreBtns[i].GetSafeHwnd())
+			{
+				if (gs >= 0)
+					m_genreBtns[i].SetChecked((i == 1) == m_genreShow[gs]);
+				m_genreBtns[i].ShowWindow(genreBtns ? SW_SHOW : SW_HIDE);
+			}
+	}
+	if (m_genreBar.GetSafeHwnd())
+		m_genreBar.ShowWindow(GenreBarActive() ? SW_SHOW : SW_HIDE);
 
 	// [표시: 목록 | 격자]는 스튜디오/태그 목록에서만, [정렬]은 영상이 보일 때만
 	const UINT viewIds[] = { IDC_STATIC_VIEW, IDC_RADIO_LISTVIEW, IDC_RADIO_GRIDVIEW };
@@ -5427,7 +5824,7 @@ void CRuliManagerDlg::UpdateLeftPane()
 		HideSuggestions();
 	const UINT detailIds[] = {
 		IDC_STATIC_NAME_LBL,
-		IDC_STATIC_CODE_LBL, IDC_EDIT_CODE, IDC_STATIC_CODE_SERIES, IDC_STATIC_TITLE_LBL, IDC_EDIT_TITLE, IDC_BTN_CHANGEIMAGE, IDC_BTN_SEARCHIMAGE, IDC_MEDIA_INFO,
+		IDC_STATIC_CODE_LBL, IDC_EDIT_CODE, IDC_BTN_COPYCODE, IDC_STATIC_CODE_SERIES, IDC_STATIC_TITLE_LBL, IDC_EDIT_TITLE, IDC_BTN_CHANGEIMAGE, IDC_BTN_SEARCHIMAGE, IDC_MEDIA_INFO,
 		IDC_STATIC_RATING_LBL, IDC_COMBO_RATING, IDC_DROP_COUNTER, IDC_BTN_SAVE,
 		IDC_STATIC_RELEASE_LBL, IDC_DATE_RELEASE, IDC_COMBO_CENSOR,
 		IDC_STATIC_ACTORS_LBL, IDC_ACTOR_CHIPS,
@@ -10480,14 +10877,169 @@ void CRuliManagerDlg::UpdatePreview(int idx)
 
 void CRuliManagerDlg::OnBnClickedAddFolder()
 {
+	// [폴더 관리]: 등록 폴더를 칩 목록으로 보여 주는 창 (추가 · 제거 · 탐색기로 열기)
+	m_folderPopup.Hide();
+	CFolderManageDlg dlg(this);
+	dlg.m_getItems = [this]()
+	{
+		std::vector<CFolderChipList::Item> items;
+		for (const FolderRow& r : BuildFolderRows())
+		{
+			CFolderChipList::Item it;
+			it.path = r.path;
+			it.tag = r.tag;
+			it.removable = r.removable;
+			it.offline = r.offline;
+			items.push_back(it);
+		}
+		return items;
+	};
+	dlg.m_onAdd = [this]() { return AddFolderInteractive(); };
+	dlg.m_onRemove = [this](int i) { return RemoveFolderAt(i); };
+	dlg.m_onRefreshState = [this]() { m_lib.UpdateRemovableState(); };   // 드라이브 문자 변경(경로 바꿈)은 메인 창의 장치 알림 처리가 함
+	dlg.m_onOpen = [this](int i)
+	{
+		if (i >= 0 && i < static_cast<int>(m_lib.folders.size()))
+			::ShellExecuteW(m_hWnd, L"open", m_lib.folders[i], nullptr, nullptr, SW_SHOWNORMAL);
+	};
+	dlg.DoModal();
+}
+
+// 등록 폴더 + 상태 (폴더 관리 창 목록 · [폴더 관리] 버튼 팝업 공용)
+std::vector<CRuliManagerDlg::FolderRow> CRuliManagerDlg::BuildFolderRows()
+{
+	std::vector<FolderRow> rows;
+	for (const CString& f : m_lib.folders)
+	{
+		FolderRow r;
+		r.path = f;
+		r.removable = m_lib.IsRemovableFolder(f);
+		if (r.removable)
+		{
+			r.offline = !m_lib.RemovableConnected(f);
+			r.tag = r.offline ? L"[이동식 디스크 - 연결 안 됨]" : L"[이동식 디스크]";
+		}
+		else if (::GetFileAttributesW(f) == INVALID_FILE_ATTRIBUTES)
+		{
+			r.offline = true;
+			r.tag = L"[찾을 수 없음]";
+		}
+		rows.push_back(r);
+	}
+	return rows;
+}
+
+// 팝업 배치 (가로: 여백 · 아이콘 · 경로 · 상태 · 여백, 세로: 제목 + 폴더 줄)
+CSize CRuliManagerDlg::FolderPopupLayout(CDC* dc)
+{
+	const int lineH = dc->GetTextExtent(L"Ag가").cy;
+	const int pad = 10, rowH = lineH + 8, icon = lineH + 2, gap = 8;
+	CFont* old = dc->SelectObject(&m_cardNameFont);
+	CString title;
+	title.Format(L"등록 폴더 %d개", static_cast<int>(m_folderPopupRows.size()));
+	int w = dc->GetTextExtent(title).cx;
+	const int titleH = dc->GetTextExtent(L"Ag가").cy;
+	dc->SelectObject(old);
+	for (const FolderRow& r : m_folderPopupRows)
+	{
+		int rw = icon + gap + dc->GetTextExtent(r.path).cx;
+		if (!r.tag.IsEmpty())
+			rw += gap + dc->GetTextExtent(r.tag).cx;
+		w = (std::max)(w, rw);
+	}
+	if (m_folderPopupRows.empty())
+		w = (std::max)(w, static_cast<int>(dc->GetTextExtent(L"등록된 폴더가 없습니다. 눌러서 폴더를 추가하세요.").cx));
+	const int rows = (std::max)(1, static_cast<int>(m_folderPopupRows.size()));
+	w = (std::min)(w + pad * 2, (std::max)(300, ::GetSystemMetrics(SM_CXSCREEN) * 2 / 3));   // 너무 긴 경로는 화면 2/3 에서 자름 (끝 … )
+	return CSize(w + 2, pad + titleH + 6 + rows * rowH + pad - 4 + 2);
+}
+
+void CRuliManagerDlg::DrawFolderPopup(CDC* dc, const CRect& rc)
+{
+	CFont* oldFont = dc->SelectObject(GetFont());
+	const int lineH = dc->GetTextExtent(L"Ag가").cy;
+	const int pad = 10, rowH = lineH + 8, iconSz = lineH + 2, gap = 8;
+	dc->SetBkMode(TRANSPARENT);
+	// 테두리
+	{
+		CBrush edge(TCOL(TC_EDGE));
+		dc->FrameRect(rc, &edge);
+	}
+	// 제목
+	dc->SelectObject(&m_cardNameFont);
+	const int titleH = dc->GetTextExtent(L"Ag가").cy;
+	CString title;
+	title.Format(L"등록 폴더 %d개", static_cast<int>(m_folderPopupRows.size()));
+	dc->SetTextColor(TCOL(TC_TEXT));
+	CRect tr(rc.left + pad, rc.top + pad, rc.right - pad, rc.top + pad + titleH);
+	dc->DrawText(title, tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+	dc->SelectObject(GetFont());
+
+	int y = tr.bottom + 6;
+	if (m_folderPopupRows.empty())
+	{
+		dc->SetTextColor(TCOL(TC_SUB2));
+		CRect er(rc.left + pad, y, rc.right - pad, y + rowH);
+		dc->DrawText(L"등록된 폴더가 없습니다. 눌러서 폴더를 추가하세요.", er, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+	}
+	for (const FolderRow& r : m_folderPopupRows)
+	{
+		const COLORREF text = r.offline ? TCOL(TC_SUB2) : TCOL(TC_TEXT);
+		CRect icon(rc.left + pad, y + (rowH - iconSz) / 2, rc.left + pad + iconSz, y + (rowH - iconSz) / 2 + iconSz);
+		if (r.removable)    VectorIcon::UsbDrive(dc, icon, text, 1.0);
+		else if (r.offline) VectorIcon::FolderWarn(dc, icon, text, 1.0);
+		else                VectorIcon::FolderPlay(dc, icon, text, 1.0);
+		int right = rc.right - pad;
+		if (!r.tag.IsEmpty())
+		{
+			// 상태는 오른쪽 끝에 붙여 항상 보이게 (경로가 길면 경로 쪽을 … 로 줄임)
+			const int tw = dc->GetTextExtent(r.tag).cx;
+			const int pathW = dc->GetTextExtent(r.path).cx;
+			const int tx = (std::min)(right - tw, static_cast<int>(icon.right) + gap + pathW + gap);   // LONG → int (형 맞춤)
+			dc->SetTextColor(r.offline ? RGB(0xF2, 0x9B, 0x54) : TCOL(TC_SUB2));
+			CRect sr(tx, y, tx + tw, y + rowH);
+			dc->DrawText(r.tag, sr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+			right = tx - gap;
+		}
+		dc->SetTextColor(text);
+		CRect pr(icon.right + gap, y, right, y + rowH);
+		dc->DrawText(r.path, pr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_PATH_ELLIPSIS);
+		y += rowH;
+	}
+	dc->SelectObject(oldFont);
+}
+
+void CRuliManagerDlg::ShowFolderPopup()
+{
+	CWnd* btn = GetDlgItem(IDC_BTN_ADDFOLDER);
+	if (!btn || !m_folderPopup.GetSafeHwnd())
+		return;
+	m_folderPopup.m_back = TCOL(TC_COMBO);   // 테마가 바뀌었을 수 있음
+	m_lib.UpdateRemovableState();   // 이동식 디스크 연결 상태를 지금 기준으로
+	m_folderPopupRows = BuildFolderRows();
+	CSize size;
+	{
+		CClientDC dc(this);
+		CFont* old = dc.SelectObject(GetFont());
+		size = FolderPopupLayout(&dc);
+		dc.SelectObject(old);
+	}
+	CRect anchor;
+	btn->GetWindowRect(&anchor);
+	m_folderPopup.ShowNear(anchor, size);
+	m_folderPopup.Invalidate(FALSE);
+}
+
+bool CRuliManagerDlg::AddFolderInteractive()
+{
 	CFolderPickerDialog dlg(nullptr, 0, this);
 	dlg.m_ofn.lpstrTitle = L"동영상 폴더 선택";
 	if (dlg.DoModal() != IDOK)
-		return;
+		return false;
 
 	const CString folder = dlg.GetFolderPath();
 	if (folder.IsEmpty())
-		return;
+		return false;
 
 	// 이동식 디스크 지정: 디스크를 뺀 채로 실행 · 새로고침해도 영상 정보를 지우지 않고, 드라이브 문자가 바뀌어도 다시 연결
 	bool removable = false;
@@ -10504,7 +11056,7 @@ void CRuliManagerDlg::OnBnClickedAddFolder()
 			L"[아니요] 일반 폴더로 등록",
 			MB_YESNOCANCEL | MB_ICONQUESTION | (looksRemovable ? MB_DEFBUTTON1 : MB_DEFBUTTON2));
 		if (r == IDCANCEL)
-			return;
+			return false;
 		removable = (r == IDYES);
 	}
 
@@ -10526,46 +11078,32 @@ void CRuliManagerDlg::OnBnClickedAddFolder()
 	CString msg;
 	msg.Format(L"'%s'\n\n새 동영상 %d개를 임시 목록에 추가했습니다.\n영상 정보를 저장하면 DB에 등록됩니다.", static_cast<LPCWSTR>(folder), added);
 	AfxMessageBox(msg, MB_ICONINFORMATION);
+	return true;
 }
 
 void CRuliManagerDlg::OnBnClickedRemoveFolder()
 {
-	if (m_lib.folders.empty())
-	{
-		AfxMessageBox(L"등록된 폴더가 없습니다.", MB_ICONINFORMATION);
-		return;
-	}
+	OnBnClickedAddFolder();   // 예전 [폴더 제거] → 폴더 관리 창
+}
 
-	CMenu menu;
-	menu.CreatePopupMenu();
-	for (size_t i = 0; i < m_lib.folders.size(); ++i)
-	{
-		CString item = m_lib.folders[i];
-		if (m_lib.IsRemovableFolder(item))
-			item += m_lib.RemovableConnected(item) ? L"   [이동식 디스크]" : L"   [이동식 디스크 - 연결 안 됨]";
-		menu.AppendMenu(MF_STRING, static_cast<UINT_PTR>(i + 1), item);
-	}
-
-	CRect rc;
-	GetDlgItem(IDC_BTN_REMOVEFOLDER)->GetWindowRect(&rc);
-	const UINT cmd = menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD | TPM_NONOTIFY,
-		rc.left, rc.bottom, this);
-	if (cmd == 0)
-		return;
-
-	const size_t index = cmd - 1;
+bool CRuliManagerDlg::RemoveFolderAt(int idx)
+{
+	if (idx < 0 || idx >= static_cast<int>(m_lib.folders.size()))
+		return false;
+	const size_t index = static_cast<size_t>(idx);
 	CString msg;
 	msg.Format(L"'%s' 폴더를 목록에서 제거할까요?\n\n"
 		L"※ 실제 파일은 삭제되지 않지만, 해당 동영상의 별점·태그·메모 정보는 사라집니다.",
 		static_cast<LPCWSTR>(m_lib.folders[index]));
 	if (AfxMessageBox(msg, MB_YESNO | MB_ICONQUESTION) != IDYES)
-		return;
+		return false;
 
 	CWaitCursor wait;
 	BeginLibraryChange();
 	m_lib.RemoveFolder(index);
 	m_lib.Save();
 	ApplyFilter();
+	return true;
 }
 
 void CRuliManagerDlg::OnVideoRefreshItem()
@@ -11262,7 +11800,7 @@ void CRuliManagerDlg::ShowNewItemMenu(CPoint screenPt)
 			}
 		}
 		else
-			menu.AppendMenu(MF_STRING, IDC_BTN_ADDFOLDER, L"폴더 추가...");   // 출연작 화면
+			menu.AppendMenu(MF_STRING, IDC_BTN_ADDFOLDER, L"폴더 관리...");   // 출연작 화면
 		break;
 	case MODE_STUDIO:
 		if (m_drill.IsEmpty())
@@ -11271,13 +11809,13 @@ void CRuliManagerDlg::ShowNewItemMenu(CPoint screenPt)
 			menu.AppendMenu(MF_STRING, ID_NEW_LABEL,  L"새 레이블 추가...");
 		}
 		else
-			menu.AppendMenu(MF_STRING, IDC_BTN_ADDFOLDER, L"폴더 추가...");
+			menu.AppendMenu(MF_STRING, IDC_BTN_ADDFOLDER, L"폴더 관리...");
 		break;
 	case MODE_TAG:
 		if (m_drill.IsEmpty())
 			menu.AppendMenu(MF_STRING, ID_NEW_TAG, L"새 태그 추가...");
 		else
-			menu.AppendMenu(MF_STRING, IDC_BTN_ADDFOLDER, L"폴더 추가...");
+			menu.AppendMenu(MF_STRING, IDC_BTN_ADDFOLDER, L"폴더 관리...");
 		break;
 	case MODE_COLLECTION:
 		if (m_drill.IsEmpty())
@@ -11286,7 +11824,7 @@ void CRuliManagerDlg::ShowNewItemMenu(CPoint screenPt)
 			return;   // 컬렉션 영상 화면: 영상은 영상 카드 오른쪽 클릭 [컬렉션에 추가] 로
 		break;
 	default:   // 영상: 영상은 폴더 스캔으로 추가
-		menu.AppendMenu(MF_STRING, IDC_BTN_ADDFOLDER, L"폴더 추가...");
+		menu.AppendMenu(MF_STRING, IDC_BTN_ADDFOLDER, L"폴더 관리...");
 		menu.AppendMenu(MF_STRING, IDC_BTN_REFRESH,   L"새로고침\tF5");
 		break;
 	}
@@ -12034,13 +12572,23 @@ void CRuliManagerDlg::ApplyColors()
 		}
 	}
 
-	// 제작사 탭 [격자] [리스트] 토글 (테마 색 다시)
+	// 제작사 탭 [격자] [리스트] · 영상 탭 [장르숨김] [전체] 토글 (테마 색 다시)
 	for (CDarkButton& b : m_studioViewBtns)
 		if (b.GetSafeHwnd())
 		{
 			b.SetColors(kButtonColor, RGB(255, 255, 255), kBackColor);
 			b.SetToggle(kComboColor, TCOL(TC_TOGGLETEXT));
 		}
+	for (CDarkButton& b : m_genreBtns)
+		if (b.GetSafeHwnd())
+		{
+			b.SetColors(kButtonColor, RGB(255, 255, 255), kBackColor);
+			b.SetToggle(kComboColor, TCOL(TC_TOGGLETEXT));
+		}
+	if (m_genreBar.GetSafeHwnd())
+		m_genreBar.Invalidate(FALSE);
+	if (m_btnCopyCode.GetSafeHwnd())
+		m_btnCopyCode.SetColors(TCOL(TC_COMBO), RGB(255, 255, 255), kBackColor);   // 품번 [복사]
 
 	// 설정 버튼 (회색 바탕 + 흰 톱니바퀴)
 	if (m_btnSettings.GetSafeHwnd() || m_btnSettings.Attach(IDC_BTN_SETTINGS, this))
@@ -12542,6 +13090,148 @@ void CRuliManagerDlg::SetActorDrillView(int mode)
 	m_grid.Refresh();
 	if (mode == 1)
 		m_yearView.SetFocus();
+}
+
+void CRuliManagerDlg::OnBnClickedCopyCode()
+{
+	// 품번 칸 글자를 클립보드로 (앞뒤 공백 제외)
+	CString code;
+	m_editCode.GetWindowText(code);
+	code.Trim();
+	if (code.IsEmpty())
+	{
+		::MessageBeep(MB_ICONWARNING);
+		return;
+	}
+	bool ok = false;
+	if (OpenClipboard())
+	{
+		::EmptyClipboard();
+		const size_t bytes = (static_cast<size_t>(code.GetLength()) + 1) * sizeof(wchar_t);
+		if (HGLOBAL mem = ::GlobalAlloc(GMEM_MOVEABLE, bytes))
+		{
+			if (void* p = ::GlobalLock(mem))
+			{
+				memcpy(p, static_cast<LPCWSTR>(code), bytes);
+				::GlobalUnlock(mem);
+				ok = ::SetClipboardData(CF_UNICODETEXT, mem) != nullptr;
+			}
+			if (!ok)
+				::GlobalFree(mem);   // 넘기지 못했으면 직접 해제 (넘겼으면 클립보드 소유)
+		}
+		::CloseClipboard();
+	}
+	if (ok)
+		SetDlgItemText(IDC_STATIC_STATUS, L"품번 '" + code + L"' 을(를) 클립보드에 복사했습니다.");
+	else
+		::MessageBeep(MB_ICONWARNING);
+}
+
+void CRuliManagerDlg::OnBnClickedGenreHide() { SetGenreShow(false); }
+void CRuliManagerDlg::OnBnClickedGenreAll()  { SetGenreShow(true); }
+
+void CRuliManagerDlg::SetGenreShow(bool show)
+{
+	// [장르숨김] ↔ [전체]: 지금 화면(영상 탭 / 배우 출연작 / 제작사 · 레이블 영상) 값만 바꿔 레지스트리에 저장 - 숨기면 고른 장르도 풀림
+	const int s = GenreSlot();
+	if (s < 0)
+		return;
+	for (int i = 0; i < 2; ++i)
+		if (m_genreBtns[i].GetSafeHwnd())
+			m_genreBtns[i].SetChecked((i == 1) == show);
+	if (show == m_genreShow[s])
+		return;
+	m_genreShow[s] = show;
+	static const wchar_t* keys[3] = { L"GenreBar", L"GenreBarActor", L"GenreBarStudio" };
+	AfxGetApp()->WriteProfileInt(L"Settings", keys[s], show ? 1 : 0);
+	if (!show && !m_genreSel[s].IsEmpty())
+	{
+		m_genreSel[s].Empty();
+		CurPageRef() = 0;
+	}
+	UpdateLeftPane();   // 칩 줄 보이기 / 숨기기 + 다시 배치
+	ApplyFilter();
+}
+
+void CRuliManagerDlg::SyncGenreKey()
+{
+	// 배우 출연작 · 제작사 영상 화면: 다른 배우 · 제작사(레이블)로 들어가면 고른 장르를 풂 (영상 탭은 대상 없음)
+	const int s = GenreSlot();
+	if (s <= 0)
+		return;
+	CString key;
+	key.Format(L"%d|%s", m_catKind, static_cast<LPCWSTR>(m_catValue));
+	if (key != m_genreKey[s])
+	{
+		m_genreKey[s] = key;
+		m_genreSel[s].Empty();
+	}
+}
+
+void CRuliManagerDlg::UpdateGenreBar(const std::vector<int>& before)
+{
+	const int slot = GenreSlot();
+	if (!m_genreBar.GetSafeHwnd() || slot < 0)
+		return;
+	const CString& sel = m_genreSel[slot];   // 지금 화면의 고른 태그
+	// 태그별 건수 (대소문자 무시, 처음 나온 표기로)
+	std::map<CString, CGenreChipBar::Item> counts;   // 소문자 → 표시 이름 · 건수
+	for (int i : before)
+	{
+		std::set<CString> seen;   // 한 영상에 같은 태그가 두 번 있어도 한 번만
+		for (const CString& t : CVideoLibrary::SplitList(m_lib.items[i].tags))
+		{
+			CString name = t;
+			name.Trim();
+			if (name.IsEmpty())
+				continue;
+			CString key = name;
+			key.MakeLower();
+			if (!seen.insert(key).second)
+				continue;
+			CGenreChipBar::Item& it = counts[key];
+			if (it.name.IsEmpty())
+				it.name = name;
+			++it.count;
+		}
+	}
+	std::vector<CGenreChipBar::Item> items;
+	items.reserve(counts.size() + 1);
+	for (auto& kv : counts)
+		items.push_back(kv.second);
+	// 고른 태그가 지금 결과에 없으면(검색 · 별점으로 빠짐) 0건으로 남겨 둠 → 보이고, 풀 수 있게
+	if (!sel.IsEmpty())
+	{
+		CString key = sel;
+		key.MakeLower();
+		if (counts.find(key) == counts.end())
+		{
+			CGenreChipBar::Item it;
+			it.name = sel;
+			items.push_back(it);
+		}
+	}
+	// 건수 많은 순, 같으면 이름 순
+	std::sort(items.begin(), items.end(), [](const CGenreChipBar::Item& a, const CGenreChipBar::Item& b)
+	{
+		if (a.count != b.count)
+			return a.count > b.count;
+		return a.name.CompareNoCase(b.name) < 0;
+	});
+	m_genreBar.SetItems(items, static_cast<int>(before.size()), sel);
+	// 머리 영역 다시 배치는 ApplyFilter 끝(페이지 버튼까지 정해진 뒤)에서
+}
+
+void CRuliManagerDlg::RelayoutToolbarHeader()
+{
+	// 목록 도구줄(+ 장르 칩 줄)만 다시 배치하고 격자 머리 높이를 맞춤 (칩 줄 높이 · 페이지 버튼이 바뀐 뒤)
+	if (!m_layoutReady || !m_toolbarHost || !m_toolbarHost->GetSafeHwnd())
+		return;
+	CRect hc;
+	m_toolbarHost->GetClientRect(&hc);
+	const int gap = DX(4);
+	const int tbH = LayoutListToolbar(0, gap, hc.Width());
+	m_toolbarHost->SetHeaderHeight(tbH + gap);
 }
 
 void CRuliManagerDlg::OnBnClickedStudioViewGrid() { SetStudioView(0); }
