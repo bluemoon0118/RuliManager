@@ -382,7 +382,8 @@ protected:
 	};
 	ActorGridOwner m_actorOwner;
 	CRect ActorHeartRect(const CRect& card) const;   // 배우 카드 오른쪽 위 즐겨찾기 하트 자리
-	CRect ActorCheckRect(const CRect& card) const;   // 배우 카드 왼쪽 위 체크 칸 자리
+	CRect ActorCheckRect(const CRect& card) const;   // 카드 왼쪽 위 체크 칸 자리 (배우 · 영상 · 제작사 · 태그 · 컬렉션 공용, 크기 고정)
+	int   m_checkSize = 18;                          // 체크 칸 한 변 (글꼴 기준, 카드 크기 계산 때 정함)
 	std::set<CString> m_actorChecked;                // 체크한 배우 (소문자 이름, 목록을 다시 만들어도 유지)
 	bool IsActorChecked(int actorIdx) const;
 	void ToggleActorCheck(int actorIdx);
@@ -439,11 +440,33 @@ protected:
 		void GridActivate(int row) override;
 		void GridKey(UINT vk) override;
 		bool GridDrawCard(CDC* dc, int row, const CRect& card, bool selected, bool focused) override;   // 스튜디오 카드
-		bool GridClick(int row, const CRect& card, CPoint pt) override;   // 태그 카드 하트 → 즐겨찾기 전환
-		int  GridHitPart(int row, const CRect& card, CPoint pt) override; // 1 = 태그 카드 하트 위
+		bool GridClick(int row, const CRect& card, CPoint pt) override;   // 태그 카드 하트 → 즐겨찾기 전환, 체크 칸 → 체크 전환
+		int  GridHitPart(int row, const CRect& card, CPoint pt) override; // 1 = 태그 · 컬렉션 카드 하트 위, 2 = 왼쪽 위 체크 칸 위 (제작사 · 태그 · 컬렉션 카드)
+		bool GridDblClick(int row, const CRect& card, CPoint pt) override; // 체크 칸 빠른 두 번 클릭 = 두 번 전환 (영상 화면으로 안 들어감)
 		CString GridTipText(int row, const CRect& card, CPoint pt) override;   // 컬렉션 카드: 제목 + 메모
 	};
 	CatGridOwner m_catOwner;
+	struct CatRow { int kind; CString value; };   // 분류 목록 한 행 (m_catRows)
+	// 제작사 · 태그 · 컬렉션 카드 체크 (왼쪽 위 체크 칸) → 체크한 항목 모두 삭제 (탭별로 따로, 목록을 다시 만들어도 유지)
+	std::set<CString> m_catChecked[5];               // [탭] → "종류|소문자 이름" (제작사 탭은 제작사 / 레이블 구분)
+	bool CatChecksEnabled() const { return IsCategoryListMode() && !StudioListView(); }   // 카드 목록에서만 (제작사 [리스트] 보기 제외)
+	static CString CatCheckKey(int kind, const CString& value);
+	bool IsCatChecked(int kind, const CString& value) const;
+	void ToggleCatCheck(int row);
+	std::vector<CatRow> CheckedCatRows() const;      // 체크한 항목 (지금 목록에 있는 것만, 목록 순)
+	afx_msg void OnCatDeleteChecked();               // 체크한 항목 모두 삭제
+	afx_msg void OnCatUncheckAll();                  // 체크 모두 해제
+	// 영상 카드 체크 (왼쪽 위 체크 칸) → 체크한 영상 DB 정보 모두 삭제 (파일은 그대로)
+	static const int kVideoCheckPart = 1000;         // GridHitPart 값 (분할 파트 칸 1 · 2 … 와 겹치지 않게)
+	std::set<CString> m_videoChecked;                // 체크한 영상 (소문자 경로, 목록을 다시 만들어도 유지)
+	bool IsVideoCardChecked(int g) const;            // 격자 칸 (합쳐 보기 카드면 첫 파트 기준)
+	bool IsItemChecked(int idx) const;
+	int  CheckedItemCount() const;                   // 체크한 영상 수 (지금 라이브러리에 있는 것만)
+	void ToggleVideoCheck(int g);                    // 합쳐 보기 카드는 파트 모두
+	afx_msg void OnVideoDeleteChecked();
+	afx_msg void OnVideoUncheckAll();
+	afx_msg void OnCheckAll();                       // 빈 곳 오른쪽 클릭 [전체 체크]: 지금 보이는 카드 모두 체크 (배우 / 제작사 · 태그 · 컬렉션 / 영상)
+	int  CheckAllCount() const;                      // 그때 체크할 수 있는 카드 수 (0 = 메뉴 없음)
 
 	// 스튜디오 / 태그 카드 (로고 · 카메라 아이콘 / 꼬리표 아이콘, 이름, ▶ 영상 수 · 배우 수(스튜디오만))
 	int   m_scardW = 255, m_scardH = 230;
@@ -496,7 +519,7 @@ protected:
 	// 보기 모드 (상단 라디오 버튼)
 	enum ViewMode { MODE_VIDEO = 0, MODE_ACTOR, MODE_STUDIO, MODE_TAG, MODE_COLLECTION, MODE_COUNT };
 	enum CatKind  { CAT_ALL = 0, CAT_NONE, CAT_VALUE, CAT_LABEL };   // CAT_LABEL: 제작사 탭의 레이블 항목 (value = 레이블 이름)
-	struct CatRow { int kind; CString value; };
+	// (CatRow 는 위쪽 체크 항목 선언에서 쓰므로 앞으로 옮김)
 	int     m_mode = MODE_VIDEO;
 	int     m_catKind = CAT_ALL;      // 선택된 분류
 	CString m_catValue;
