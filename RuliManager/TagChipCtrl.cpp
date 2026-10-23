@@ -754,9 +754,13 @@ void CGenreChipBar::OnPaint()
 				(GetBValue(a) * (100 - pct) + GetBValue(b) * pct) / 100);
 		};
 		const COLORREF red = RGB(0xD9, 0x3B, 0x3B);
-		COLORREF fill = sel ? red : TCOL(TC_COMBO);
+		// 칩은 모두 초록 바탕 ([전체] 포함, 저장 버튼 초록을 바탕색 쪽으로 조금 눌러 차분하게)
+		const bool tagChip = true;
+		const COLORREF green = mix(TCOL(TC_SAVE), TCOL(TC_BACK), 25);
+		const COLORREF base = tagChip ? green : TCOL(TC_COMBO);
+		COLORREF fill = sel ? red : base;
 		if (hot)
-			fill = sel ? mix(red, RGB(255, 255, 255), 15) : mix(TCOL(TC_COMBO), red, 35);
+			fill = sel ? mix(red, RGB(255, 255, 255), 15) : (tagChip ? mix(green, RGB(255, 255, 255), 15) : mix(TCOL(TC_COMBO), red, 35));
 		const COLORREF edge = hot ? mix(fill, red, 60) : fill;
 		CBrush br(fill);
 		CPen pen(PS_SOLID, 1, edge);
@@ -770,12 +774,12 @@ void CGenreChipBar::OnPaint()
 		const CString name = ChipText(i, count);
 		const int cw = count.IsEmpty() ? 0 : mem.GetTextExtent(count).cx;
 		CRect tr(r.left + kGenrePadX, r.top, r.right - kGenrePadX - (cw > 0 ? cw + kGenreCountGap : 0), r.bottom);
-		mem.SetTextColor((sel || hot) ? RGB(255, 255, 255) : TCOL(TC_TEXT));
+		mem.SetTextColor((sel || hot || tagChip) ? RGB(255, 255, 255) : TCOL(TC_TEXT));
 		mem.DrawText(name, tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 		if (cw > 0)
 		{
 			CRect cr(r.right - kGenrePadX - cw, r.top, r.right - kGenrePadX, r.bottom);
-			mem.SetTextColor((sel || hot) ? RGB(255, 225, 225) : TCOL(TC_SUB2));
+			mem.SetTextColor((sel || hot) ? RGB(255, 225, 225) : (tagChip ? RGB(205, 240, 220) : TCOL(TC_SUB2)));
 			mem.DrawText(count, cr, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 		}
 	}
