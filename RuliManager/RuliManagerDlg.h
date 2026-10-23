@@ -130,20 +130,20 @@ protected:
 	bool m_videoPortrait[4] = {};      // 화면별: [1] 배우 출연작, [2] 제작사 · 레이블 영상, [3] 태그 영상 (레지스트리 …Actor / …Studio / …Tag) - [0] 영상 탭은 [패키지] 보기로 옮김
 	bool m_coverPortrait = false;      // GetVideoCover: 세로 카드용으로 자른 커버 (그리는 동안만 켬)
 	int  m_pcardW = 160, m_pcardH = 213;   // 세로 카드 크기
-	int  VideoViewSlot() const           // [가로|세로] 버튼이 있는 화면 (-1 = 없음)
+	int  VideoViewSlot() const           // [격자|리스트|패키지] 버튼이 있는 영상 화면 (-1 = 없음) - 화면별로 따로 저장
 	{
-		if (m_mode == MODE_VIDEO) return -1;   // 영상 탭은 [가로|세로] 없음 ([격자|리스트|패키지] 로)
+		if (m_mode == MODE_VIDEO) return 0;                              // 영상 탭
 		if (m_drill.IsEmpty()) return -1;
-		if (m_mode == MODE_ACTOR) return YearViewActive() ? -1 : 1;   // 배우 출연작 [연도별] 보기는 제외
-		if (m_mode == MODE_STUDIO) return 2;
-		if (m_mode == MODE_TAG) return 3;
+		if (m_mode == MODE_ACTOR) return YearViewActive() ? -1 : 1;     // 배우 출연작 ([연도별] 보기는 제외)
+		if (m_mode == MODE_STUDIO) return 2;                             // 제작사 · 레이블 영상
+		if (m_mode == MODE_TAG) return 3;                                // 태그 영상
+		if (m_mode == MODE_COLLECTION) return 4;                         // 컬렉션 영상
 		return -1;
 	}
-	bool VideoPortraitActive() const   // 세로 카드 (이미지만): 영상 탭 [패키지] / 다른 영상 화면 [세로]
+	bool VideoPortraitActive() const   // 세로 카드 (이미지만) = [패키지]
 	{
-		if (m_mode == MODE_VIDEO) return m_videoView == 2;
 		const int s = VideoViewSlot();
-		return s >= 0 && m_videoPortrait[s];
+		return s >= 0 && m_videoView[s] == 2;
 	}
 	void SetVideoPortrait(bool portrait);
 	afx_msg void OnBnClickedVideoViewH();
@@ -151,8 +151,10 @@ protected:
 	// 영상 탭 보기 방식: [격자] (카드 - [가로|세로]) / [리스트] (스프레드시트 - 숨겨 두던 목록 컨트롤을 보임) - 레지스트리 Settings\VideoList
 	CDarkButton m_videoModeBtns[3];
 	CDarkHeader m_listHeader;          // [리스트] 열 머리글 (어두운 색 + 정렬 삼각형)
-	int  m_videoView = 0;              // 영상 탭 보기: 0 = [격자] (가로 카드), 1 = [리스트] (스프레드시트), 2 = [패키지] (세로 카드, 이미지만 - 예전 격자 세로) - 레지스트리 Settings\VideoViewMode
-	bool VideoListActive() const { return m_mode == MODE_VIDEO && m_videoView == 1; }
+	// 영상 화면별 보기: 0 = [격자] (가로 카드), 1 = [리스트] (스프레드시트), 2 = [패키지] (세로 카드, 이미지만)
+	//  [0] 영상 탭, [1] 배우 출연작, [2] 제작사 · 레이블 영상, [3] 태그 영상, [4] 컬렉션 영상 - 레지스트리 Settings\VideoViewMode / …Actor / …Studio / …Tag / …Collection
+	int  m_videoView[5] = {};
+	bool VideoListActive() const { const int s = VideoViewSlot(); return s >= 0 && m_videoView[s] == 1; }
 	void SetVideoMode(int mode);
 	afx_msg void OnBnClickedVideoModeGrid();
 	afx_msg void OnBnClickedVideoModeList();
@@ -531,7 +533,8 @@ protected:
 	void DrawStudioCard(CDC* dc, int row, const CRect& card, bool selected, bool focused);
 	std::vector<int> m_actorRows;          // 배우 격자 행 → m_lib.actors 인덱스
 	std::map<CString, int> m_actorCounts;  // 배우 이름(소문자) → 출연작 수
-	int     m_actorSel = -1;
+	int     m_actorSel = -1;
+	CString m_gotoActorName;   // 탭 전환 때 배우 탭에서 고를 배우 (GoToActor 만, 보통 탭 전환은 선택 해제)
 	CString m_actorSelName;
 	CString m_drill;                  // 영상을 보고 있는 배우/스튜디오/태그 (비어 있으면 배우 격자 / 분류 목록)
 	int     m_catSelKind = -1;        // 분류 목록에서 선택한 행 (영상 필터와는 별개)
@@ -757,7 +760,8 @@ protected:
 	afx_msg void OnCbnSelchangeFilter();
 	afx_msg void OnCbnSelchangeSort();
 	afx_msg void OnBnClickedSortDir();
-	void UpdateSortUI();
+	void UpdateSortUI();
+	void SetSortDirButton(bool asc);   // 정렬 방향 버튼 아이콘 + 툴팁
 	afx_msg void OnDetailsChanged();
 	afx_msg void OnStnClickedRatingLabel();   // [별점] 라벨 클릭 → 0점
 	afx_msg void OnDtnReleaseChanged(NMHDR* pNMHDR, LRESULT* pResult);

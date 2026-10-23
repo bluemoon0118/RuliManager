@@ -111,12 +111,17 @@ public:
 	bool IsChecked() const { return m_checked; }
 
 	// 글자 왼쪽 아이콘
-	enum Icon { ICON_NONE = 0, ICON_PLAY, ICON_PERSON, ICON_CAMERA, ICON_TAG, ICON_GEAR, ICON_COLLECTION, ICON_COPY, ICON_GENDER_ALL, ICON_FEMALE, ICON_MALE };   // GENDER_ALL / FEMALE / MALE: ⚥ / ♀ / ♂ (배우 성별 거르기 - 꺼진 상태면 분홍 / 파랑)   // COPY: 글자 없이 가운데 겹친 두 장 (품번 복사)   // COLLECTION: 겹친 화면 (컬렉션 탭)   // GEAR: 글자 없이 가운데 톱니바퀴   // PLAY: 원 안의 재생(▶), PERSON: 사람, CAMERA: 비디오 카메라, TAG: 꼬리표
+	enum Icon { ICON_NONE = 0, ICON_PLAY, ICON_PERSON, ICON_CAMERA, ICON_TAG, ICON_GEAR, ICON_COLLECTION, ICON_COPY, ICON_GENDER_ALL, ICON_FEMALE, ICON_MALE,
+		ICON_VIEW_GRID, ICON_VIEW_LIST, ICON_VIEW_PACKAGE, ICON_VIEW_YEAR, ICON_SYMBOL_ALL, ICON_SYMBOL_F, ICON_SYMBOL_M, ICON_SORT_ASC, ICON_SORT_DESC };   // SORT_ASC / DESC: 글자 없이 가운데 정렬 방향 (화살표 + 막대)   // SYMBOL_ALL / F / M: 글자 없이 가운데 성별 기호 (♀♂ 나란히 / ♀ 분홍 / ♂ 파랑 - 배우 성별 거르기)   // VIEW_*: 글자 없이 가운데 보기 방식 아이콘 ([격자|리스트|패키지])   // GENDER_ALL / FEMALE / MALE: ⚥ / ♀ / ♂ (배우 성별 거르기 - 꺼진 상태면 분홍 / 파랑)   // COPY: 글자 없이 가운데 겹친 두 장 (품번 복사)   // COLLECTION: 겹친 화면 (컬렉션 탭)   // GEAR: 글자 없이 가운데 톱니바퀴   // PLAY: 원 안의 재생(▶), PERSON: 사람, CAMERA: 비디오 카메라, TAG: 꼬리표
 	void SetIcon(int icon) { m_icon = icon; if (GetSafeHwnd()) Invalidate(FALSE); }
 
 	// 붙은 버튼 묶음(세그먼트 컨트롤)의 한 칸: 안쪽 모서리는 각지게, 칸 사이에 가는 구분선, 묶음 전체에 테두리
 	enum Segment { SEG_NONE = 0, SEG_LEFT, SEG_MIDDLE, SEG_RIGHT };
 	void SetSegment(int seg) { m_segment = seg; if (GetSafeHwnd()) Invalidate(FALSE); }
+
+	// 마우스를 올리면 뜨는 설명 (아이콘만 있는 버튼용)
+	void SetTooltip(const CString& text);
+	BOOL PreTranslateMessage(MSG* pMsg) override;
 
 	virtual void DrawItem(LPDRAWITEMSTRUCT lpDIS);
 
@@ -133,6 +138,7 @@ protected:
 	bool     m_hover    = false;
 	int      m_icon     = ICON_NONE;
 	int      m_segment  = SEG_NONE;
+	CToolTipCtrl m_tip;
 
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnMouseLeave();

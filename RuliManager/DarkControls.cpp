@@ -142,6 +142,28 @@ void CDarkButton::SetChecked(bool checked)
 		Invalidate(FALSE);
 }
 
+void CDarkButton::SetTooltip(const CString& text)
+{
+	if (!GetSafeHwnd())
+		return;
+	if (!m_tip.GetSafeHwnd())
+	{
+		if (!m_tip.Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX))
+			return;
+		m_tip.AddTool(this, text);
+		m_tip.Activate(TRUE);
+	}
+	else
+		m_tip.UpdateTipText(text, this);
+}
+
+BOOL CDarkButton::PreTranslateMessage(MSG* pMsg)
+{
+	if (m_tip.GetSafeHwnd())
+		m_tip.RelayEvent(pMsg);
+	return CButton::PreTranslateMessage(pMsg);
+}
+
 void CDarkButton::OnMouseMove(UINT nFlags, CPoint point)
 {
 	if (!m_hover)
@@ -238,6 +260,32 @@ void CDarkButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	{
 		// 설정 버튼: 글자 없이 가운데 톱니바퀴 (벡터)
 		VectorIcon::Gear(&dc, tr, disabled ? Dim(textColor) : textColor, 0.72);
+	}
+	else if (m_icon == ICON_VIEW_GRID || m_icon == ICON_VIEW_LIST || m_icon == ICON_VIEW_PACKAGE || m_icon == ICON_VIEW_YEAR)
+	{
+		// 보기 방식 버튼: 글자 없이 가운데 아이콘 (벡터)
+		const COLORREF ic = disabled ? Dim(textColor) : textColor;
+		if (m_icon == ICON_VIEW_GRID)      VectorIcon::ViewGrid(&dc, tr, ic, 0.66);
+		else if (m_icon == ICON_VIEW_LIST) VectorIcon::ViewList(&dc, tr, ic, 0.66);
+		else if (m_icon == ICON_VIEW_YEAR) VectorIcon::ViewYear(&dc, tr, ic, 0.66);
+		else                               VectorIcon::ViewPackage(&dc, tr, ic, 0.66);
+	}
+	else if (m_icon == ICON_SORT_ASC || m_icon == ICON_SORT_DESC)
+	{
+		// 정렬 방향 버튼: 글자 없이 가운데 화살표 + 막대 (이름은 툴팁)
+		const COLORREF ic = disabled ? Dim(textColor) : textColor;
+		if (m_icon == ICON_SORT_ASC) VectorIcon::SortAsc(&dc, tr, ic, 0.70);
+		else                         VectorIcon::SortDesc(&dc, tr, ic, 0.70);
+	}
+	else if (m_icon == ICON_SYMBOL_ALL || m_icon == ICON_SYMBOL_F || m_icon == ICON_SYMBOL_M)
+	{
+		// 성별 거르기 버튼: 글자 없이 가운데 성별 기호 (고른 상태도 분홍 / 파랑 그대로 - 고른 칸은 바탕색으로 구분)
+		const COLORREF kF = RGB(0xF5, 0x49, 0x8B), kM = RGB(0x48, 0xAF, 0xF0);
+		const COLORREF f = disabled ? Dim(textColor) : kF;
+		const COLORREF m = disabled ? Dim(textColor) : kM;
+		if (m_icon == ICON_SYMBOL_ALL)    VectorIcon::GenderPair(&dc, tr, f, m, 0.72);
+		else if (m_icon == ICON_SYMBOL_F) VectorIcon::GenderFemale(&dc, tr, f, 0.66);
+		else                              VectorIcon::GenderMale(&dc, tr, m, 0.66);
 	}
 	else if (m_icon == ICON_COPY)
 	{
