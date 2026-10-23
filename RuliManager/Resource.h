@@ -250,6 +250,8 @@
 #define IDC_GENRE_ALL                   1311
 #define IDC_GENRE_CHIPS                 1312
 #define IDC_BTN_COPYCODE                1313
+#define IDC_VIDEO_VIEW_H                1314
+#define IDC_VIDEO_VIEW_V                1315
 #define IDC_SET_MERGE_PARTS             1277
 #define IDC_SET_DETAIL_RIGHT            1278
 #define IDC_SET_DETAIL_LEFT             1279
@@ -310,7 +312,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        145
 #define _APS_NEXT_COMMAND_VALUE         33045
-#define _APS_NEXT_CONTROL_VALUE         1314
+#define _APS_NEXT_CONTROL_VALUE         1316
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
