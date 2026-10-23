@@ -661,6 +661,7 @@ protected:
 	Gdiplus::Bitmap* GetStudioLogo(const CString& path);
 	void DrawStudioMark(CDC* dc, const CRect& img, const CString& studio, const CString& label = CString());   // 레이블이 있으면 레이블 이미지
 	void DrawVideoCard(CDC* dc, int row, const CRect& card, bool selected, bool focused);
+	void DrawPartZones(CDC* dc, int row, const CRect& rc, const CRect& img, int radius, bool show);   // 분할 영상 합쳐 보기 카드: img 위에 파트 칸 · 번호 (show = 마우스가 이미지 위)
 
 	// 메시지 처리기
 	afx_msg void OnSize(UINT nType, int cx, int cy);
