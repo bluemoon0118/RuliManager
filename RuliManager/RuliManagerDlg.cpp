@@ -4348,9 +4348,9 @@ int CRuliManagerDlg::GridIdxOf(int row) const
 int CRuliManagerDlg::PartZoneAt(int g, const CRect& card, CPoint pt) const
 {
 	auto it = m_gridParts.find(g);
-	if (it == m_gridParts.end() || card.Width() <= 0 || VideoPortraitActive())
-		return -1;   // [세로] 격자: 파트 칸 없음 (첫 파트 카드)
-	const CRect img(card.left, card.top, card.right, card.top + m_vcardImgH);   // DrawVideoCard 의 이미지 영역
+	if (it == m_gridParts.end() || card.Width() <= 0)
+		return -1;
+	const CRect img(card.left, card.top, card.right, VideoPortraitActive() ? card.bottom : card.top + m_vcardImgH);   // DrawVideoCard 의 이미지 영역 ([세로] 격자 = 카드 전체)
 	if (!img.PtInRect(pt))
 		return -1;
 	const int n = static_cast<int>(it->second.size());
@@ -9521,7 +9521,7 @@ bool CRuliManagerDlg::ShotBadgeRect(int row, const CRect& card, CRect& out, CStr
 		return false;
 	// 분할 영상 합쳐 보기(격자): 카드의 파트 중 하나라도 추출 중 / 대기 중이면 표시
 	std::vector<int> rows{ row };
-	if (!m_cardImageOnly)
+	if (!m_cardImageOnly || VideoPortraitActive())   // 연도별 보기는 묶음 없음 ([세로] 격자는 묶음 카드)
 	{
 		auto pit = m_gridParts.find(GridIdxOf(row));
 		if (pit != m_gridParts.end() && GridRowOf(pit->first) == row)
@@ -9618,8 +9618,8 @@ bool CRuliManagerDlg::GridDblClick(int g, const CRect& card, CPoint pt)
 	int pos = 0;
 	if (!ShotBadgeRect(row, card, badge, nullptr, &pos) || !badge.PtInRect(pt))
 	{
-		// 분할 영상 합쳐 보기: 이미지 위 파트 칸 더블클릭 = 그 파트 재생
-		if (!m_cardImageOnly)
+		// 분할 영상 합쳐 보기: 이미지 위 파트 칸 더블클릭 = 그 파트 재생 ([세로] 격자는 카드 전체가 파트 칸)
+		if (!m_cardImageOnly || VideoPortraitActive())
 		{
 			const int z = PartZoneAt(g, card, pt);
 			if (z >= 0)
@@ -9645,10 +9645,8 @@ bool CRuliManagerDlg::GridDblClick(int g, const CRect& card, CPoint pt)
 
 int CRuliManagerDlg::GridHoverZone(int /*row*/, const CRect& card, CPoint pt)
 {
-	// 영상 카드 이미지 영역 (DrawVideoCard 의 img 와 같음) - [세로] 격자는 덧그림이 없어 사용 안 함
-	if (VideoPortraitActive())
-		return 0;
-	const CRect img(card.left, card.top, card.right, card.top + m_vcardImgH);
+	// 영상 카드 이미지 영역 (DrawVideoCard 의 img 와 같음) - [세로] 격자는 카드 전체 (분할 영상 파트 칸 표시)
+	const CRect img(card.left, card.top, card.right, VideoPortraitActive() ? card.bottom : card.top + m_vcardImgH);
 	return img.PtInRect(pt) ? 1 : 0;
 }
 
@@ -10164,6 +10162,64 @@ bool CRuliManagerDlg::SplitPartName(const CString& path, CString& key, int& num)
 	return CVideoLibrary::PartGroupKey(path, key, num);   // "ABC-123_2.mp4" → 묶음 키 + 순번 2
 }
 
+void CRuliManagerDlg::DrawPartZones(CDC* dc, int row, const CRect& rc, const CRect& img, int radius, bool show)
+{
+	const int gIdx = GridIdxOf(row);
+	// 분할 영상 합쳐 보기: 이미지 위에 마우스를 올리면 파트 수만큼 좌우 칸 + 반투명 번호 (올라간 칸은 밝게, 고른 파트 칸은 아래 파란 줄)
+	const auto partsIt = m_gridParts.find(gIdx);
+	const bool merged = (partsIt != m_gridParts.end() && GridRowOf(gIdx) == row);
+	int selPart = -1;   // 이 카드에서 고른 파트 (0 부터)
+	if (merged)
+	{
+		const int selRow = GetSelectedRow();
+		for (size_t p = 0; p < partsIt->second.size(); ++p)
+			if (partsIt->second[p] == selRow) { selPart = static_cast<int>(p); break; }
+	}
+	if (merged && show)
+	{
+		EnsureGdiPlus();
+		const int n = static_cast<int>(partsIt->second.size());
+		const int hotPart = m_grid.HotPart() - 1;
+		CRgn clip;
+		clip.CreateRoundRectRgn(rc.left, rc.top, rc.right + 1, rc.bottom + 1, radius, radius);
+		dc->SelectClipRgn(&clip);
+		dc->IntersectClipRect(img);
+		{
+			Gdiplus::Graphics g(dc->GetSafeHdc());
+			g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+			g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAliasGridFit);
+			Gdiplus::SolidBrush dim(Gdiplus::Color(70, 0, 0, 0));
+			Gdiplus::SolidBrush hot(Gdiplus::Color(60, 255, 255, 255));
+			Gdiplus::Pen sep(Gdiplus::Color(110, 255, 255, 255), 1.0f);
+			Gdiplus::FontFamily family(L"Segoe UI");
+			const float fs = (std::max)(9.0f, (std::min)(img.Height() * 0.45f, img.Width() / static_cast<float>(n) * 0.6f));
+			Gdiplus::Font font(&family, fs, Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
+			Gdiplus::StringFormat fmt;
+			fmt.SetAlignment(Gdiplus::StringAlignmentCenter);
+			fmt.SetLineAlignment(Gdiplus::StringAlignmentCenter);
+			for (int p = 0; p < n; ++p)
+			{
+				const int x0 = img.left + img.Width() * p / n, x1 = img.left + img.Width() * (p + 1) / n;
+				const Gdiplus::RectF cell(static_cast<float>(x0), static_cast<float>(img.top), static_cast<float>(x1 - x0), static_cast<float>(img.Height()));
+				g.FillRectangle(p == hotPart ? static_cast<Gdiplus::Brush*>(&hot) : static_cast<Gdiplus::Brush*>(&dim), cell);
+				if (p > 0)
+					g.DrawLine(&sep, static_cast<float>(x0), static_cast<float>(img.top + 2), static_cast<float>(x0), static_cast<float>(img.bottom - 2));
+				Gdiplus::SolidBrush text(Gdiplus::Color(p == hotPart ? 235 : 150, 255, 255, 255));
+				wchar_t num[8];
+				swprintf_s(num, L"%d", p + 1);
+				g.DrawString(num, -1, &font, cell, &fmt, &text);
+				if (p == selPart)
+				{
+					Gdiplus::SolidBrush selBar(Gdiplus::Color(230, GetRValue(kButtonColor), GetGValue(kButtonColor), GetBValue(kButtonColor)));
+					const float bh = static_cast<float>((std::max)(2, DX(3)));
+					g.FillRectangle(&selBar, Gdiplus::RectF(cell.X + 2, cell.GetBottom() - bh - 1, cell.Width - 4, bh));
+				}
+			}
+		}
+		dc->SelectClipRgn(nullptr);
+	}
+}
+
 void CRuliManagerDlg::DrawVideoCard(CDC* dc, int row, const CRect& rc, bool selected, bool focused)
 {
 	if (row < 0 || row >= static_cast<int>(m_view.size()))
@@ -10248,6 +10304,9 @@ void CRuliManagerDlg::DrawVideoCard(CDC* dc, int row, const CRect& rc, bool sele
 
 	if (m_cardImageOnly)
 	{
+		// [세로] 격자: 분할 영상 합쳐 보기 카드에 마우스를 올리면 카드 전체에 파트 칸 (가로 카드의 이미지 위와 같음)
+		if (VideoPortraitActive())
+			DrawPartZones(dc, row, rc, img, radius, m_grid.HotRow() == GridIdxOf(row) && m_grid.HotZone() == 1);
 		// 연도별 보기: 이미지만 (로고 · 별점 리본 · 재생 시간 · 아래 글자 없음), 선택 테두리만
 		if (selected)
 		{
@@ -10402,7 +10461,8 @@ void CRuliManagerDlg::DrawVideoCard(CDC* dc, int row, const CRect& rc, bool sele
 		tmp.SelectObject(ob);
 	}
 
-	// 분할 영상 합쳐 보기: 이미지 위에 마우스를 올리면 파트 수만큼 좌우 칸 + 반투명 번호 (올라간 칸은 밝게, 고른 파트 칸은 아래 파란 줄)
+	DrawPartZones(dc, row, rc, img, radius, imageOnly);   // 분할 영상 합쳐 보기: 파트 칸 (이미지 위에 마우스를 올렸을 때)
+	// 아래 순번 · 라벨에서 쓰는 이 카드의 묶음 / 고른 파트
 	const auto partsIt = m_gridParts.find(gIdx);
 	const bool merged = (partsIt != m_gridParts.end() && GridRowOf(gIdx) == row);
 	int selPart = -1;   // 이 카드에서 고른 파트 (0 부터)
@@ -10411,49 +10471,6 @@ void CRuliManagerDlg::DrawVideoCard(CDC* dc, int row, const CRect& rc, bool sele
 		const int selRow = GetSelectedRow();
 		for (size_t p = 0; p < partsIt->second.size(); ++p)
 			if (partsIt->second[p] == selRow) { selPart = static_cast<int>(p); break; }
-	}
-	if (merged && imageOnly)
-	{
-		EnsureGdiPlus();
-		const int n = static_cast<int>(partsIt->second.size());
-		const int hotPart = m_grid.HotPart() - 1;
-		CRgn clip;
-		clip.CreateRoundRectRgn(rc.left, rc.top, rc.right + 1, rc.bottom + 1, radius, radius);
-		dc->SelectClipRgn(&clip);
-		dc->IntersectClipRect(img);
-		{
-			Gdiplus::Graphics g(dc->GetSafeHdc());
-			g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-			g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAliasGridFit);
-			Gdiplus::SolidBrush dim(Gdiplus::Color(70, 0, 0, 0));
-			Gdiplus::SolidBrush hot(Gdiplus::Color(60, 255, 255, 255));
-			Gdiplus::Pen sep(Gdiplus::Color(110, 255, 255, 255), 1.0f);
-			Gdiplus::FontFamily family(L"Segoe UI");
-			const float fs = (std::max)(9.0f, (std::min)(img.Height() * 0.45f, img.Width() / static_cast<float>(n) * 0.6f));
-			Gdiplus::Font font(&family, fs, Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
-			Gdiplus::StringFormat fmt;
-			fmt.SetAlignment(Gdiplus::StringAlignmentCenter);
-			fmt.SetLineAlignment(Gdiplus::StringAlignmentCenter);
-			for (int p = 0; p < n; ++p)
-			{
-				const int x0 = img.left + img.Width() * p / n, x1 = img.left + img.Width() * (p + 1) / n;
-				const Gdiplus::RectF cell(static_cast<float>(x0), static_cast<float>(img.top), static_cast<float>(x1 - x0), static_cast<float>(img.Height()));
-				g.FillRectangle(p == hotPart ? static_cast<Gdiplus::Brush*>(&hot) : static_cast<Gdiplus::Brush*>(&dim), cell);
-				if (p > 0)
-					g.DrawLine(&sep, static_cast<float>(x0), static_cast<float>(img.top + 2), static_cast<float>(x0), static_cast<float>(img.bottom - 2));
-				Gdiplus::SolidBrush text(Gdiplus::Color(p == hotPart ? 235 : 150, 255, 255, 255));
-				wchar_t num[8];
-				swprintf_s(num, L"%d", p + 1);
-				g.DrawString(num, -1, &font, cell, &fmt, &text);
-				if (p == selPart)
-				{
-					Gdiplus::SolidBrush selBar(Gdiplus::Color(230, GetRValue(kButtonColor), GetGValue(kButtonColor), GetBValue(kButtonColor)));
-					const float bh = static_cast<float>((std::max)(2, DX(3)));
-					g.FillRectangle(&selBar, Gdiplus::RectF(cell.X + 2, cell.GetBottom() - bh - 1, cell.Width - 4, bh));
-				}
-			}
-		}
-		dc->SelectClipRgn(nullptr);
 	}
 
 	// 스크린샷 추출 중인 영상: 카드 왼쪽 아래에 "(3/15)", 대기 중인 영상은 "(대기 2)" (더블클릭하면 멈춤 / 대기열에서 뺌)
