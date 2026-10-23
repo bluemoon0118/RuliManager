@@ -660,6 +660,8 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_DRILL_VIEW_YEAR, &CRuliManagerDlg::OnBnClickedDrillViewYear)
 	ON_BN_CLICKED(IDC_STUDIO_VIEW_GRID, &CRuliManagerDlg::OnBnClickedStudioViewGrid)
 	ON_BN_CLICKED(IDC_STUDIO_VIEW_LIST, &CRuliManagerDlg::OnBnClickedStudioViewList)
+	ON_BN_CLICKED(IDC_VIDEO_VIEW_H, &CRuliManagerDlg::OnBnClickedVideoViewH)
+	ON_BN_CLICKED(IDC_VIDEO_VIEW_V, &CRuliManagerDlg::OnBnClickedVideoViewV)
 	ON_BN_CLICKED(IDC_GENRE_HIDE, &CRuliManagerDlg::OnBnClickedGenreHide)
 	ON_BN_CLICKED(IDC_BTN_COPYCODE, &CRuliManagerDlg::OnBnClickedCopyCode)
 	ON_BN_CLICKED(IDC_GENRE_ALL, &CRuliManagerDlg::OnBnClickedGenreAll)
@@ -1218,6 +1220,29 @@ BOOL CRuliManagerDlg::OnInitDialog()
 					m_studioViewBtns[i].SetToggle(kComboColor, TCOL(TC_TOGGLETEXT));
 					m_studioViewBtns[i].SetChecked(i == m_studioView);
 					m_studioViewBtns[i].SetSegment(i == 0 ? CDarkButton::SEG_LEFT : CDarkButton::SEG_RIGHT);   // [격자|리스트] 한 묶음
+				}
+			}
+		}
+		{
+			// 영상 탭: [가로] [세로] 격자 (목록 도구줄 - 정렬 오른쪽)
+			static const wchar_t* pkeys[4] = { L"VideoPortrait", L"VideoPortraitActor", L"VideoPortraitStudio", L"VideoPortraitTag" };
+			for (int s = 0; s < 4; ++s)
+				m_videoPortrait[s] = AfxGetApp()->GetProfileInt(L"Settings", pkeys[s], 0) == 1;
+			const wchar_t* labels[2] = { L"가로", L"세로" };
+			for (int i = 0; i < 2; ++i)
+			{
+				const UINT id = IDC_VIDEO_VIEW_H + i;
+				HWND h = ::CreateWindowExW(0, L"BUTTON", labels[i], WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON, 0, 0, 10, 10,
+					m_hWnd, reinterpret_cast<HMENU>(static_cast<UINT_PTR>(id)), AfxGetInstanceHandle(), nullptr);
+				if (!h)
+					continue;
+				::SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(GetFont()->GetSafeHandle()), TRUE);
+				if (m_videoViewBtns[i].Attach(id, this))
+				{
+					m_videoViewBtns[i].SetColors(kButtonColor, RGB(255, 255, 255), kBackColor);
+					m_videoViewBtns[i].SetToggle(kComboColor, TCOL(TC_TOGGLETEXT));
+					m_videoViewBtns[i].SetChecked((i == 1) == m_videoPortrait[0]);   // 화면이 바뀌면 UpdateLeftPane 이 그 화면 값으로
+					m_videoViewBtns[i].SetSegment(i == 0 ? CDarkButton::SEG_LEFT : CDarkButton::SEG_RIGHT);   // [가로|세로] 한 묶음
 				}
 			}
 		}
@@ -2009,7 +2034,7 @@ int CRuliManagerDlg::LeftPaneWidth(int cx)
 const UINT* CRuliManagerDlg::ToolbarIds(int& count)
 {
 	static const UINT ids[] = {
-		IDC_EDIT_SEARCH, IDC_COMBO_FILTER, IDC_COMBO_SORT, IDC_BTN_SORTDIR, IDC_STUDIO_VIEW_GRID, IDC_STUDIO_VIEW_LIST, IDC_GENRE_HIDE, IDC_GENRE_ALL, IDC_COMBO_PAGESIZE, IDC_ZOOM_SLIDER,
+		IDC_EDIT_SEARCH, IDC_COMBO_FILTER, IDC_COMBO_SORT, IDC_BTN_SORTDIR, IDC_STUDIO_VIEW_GRID, IDC_STUDIO_VIEW_LIST, IDC_VIDEO_VIEW_H, IDC_VIDEO_VIEW_V, IDC_GENRE_HIDE, IDC_GENRE_ALL, IDC_COMBO_PAGESIZE, IDC_ZOOM_SLIDER,
 		IDC_PAGE_FIRST, IDC_PAGE_PREV, IDC_PAGE_N1, IDC_PAGE_N2, IDC_PAGE_N3, IDC_PAGE_N4, IDC_PAGE_N5, IDC_PAGE_NEXT, IDC_PAGE_LAST,
 		IDC_STATIC_PAGEINFO, IDC_GENRE_CHIPS   // 장르 칩 줄도 격자의 자식으로 (빠져 있어서 대화상자 자식으로 남아 격자와 겹쳐 그려졌음)
 	};
@@ -2072,6 +2097,8 @@ int CRuliManagerDlg::LayoutListToolbar(int x, int y, int w)
 	if (visible(IDC_BTN_SORTDIR))  row1.push_back({ IDC_BTN_SORTDIR, DX(50), btnH, -DY(1) / 2 });
 	if (visible(IDC_STUDIO_VIEW_GRID)) row1.push_back({ IDC_STUDIO_VIEW_GRID, DX(28), btnH, -DY(1) / 2, visible(IDC_STUDIO_VIEW_LIST) });   // 제작사 탭 [격자|리스트] 붙은 한 묶음
 	if (visible(IDC_STUDIO_VIEW_LIST)) row1.push_back({ IDC_STUDIO_VIEW_LIST, DX(32), btnH, -DY(1) / 2 });
+	if (visible(IDC_VIDEO_VIEW_H)) row1.push_back({ IDC_VIDEO_VIEW_H, DX(28), btnH, -DY(1) / 2, visible(IDC_VIDEO_VIEW_V) });   // 영상 탭 [가로|세로] 붙은 한 묶음
+	if (visible(IDC_VIDEO_VIEW_V)) row1.push_back({ IDC_VIDEO_VIEW_V, DX(28), btnH, -DY(1) / 2 });
 	if (visible(IDC_GENRE_HIDE)) row1.push_back({ IDC_GENRE_HIDE, DX(40), btnH, -DY(1) / 2, visible(IDC_GENRE_ALL) });   // 영상 탭 [장르숨김|전체] 붙은 한 묶음
 	if (visible(IDC_GENRE_ALL))  row1.push_back({ IDC_GENRE_ALL, DX(28), btnH, -DY(1) / 2 });
 	if (visible(IDC_COMBO_PAGESIZE)) row1.push_back({ IDC_COMBO_PAGESIZE, DX(42), DY(120), 0 });
@@ -4321,8 +4348,8 @@ int CRuliManagerDlg::GridIdxOf(int row) const
 int CRuliManagerDlg::PartZoneAt(int g, const CRect& card, CPoint pt) const
 {
 	auto it = m_gridParts.find(g);
-	if (it == m_gridParts.end() || card.Width() <= 0)
-		return -1;
+	if (it == m_gridParts.end() || card.Width() <= 0 || VideoPortraitActive())
+		return -1;   // [세로] 격자: 파트 칸 없음 (첫 파트 카드)
 	const CRect img(card.left, card.top, card.right, card.top + m_vcardImgH);   // DrawVideoCard 의 이미지 영역
 	if (!img.PtInRect(pt))
 		return -1;
@@ -5808,6 +5835,17 @@ void CRuliManagerDlg::UpdateLeftPane()
 		if (b.GetSafeHwnd())
 			b.ShowWindow(catList && m_mode == MODE_STUDIO ? SW_SHOW : SW_HIDE);   // [격자] [리스트] 는 제작사 카드 목록에서만
 	{
+		// [가로] [세로]: 영상 탭 · 배우 출연작(연도별 제외) · 제작사(레이블) 영상 · 태그 영상 화면, 선택은 그 화면 값
+		const int vs = VideoViewSlot();
+		for (int i = 0; i < 2; ++i)
+			if (m_videoViewBtns[i].GetSafeHwnd())
+			{
+				if (vs >= 0)
+					m_videoViewBtns[i].SetChecked((i == 1) == m_videoPortrait[vs]);
+				m_videoViewBtns[i].ShowWindow(vs >= 0 ? SW_SHOW : SW_HIDE);
+			}
+	}
+	{
 		// [장르숨김] [전체]: 영상 탭 · 배우 출연작 · 제작사(레이블) 영상 화면 (연도별 보기 제외), 선택은 그 화면 값
 		const int gs = GenreSlot();
 		const bool genreBtns = gs >= 0 && !YearViewActive();
@@ -6226,6 +6264,8 @@ void CRuliManagerDlg::DrillIntoCategory(int row)
 		m_zoomSlider.SetPos(m_zoom[ZoomSlot()]);
 		SetupActorCards();
 	}
+	else
+		SetupActorCards();   // 태그 · 컬렉션 영상 화면: 영상 격자 칸 크기 ([세로] 격자면 세로 카드)
 	m_catKind = r.kind;
 	m_catValue = r.value;
 	m_namedActors = false;   // 제작사 영상 화면: 배우 카드 띠는 고른 영상의 출연 배우 (목록으로 돌아가면 ShowNamedInfo 가 다시 정함)
@@ -6944,7 +6984,13 @@ void CRuliManagerDlg::SetupActorCards()
 		+ m_vcardSubLine * 3 + m_cardPad        // 메모 3줄 (1pt 큰 굵은 글꼴)
 		+ 1                                     // 구분선
 		+ m_cardPad + m_cardLine + m_cardPad;   // 태그 수 · 배우 수
-	m_grid.SetFixedTile(m_vcardW, m_vcardH);
+	// 영상 탭 [세로] 격자: 배우 카드 폭, 세로 3:4, 이미지만
+	m_pcardW = m_cardW;
+	m_pcardH = m_pcardW * 4 / 3;
+	if (VideoPortraitActive())
+		m_grid.SetFixedTile(m_pcardW, m_pcardH);
+	else
+		m_grid.SetFixedTile(m_vcardW, m_vcardH);
 	if (m_vcardW != oldVcardW)
 		ClearVideoCovers();
 
@@ -9366,7 +9412,17 @@ void CRuliManagerDlg::OnZoomChanged(int pos)
 
 bool CRuliManagerDlg::GridDrawCard(CDC* dc, int g, const CRect& card, bool selected, bool focused)
 {
-	DrawVideoCard(dc, GridRowOf(g), card, selected, focused);   // 합쳐 보기: 첫 파트로 그림 (순번은 고른 파트)
+	if (VideoPortraitActive())
+	{
+		// 영상 탭 [세로] 격자: 이미지만 (세로 카드용으로 자른 커버)
+		m_cardImageOnly = true;
+		m_coverPortrait = true;
+		DrawVideoCard(dc, GridRowOf(g), card, selected, focused);
+		m_cardImageOnly = false;
+		m_coverPortrait = false;
+	}
+	else
+		DrawVideoCard(dc, GridRowOf(g), card, selected, focused);   // 합쳐 보기: 첫 파트로 그림 (순번은 고른 파트)
 	// 왼쪽 위 체크 칸 (배우 카드와 같음): 체크했으면 항상, 아니면 그 자리에 마우스가 있을 때만 빈 칸 (연도별 보기는 격자를 쓰지 않음)
 	const bool checked = IsVideoCardChecked(g);
 	if (checked || (m_grid.HotRow() == g && m_grid.HotPart() == kVideoCheckPart))
@@ -9544,6 +9600,14 @@ void CRuliManagerDlg::InvalidateShotCards()
 
 bool CRuliManagerDlg::GridDblClick(int g, const CRect& card, CPoint pt)
 {
+	if (VideoPortraitActive() && !m_cardImageOnly)
+	{
+		// [세로] 격자: 이미지만 그린 카드 배치로 (스크린샷 표시 자리 · 파트 칸 없음)
+		m_cardImageOnly = true;
+		const bool handled = GridDblClick(g, card, pt);
+		m_cardImageOnly = false;
+		return handled;
+	}
 	if (GridHitPart(g, card, pt) == kVideoCheckPart)
 	{
 		ToggleVideoCheck(g);   // 체크 칸 빠른 두 번 클릭 = 두 번 전환 (재생하지 않음)
@@ -9581,7 +9645,9 @@ bool CRuliManagerDlg::GridDblClick(int g, const CRect& card, CPoint pt)
 
 int CRuliManagerDlg::GridHoverZone(int /*row*/, const CRect& card, CPoint pt)
 {
-	// 영상 카드 이미지 영역 (DrawVideoCard 의 img 와 같음)
+	// 영상 카드 이미지 영역 (DrawVideoCard 의 img 와 같음) - [세로] 격자는 덧그림이 없어 사용 안 함
+	if (VideoPortraitActive())
+		return 0;
 	const CRect img(card.left, card.top, card.right, card.top + m_vcardImgH);
 	return img.PtInRect(pt) ? 1 : 0;
 }
@@ -9589,7 +9655,8 @@ int CRuliManagerDlg::GridHoverZone(int /*row*/, const CRect& card, CPoint pt)
 namespace
 {
 	// 이미지 파일 → w×h 32비트 DIB (비율 유지 · 가운데 · 남는 곳은 배경색) - 백그라운드 스레드용 (화면 DC 를 쓰지 않음)
-	HBITMAP MakeCoverBitmap(const CString& file, int w, int h, COLORREF back)
+	//  portrait: 세로 카드용 - 가로가 더 긴 이미지는 오른쪽 절반, 세로가 더 긴 이미지는 전체를 폭에 맞춤 (넘치는 위아래는 가운데 기준으로 잘라냄)
+	HBITMAP MakeCoverBitmap(const CString& file, int w, int h, COLORREF back, bool portrait = false)
 	{
 		CImage img;
 		if (file.IsEmpty() || !LoadImageFileSfw(img, file) || img.IsNull())   // SFW: 모자이크 (백그라운드 스레드)
@@ -9611,6 +9678,34 @@ namespace
 		RECT all = { 0, 0, w, h };
 		::FillRect(mem, &all, br);
 		::DeleteObject(br);
+		if (portrait)
+		{
+			const int iw0 = img.GetWidth(), ih0 = img.GetHeight();
+			int sx = 0, sw = iw0;
+			if (iw0 > ih0)
+			{
+				sx = iw0 / 2;            // 가로가 더 긴 이미지: 오른쪽 절반 (앞표지)
+				sw = iw0 - sx;
+			}
+			int sy = 0, sh = ih0;
+			const double scale = static_cast<double>(w) / (std::max)(1, sw);   // 폭에 맞춤
+			int dh = static_cast<int>(sh * scale + 0.5);
+			int dy = 0;
+			if (dh > h)
+			{
+				sh = (std::max)(1, static_cast<int>(h / scale + 0.5));   // 넘치는 위아래는 잘라냄 (가운데)
+				sy = (ih0 - sh) / 2;
+				dh = h;
+			}
+			else
+				dy = (h - dh) / 2;       // 모자라면 위아래 여백 (배경색)
+			::SetStretchBltMode(mem, HALFTONE);
+			::SetBrushOrgEx(mem, 0, 0, nullptr);
+			img.StretchBlt(mem, 0, dy, w, (std::max)(1, dh), sx, sy, sw, sh, SRCCOPY);
+			::SelectObject(mem, old);
+			::DeleteDC(mem);
+			return bmp;
+		}
 		// 비율을 유지한 채 이미지 전체가 카드 이미지 칸에 들어가도록 맞춤 (자르지 않음, 가운데 정렬)
 		const double iw = img.GetWidth(), ih = img.GetHeight();
 		const double scale = (std::min)(w / iw, h / ih);
@@ -9666,7 +9761,7 @@ CBitmap* CRuliManagerDlg::GetVideoCover(int itemIdx, int w, int h, bool* loading
 	if (itemIdx < 0 || itemIdx >= static_cast<int>(m_lib.items.size()) || w <= 0 || h <= 0)
 		return nullptr;
 	CString key;
-	key.Format(L"%s|%dx%d", static_cast<LPCWSTR>(m_lib.items[itemIdx].path), w, h);
+	key.Format(L"%s|%dx%d%s", static_cast<LPCWSTR>(m_lib.items[itemIdx].path), w, h, m_coverPortrait ? L"|p" : L"");   // |p = 세로 카드용으로 자름
 	key.MakeLower();
 	auto it = m_videoCovers.find(key);
 	if (it != m_videoCovers.end())
@@ -9749,13 +9844,13 @@ CBitmap* CRuliManagerDlg::GetVideoCover(int itemIdx, int w, int h, bool* loading
 					const CString file = FindImageFor(job.videoPath);
 					if (!file.IsEmpty())
 					{
-						r->bmp = MakeCoverBitmap(file, job.w, job.h, kThumbBackColor);
+						r->bmp = MakeCoverBitmap(file, job.w, job.h, kThumbBackColor, job.portrait);
 						// 이동식 디스크 영상: 커버를 캐시에 보관 (디스크를 빼도 표시)
 						if (r->bmp && !job.cacheFile.IsEmpty() && !::PathFileExistsW(job.cacheFile))
 							CVideoLibrary::SaveCoverCache(file, job.cacheFile);
 					}
 					else if (!job.cacheFile.IsEmpty() && ::PathFileExistsW(job.cacheFile))
-						r->bmp = MakeCoverBitmap(job.cacheFile, job.w, job.h, kThumbBackColor);   // 디스크 연결 안 됨 → 캐시의 커버
+						r->bmp = MakeCoverBitmap(job.cacheFile, job.w, job.h, kThumbBackColor, job.portrait);   // 디스크 연결 안 됨 → 캐시의 커버
 					if (!::IsWindow(q->hwnd) || !::PostMessageW(q->hwnd, WM_APP_COVER_READY, 0, reinterpret_cast<LPARAM>(r)))
 					{
 						if (r->bmp) ::DeleteObject(r->bmp);
@@ -9778,6 +9873,7 @@ CBitmap* CRuliManagerDlg::GetVideoCover(int itemIdx, int w, int h, bool* loading
 		job.gen = m_coverGen;
 		job.item = itemIdx;
 		job.cacheFile = m_lib.CoverCacheFile(job.videoPath);   // 이동식 디스크 영상이면 커버 캐시 파일
+		job.portrait = m_coverPortrait;
 		if (prefetch)
 			m_coverQ->q.push_front(job);   // 미리 읽기: 보이는 카드 다음에
 		else
@@ -9894,7 +9990,14 @@ void CRuliManagerDlg::GridPrefetch(int first, int last)
 		CRect card;
 		if (!m_grid.GetCardRect(g, card) || card.Width() <= 0)
 			continue;
-		GetVideoCover(m_view[row], card.Width(), m_vcardImgH, nullptr, true);
+		if (VideoPortraitActive())
+		{
+			m_coverPortrait = true;   // [세로] 격자: 카드 전체 = 세로로 자른 커버
+			GetVideoCover(m_view[row], card.Width(), card.Height(), nullptr, true);
+			m_coverPortrait = false;
+		}
+		else
+			GetVideoCover(m_view[row], card.Width(), m_vcardImgH, nullptr, true);
 	}
 }
 
@@ -13076,6 +13179,12 @@ void CRuliManagerDlg::ApplyColors()
 			b.SetColors(kButtonColor, RGB(255, 255, 255), kBackColor);
 			b.SetToggle(kComboColor, TCOL(TC_TOGGLETEXT));
 		}
+	for (CDarkButton& b : m_videoViewBtns)
+		if (b.GetSafeHwnd())
+		{
+			b.SetColors(kButtonColor, RGB(255, 255, 255), kBackColor);
+			b.SetToggle(kComboColor, TCOL(TC_TOGGLETEXT));
+		}
 	if (m_genreBar.GetSafeHwnd())
 		m_genreBar.Invalidate(FALSE);
 	if (m_btnCopyCode.GetSafeHwnd())
@@ -13577,6 +13686,7 @@ void CRuliManagerDlg::SetActorDrillView(int mode)
 	AfxGetApp()->WriteProfileInt(L"Settings", L"ActorDrillView", mode);
 	m_yearViewActor = -1;   // 다시 만들 때 스크롤을 처음으로
 	ApplyFilter();          // 연도별은 페이지를 나누지 않음 → 목록을 다시
+	SetupActorCards();      // 격자로 돌아오면 [가로|세로] 값의 칸 크기
 	UpdateLeftPane();       // 보이기 / 숨기기 + 다시 배치
 	m_grid.Refresh();
 	if (mode == 1)
@@ -13723,6 +13833,32 @@ void CRuliManagerDlg::RelayoutToolbarHeader()
 	const int gap = DX(4);
 	const int tbH = LayoutListToolbar(0, gap, hc.Width());
 	m_toolbarHost->SetHeaderHeight(tbH + gap);
+}
+
+void CRuliManagerDlg::OnBnClickedVideoViewH() { SetVideoPortrait(false); }
+void CRuliManagerDlg::OnBnClickedVideoViewV() { SetVideoPortrait(true); }
+
+void CRuliManagerDlg::SetVideoPortrait(bool portrait)
+{
+	// [가로] ↔ [세로] 격자: 지금 화면(영상 탭 / 배우 출연작 / 제작사 영상 / 태그 영상) 값만 바꿔 레지스트리에 저장
+	const int s = VideoViewSlot();
+	if (s < 0)
+		return;
+	for (int i = 0; i < 2; ++i)
+		if (m_videoViewBtns[i].GetSafeHwnd())
+			m_videoViewBtns[i].SetChecked((i == 1) == portrait);
+	if (portrait == m_videoPortrait[s])
+		return;
+	m_videoPortrait[s] = portrait;
+	static const wchar_t* pkeys[4] = { L"VideoPortrait", L"VideoPortraitActor", L"VideoPortraitStudio", L"VideoPortraitTag" };
+	AfxGetApp()->WriteProfileInt(L"Settings", pkeys[s], portrait ? 1 : 0);
+	m_overlayFade.clear();
+	SetupActorCards();     // 영상 격자 칸 크기 (세로 카드 / 가로 카드)
+	m_grid.Refresh();
+	m_grid.Invalidate(FALSE);
+	if (GridIdxOf(GetSelectedRow()) >= 0)
+		m_grid.OnSelectionChanged();   // 고른 카드가 보이게
+	m_grid.SetFocus();
 }
 
 void CRuliManagerDlg::OnBnClickedStudioViewGrid() { SetStudioView(0); }

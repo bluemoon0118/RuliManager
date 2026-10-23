@@ -123,6 +123,25 @@ protected:
 	void SetStudioView(int mode);
 	afx_msg void OnBnClickedStudioViewGrid();
 	afx_msg void OnBnClickedStudioViewList();
+	// 영상 보기: [가로] 격자 (기존 영상 카드) / [세로] 격자 (배우 카드처럼 세로 3:4, 이미지만) - 영상 탭 · 배우 출연작 · 제작사 영상 · 태그 영상 화면별로 저장
+	//  세로: 가로가 더 긴 이미지 = 오른쪽 절반, 세로가 더 긴 이미지 = 폭에 맞춰 비율 유지 (넘치면 위아래를 잘라 가운데)
+	CDarkButton m_videoViewBtns[2];
+	bool m_videoPortrait[4] = {};      // 화면별: [0] 영상 탭, [1] 배우 출연작, [2] 제작사 · 레이블 영상, [3] 태그 영상 (레지스트리 VideoPortrait / …Actor / …Studio / …Tag)
+	bool m_coverPortrait = false;      // GetVideoCover: 세로 카드용으로 자른 커버 (그리는 동안만 켬)
+	int  m_pcardW = 160, m_pcardH = 213;   // 세로 카드 크기
+	int  VideoViewSlot() const           // [가로|세로] 버튼이 있는 화면 (-1 = 없음)
+	{
+		if (m_mode == MODE_VIDEO) return 0;
+		if (m_drill.IsEmpty()) return -1;
+		if (m_mode == MODE_ACTOR) return YearViewActive() ? -1 : 1;   // 배우 출연작 [연도별] 보기는 제외
+		if (m_mode == MODE_STUDIO) return 2;
+		if (m_mode == MODE_TAG) return 3;
+		return -1;
+	}
+	bool VideoPortraitActive() const { const int s = VideoViewSlot(); return s >= 0 && m_videoPortrait[s]; }
+	void SetVideoPortrait(bool portrait);
+	afx_msg void OnBnClickedVideoViewH();
+	afx_msg void OnBnClickedVideoViewV();
 	// 장르(태그) 칩: [장르숨김][전체] (목록 도구줄) - [전체] 면 도구줄 아래에 태그 칩 줄, 칩 하나를 골라 그 태그 영상만
 	//  화면별(영상 탭 / 배우 출연작 / 제작사 · 레이블 영상)로 따로: 레지스트리 Settings\GenreBar · GenreBarActor · GenreBarStudio
 	CDarkButton   m_genreBtns[2];
@@ -735,7 +754,7 @@ protected:
 	const CMediaInfoLabel::Info* CardMediaInfo(const CString& path);   // 있으면 정보, 없으면 백그라운드 읽기 요청 후 nullptr
 	afx_msg LRESULT OnCardMediaReady(WPARAM wParam, LPARAM lParam);
 	// 영상 카드 이미지: 백그라운드 스레드에서 이미지 파일을 찾아 읽고 카드 크기로 줄여 둠 (읽는 동안 카드에 "불러오는 중" 표시)
-	struct CoverJob { CString key; CString videoPath; int w = 0; int h = 0; UINT gen = 0; int item = -1; CString cacheFile; };   // cacheFile: 이동식 디스크 영상의 커버 캐시
+	struct CoverJob { CString key; CString videoPath; int w = 0; int h = 0; UINT gen = 0; int item = -1; CString cacheFile; bool portrait = false; };   // portrait: 세로 카드용 자르기   // cacheFile: 이동식 디스크 영상의 커버 캐시
 	struct CoverQueue
 	{
 		std::mutex mx;
