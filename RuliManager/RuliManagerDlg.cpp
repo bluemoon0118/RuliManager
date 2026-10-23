@@ -1249,6 +1249,10 @@ BOOL CRuliManagerDlg::OnInitDialog()
 					m_drillViewBtns[i].SetColors(kButtonColor, RGB(255, 255, 255), kBackColor);
 					m_drillViewBtns[i].SetToggle(kComboColor, TCOL(TC_TOGGLETEXT));
 					m_drillViewBtns[i].SetChecked(i == m_actorDrillView);
+					m_drillViewBtns[i].SetSegment(i == 0 ? CDarkButton::SEG_LEFT : CDarkButton::SEG_RIGHT);   // [격자|연도별] 한 묶음
+					// 글자 대신 아이콘 (가로 칸 2×2 / 달력), 마우스를 올리면 이름
+					m_drillViewBtns[i].SetIcon(i == 0 ? CDarkButton::ICON_VIEW_GRID : CDarkButton::ICON_VIEW_YEAR);
+					m_drillViewBtns[i].SetTooltip(labels[i]);
 				}
 			}
 		}
@@ -1270,6 +1274,9 @@ BOOL CRuliManagerDlg::OnInitDialog()
 					m_studioViewBtns[i].SetToggle(kComboColor, TCOL(TC_TOGGLETEXT));
 					m_studioViewBtns[i].SetChecked(i == m_studioView);
 					m_studioViewBtns[i].SetSegment(i == 0 ? CDarkButton::SEG_LEFT : CDarkButton::SEG_RIGHT);   // [격자|리스트] 한 묶음
+					// 글자 대신 아이콘 (영상 탭 [격자|리스트] 와 같은 그림), 마우스를 올리면 이름
+					m_studioViewBtns[i].SetIcon(i == 0 ? CDarkButton::ICON_VIEW_GRID : CDarkButton::ICON_VIEW_LIST);
+					m_studioViewBtns[i].SetTooltip(labels[i]);
 				}
 			}
 		}
@@ -1291,18 +1298,30 @@ BOOL CRuliManagerDlg::OnInitDialog()
 					m_genderBtns[i].SetToggle(kComboColor, TCOL(TC_TOGGLETEXT));
 					m_genderBtns[i].SetChecked(i == m_actorGender);
 					m_genderBtns[i].SetSegment(i == 0 ? CDarkButton::SEG_LEFT : (i == 2 ? CDarkButton::SEG_RIGHT : CDarkButton::SEG_MIDDLE));   // 붙은 한 묶음
-					m_genderBtns[i].SetIcon(i == 0 ? CDarkButton::ICON_GENDER_ALL : (i == 1 ? CDarkButton::ICON_FEMALE : CDarkButton::ICON_MALE));   // ⚥ / ♀ / ♂
+					// 글자 대신 성별 기호 (♀♂ 나란히 / ♀ / ♂), 마우스를 올리면 이름
+					m_genderBtns[i].SetIcon(i == 0 ? CDarkButton::ICON_SYMBOL_ALL : (i == 1 ? CDarkButton::ICON_SYMBOL_F : CDarkButton::ICON_SYMBOL_M));
+					m_genderBtns[i].SetTooltip(labels[i]);
 				}
 			}
 		}
 		{
 			// 영상 탭: [격자] [리스트] 보기 방식 (목록 도구줄 - 정렬 오른쪽, [가로|세로] 앞)
 			// 영상 탭: [격자] [리스트] [패키지] (예전 값: VideoList = 리스트, VideoPortrait = 격자 세로 → 패키지)
+			// 화면별 (배우 출연작 · 제작사 · 태그 영상의 예전 [가로|세로] 값: 세로 → 패키지)
 			CWinApp* app = AfxGetApp();
-			int vm = static_cast<int>(app->GetProfileInt(L"Settings", L"VideoViewMode", -1));
-			if (vm < 0 || vm > 2)
-				vm = (app->GetProfileInt(L"Settings", L"VideoList", 0) == 1) ? 1 : ((app->GetProfileInt(L"Settings", L"VideoPortrait", 0) == 1) ? 2 : 0);
-			m_videoView = vm;
+			static const wchar_t* vkeys[5] = { L"VideoViewMode", L"VideoViewModeActor", L"VideoViewModeStudio", L"VideoViewModeTag", L"VideoViewModeCollection" };
+			static const wchar_t* oldPortrait[5] = { L"VideoPortrait", L"VideoPortraitActor", L"VideoPortraitStudio", L"VideoPortraitTag", nullptr };
+			for (int s = 0; s < 5; ++s)
+			{
+				int vm = static_cast<int>(app->GetProfileInt(L"Settings", vkeys[s], -1));
+				if (vm < 0 || vm > 2)
+				{
+					vm = (oldPortrait[s] && app->GetProfileInt(L"Settings", oldPortrait[s], 0) == 1) ? 2 : 0;
+					if (s == 0 && app->GetProfileInt(L"Settings", L"VideoList", 0) == 1)
+						vm = 1;
+				}
+				m_videoView[s] = vm;
+			}
 			const wchar_t* labels[3] = { L"격자", L"리스트", L"패키지" };
 			for (int i = 0; i < 3; ++i)
 			{
@@ -1316,8 +1335,11 @@ BOOL CRuliManagerDlg::OnInitDialog()
 				{
 					m_videoModeBtns[i].SetColors(kButtonColor, RGB(255, 255, 255), kBackColor);
 					m_videoModeBtns[i].SetToggle(kComboColor, TCOL(TC_TOGGLETEXT));
-					m_videoModeBtns[i].SetChecked(i == m_videoView);
+					m_videoModeBtns[i].SetChecked(i == m_videoView[0]);   // 화면이 바뀌면 UpdateLeftPane 이 그 화면 값으로
 					m_videoModeBtns[i].SetSegment(i == 0 ? CDarkButton::SEG_LEFT : (i == 2 ? CDarkButton::SEG_RIGHT : CDarkButton::SEG_MIDDLE));   // [격자|리스트|패키지] 한 묶음
+					// 글자 대신 아이콘 (가로 칸 2×2 / 썸네일 + 줄 / 세로 케이스), 마우스를 올리면 이름
+					m_videoModeBtns[i].SetIcon(i == 0 ? CDarkButton::ICON_VIEW_GRID : (i == 1 ? CDarkButton::ICON_VIEW_LIST : CDarkButton::ICON_VIEW_PACKAGE));
+					m_videoModeBtns[i].SetTooltip(labels[i]);
 				}
 			}
 		}
@@ -2161,7 +2183,7 @@ void CRuliManagerDlg::SetToolbarHost(CVideoGrid* host)
 int CRuliManagerDlg::LayoutListToolbar(int x, int y, int w)
 {
 	// 목록(격자) 머리 영역의 도구줄 (가운데 정렬, 격자 클라이언트 좌표 - 스크롤한 만큼 위로)
-	//  1줄: [검색...] [별점 ▾] [정렬 ▾][▲▼] [페이지당 ▾] [확대 ━●━]   (보이는 것만)
+	//  1줄: [검색...] [정렬 ▾][▲▼] [페이지당 ▾] [화면별 버튼 묶음] [확대 ━●━]   (보이는 것만)
 	//  2줄: [«] [<] [1] [2] [3] [4] [5] [>] [»]
 	//  3줄: 1-250 / 1,251개 (6.9 TiB)
 	if (!m_toolbarHost || !m_toolbarHost->GetSafeHwnd())
@@ -2189,23 +2211,40 @@ int CRuliManagerDlg::LayoutListToolbar(int x, int y, int w)
 	};
 	struct Item { UINT id; int w; int h; int dy; bool joinNext = false; };   // joinNext: 다음 칸과 붙임 (세그먼트 버튼)
 	std::vector<Item> row1;
+	// 순서 (보이는 것만): [검색][정렬 ▾][▲▼][페이지당 ▾] + 화면별 묶음 + [확대]
+	//  영상 화면(영상 탭 · 배우 / 제작사 / 태그 / 컬렉션 영상): [장르숨김|전체][격자|리스트|패키지]
+	//  배우 탭: [선택없음|여성만|남성만] · 제작사 탭: [격자|리스트] · 태그 탭: 없음
 	row1.push_back({ IDC_EDIT_SEARCH, DX(150), rowH, 0 });
-	if (visible(IDC_COMBO_FILTER)) row1.push_back({ IDC_COMBO_FILTER, DX(66), DY(120), 0 });
-	if (visible(IDC_COMBO_SORT))   row1.push_back({ IDC_COMBO_SORT, DX(60), DY(120), 0 });
-	if (visible(IDC_BTN_SORTDIR))  row1.push_back({ IDC_BTN_SORTDIR, DX(50), btnH, -DY(1) / 2 });
-	if (visible(IDC_STUDIO_VIEW_GRID)) row1.push_back({ IDC_STUDIO_VIEW_GRID, DX(28), btnH, -DY(1) / 2, visible(IDC_STUDIO_VIEW_LIST) });   // 제작사 탭 [격자|리스트] 붙은 한 묶음
-	if (visible(IDC_STUDIO_VIEW_LIST)) row1.push_back({ IDC_STUDIO_VIEW_LIST, DX(32), btnH, -DY(1) / 2 });
-	if (visible(IDC_ACTOR_GENDER_ALL)) row1.push_back({ IDC_ACTOR_GENDER_ALL, DX(52), btnH, -DY(1) / 2, true });   // 배우 탭 [⚥ 선택없음|♀ 여성만|♂ 남성만] 붙은 한 묶음 (아이콘 자리만큼 넓게)
-	if (visible(IDC_ACTOR_GENDER_F))   row1.push_back({ IDC_ACTOR_GENDER_F, DX(46), btnH, -DY(1) / 2, true });
-	if (visible(IDC_ACTOR_GENDER_M))   row1.push_back({ IDC_ACTOR_GENDER_M, DX(46), btnH, -DY(1) / 2 });
-	if (visible(IDC_VIDEO_MODE_GRID))    row1.push_back({ IDC_VIDEO_MODE_GRID, DX(28), btnH, -DY(1) / 2, true });   // 영상 탭 [격자|리스트|패키지] 붙은 한 묶음
-	if (visible(IDC_VIDEO_MODE_LIST))    row1.push_back({ IDC_VIDEO_MODE_LIST, DX(32), btnH, -DY(1) / 2, true });
-	if (visible(IDC_VIDEO_MODE_PACKAGE)) row1.push_back({ IDC_VIDEO_MODE_PACKAGE, DX(36), btnH, -DY(1) / 2 });
-	if (visible(IDC_VIDEO_VIEW_H)) row1.push_back({ IDC_VIDEO_VIEW_H, DX(28), btnH, -DY(1) / 2, visible(IDC_VIDEO_VIEW_V) });   // 영상 탭 [가로|세로] 붙은 한 묶음
-	if (visible(IDC_VIDEO_VIEW_V)) row1.push_back({ IDC_VIDEO_VIEW_V, DX(28), btnH, -DY(1) / 2 });
-	if (visible(IDC_GENRE_HIDE)) row1.push_back({ IDC_GENRE_HIDE, DX(40), btnH, -DY(1) / 2, visible(IDC_GENRE_ALL) });   // 영상 탭 [장르숨김|전체] 붙은 한 묶음
-	if (visible(IDC_GENRE_ALL))  row1.push_back({ IDC_GENRE_ALL, DX(28), btnH, -DY(1) / 2 });
+	if (visible(IDC_COMBO_SORT))   row1.push_back({ IDC_COMBO_SORT, DX(60), DY(120), 0, visible(IDC_BTN_SORTDIR) });   // [정렬 ▾][▲▼] 붙은 한 묶음
+	if (visible(IDC_BTN_SORTDIR))
+	{
+		// 아이콘만 (오름차순 / 내림차순은 툴팁) - 콤보 칸과 같은 높이 · 같은 위치로 붙여 한 묶음처럼
+		int sh = rowH;
+		if (CWnd* sc = GetDlgItem(IDC_COMBO_SORT))
+		{
+			CRect r;
+			sc->GetWindowRect(&r);   // 콤보는 창 높이 = 선택 칸 높이 (펼친 목록 제외)
+			if (r.Height() > 0) sh = r.Height();
+		}
+		row1.push_back({ IDC_BTN_SORTDIR, sh * 12 / 10, sh, 0 });
+	}
 	if (visible(IDC_COMBO_PAGESIZE)) row1.push_back({ IDC_COMBO_PAGESIZE, DX(42), DY(120), 0 });
+	if (visible(IDC_GENRE_HIDE)) row1.push_back({ IDC_GENRE_HIDE, DX(40), btnH, -DY(1) / 2, visible(IDC_GENRE_ALL) });   // 영상 화면 [장르숨김|전체] 붙은 한 묶음
+	if (visible(IDC_GENRE_ALL))  row1.push_back({ IDC_GENRE_ALL, DX(28), btnH, -DY(1) / 2 });
+	if (visible(IDC_ACTOR_GENDER_ALL)) row1.push_back({ IDC_ACTOR_GENDER_ALL, btnH * 13 / 10, btnH, -DY(1) / 2, true });   // 배우 탭 [선택없음|여성만|남성만] 붙은 한 묶음 (아이콘 버튼)
+	if (visible(IDC_ACTOR_GENDER_F))   row1.push_back({ IDC_ACTOR_GENDER_F, btnH * 13 / 10, btnH, -DY(1) / 2, true });
+	if (visible(IDC_ACTOR_GENDER_M))   row1.push_back({ IDC_ACTOR_GENDER_M, btnH * 13 / 10, btnH, -DY(1) / 2 });
+	if (visible(IDC_STUDIO_VIEW_GRID)) row1.push_back({ IDC_STUDIO_VIEW_GRID, btnH * 13 / 10, btnH, -DY(1) / 2, visible(IDC_STUDIO_VIEW_LIST) });   // 제작사 탭 [격자|리스트] 붙은 한 묶음 (아이콘 버튼)
+	if (visible(IDC_STUDIO_VIEW_LIST)) row1.push_back({ IDC_STUDIO_VIEW_LIST, btnH * 13 / 10, btnH, -DY(1) / 2 });
+	{
+		// 영상 [격자|리스트|패키지] 붙은 한 묶음 - 아이콘 버튼 (높이보다 조금 넓게)
+		const int vw = btnH * 13 / 10;
+		if (visible(IDC_VIDEO_MODE_GRID))    row1.push_back({ IDC_VIDEO_MODE_GRID, vw, btnH, -DY(1) / 2, true });
+		if (visible(IDC_VIDEO_MODE_LIST))    row1.push_back({ IDC_VIDEO_MODE_LIST, vw, btnH, -DY(1) / 2, true });
+		if (visible(IDC_VIDEO_MODE_PACKAGE)) row1.push_back({ IDC_VIDEO_MODE_PACKAGE, vw, btnH, -DY(1) / 2 });
+	}
+	if (visible(IDC_VIDEO_VIEW_H)) row1.push_back({ IDC_VIDEO_VIEW_H, DX(28), btnH, -DY(1) / 2, visible(IDC_VIDEO_VIEW_V) });   // 예전 [가로|세로] (지금은 늘 숨김)
+	if (visible(IDC_VIDEO_VIEW_V)) row1.push_back({ IDC_VIDEO_VIEW_V, DX(28), btnH, -DY(1) / 2 });
 	row1.push_back({ IDC_ZOOM_SLIDER, DX(56), btnH, 0 });
 	int total = 0;
 	for (const Item& it : row1)
@@ -2357,10 +2396,12 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 		MoveCtrl(IDC_BTN_ACTOR_BACK, lx, top, DX(70), btnH);
 		MoveCtrl(IDC_STATIC_ACTOR_TITLE, lx + DX(74), top + DY(3), leftW - DX(74), DY(9));
 		{
-			// 배우 출연작 화면: [격자] [연도별] (줄 오른쪽 끝, 붙여서)
-			const int vbw = DX(40);
-			MoveCtrl(IDC_DRILL_VIEW_YEAR, lx + leftW - vbw, top, vbw, btnH);
-			MoveCtrl(IDC_DRILL_VIEW_GRID, lx + leftW - vbw * 2 - 2, top, vbw, btnH);
+			// 배우 출연작 화면: [◀ 배우 목록] 바로 오른쪽에 [격자|연도별] (간격 없이 붙인 아이콘 버튼 한 묶음)
+			//  (배우 출연작 화면은 제목 글자를 숨기고 배우 머리 영역을 쓰므로 제목 자리와 겹치지 않음)
+			const int vbw = btnH * 13 / 10;
+			const int vx = lx + DX(70) + DX(4);
+			MoveCtrl(IDC_DRILL_VIEW_GRID, vx, top, vbw, btnH);
+			MoveCtrl(IDC_DRILL_VIEW_YEAR, vx + vbw, top, vbw, btnH);
 		}
 		MoveCtrl(IDC_LIST_VIDEOS, lx, lt, leftW, bottom - lt);
 		MoveCtrl(IDC_GRID, lx, lt, leftW, bottom - lt);
@@ -2384,10 +2425,12 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 			// 영상 탭 [리스트] 보기: 격자는 도구줄 높이만, 그 아래 전체를 목록(스프레드시트)으로
 			if (VideoListActive() && host == &m_grid)
 			{
+				// 영상 탭은 맨 위부터, 배우 · 제작사 · 태그 · 컬렉션 영상 화면은 위쪽 정보(사진 · 커버 등) 아래부터
+				const int gTop = gridRc.IsRectEmpty() ? top : static_cast<int>(gridRc.top);
 				const int edge = ::GetSystemMetrics(SM_CYEDGE) * 2;   // 격자의 WS_EX_CLIENTEDGE 테두리
-				const int headH = (std::min)(bottom - top, tbH + gap + edge);
-				MoveCtrl(IDC_GRID, lx, top, leftW, headH);
-				MoveCtrl(IDC_LIST_VIDEOS, lx, top + headH, leftW, (std::max)(0, bottom - top - headH));
+				const int headH = (std::min)(bottom - gTop, tbH + gap + edge);
+				MoveCtrl(IDC_GRID, lx, gTop, leftW, headH);
+				MoveCtrl(IDC_LIST_VIDEOS, lx, gTop + headH, leftW, (std::max)(0, bottom - gTop - headH));
 				AutoSizeListColumns();   // 목록 폭에 맞춰 열 폭
 			}
 		}
@@ -2943,7 +2986,7 @@ void CRuliManagerDlg::ApplyFilter()
 		token = query.Tokenize(L" ", pos);
 	}
 
-	const int minRating = (std::max)(0, m_comboFilter.GetCurSel()) * 2;   // 별 N 개 이상 (반 별 단위)
+	const int minRating = 0;   // 별점 거르기 콤보는 없앰 (늘 전체) - 예전: 콤보 선택 × 2 (반 별 단위)
 
 	// 배우 이름/별칭 어느 것으로도 검색되도록: 영상의 배우 표기(이름 또는 별칭, 소문자) → 이름, 별칭
 	std::map<CString, CString> aliasMap;
@@ -3496,6 +3539,19 @@ void CRuliManagerDlg::OnCbnSelchangeFilter()
 	ApplyFilter();
 }
 
+void CRuliManagerDlg::SetSortDirButton(bool asc)
+{
+	// 정렬 방향 버튼: 글자 대신 아이콘 (위 화살표 + 짧은→긴 막대 / 아래 화살표 + 긴→짧은 막대), 이름은 툴팁
+	const wchar_t* name = asc ? L"오름차순" : L"내림차순";
+	SetDlgItemText(IDC_BTN_SORTDIR, name);
+	for (CDarkButton& b : m_darkButtons)
+		if (b.GetSafeHwnd() && b.GetDlgCtrlID() == IDC_BTN_SORTDIR)
+		{
+			b.SetIcon(asc ? CDarkButton::ICON_SORT_ASC : CDarkButton::ICON_SORT_DESC);
+			b.SetTooltip(name);
+		}
+}
+
 void CRuliManagerDlg::UpdateSortUI()
 {
 	// 정렬 콤보: 배우 격자는 [이름 | 작품수], 제작사 · 태그 카드는 [이름 | 영상수], 그 외(영상)는 영상 정렬 기준
@@ -3525,7 +3581,7 @@ void CRuliManagerDlg::UpdateSortUI()
 	if (kind == 1)
 	{
 		m_comboSort.SetCurSel(m_actorSortCol);
-		SetDlgItemText(IDC_BTN_SORTDIR, m_actorSortAsc ? L"▲ 오름차순" : L"▼ 내림차순");
+		SetSortDirButton(m_actorSortAsc);
 		AfxGetApp()->WriteProfileInt(L"Settings", L"ActorSortColumn", m_actorSortCol);
 		AfxGetApp()->WriteProfileInt(L"Settings", L"ActorSortAsc", m_actorSortAsc ? 1 : 0);
 		return;
@@ -3534,13 +3590,13 @@ void CRuliManagerDlg::UpdateSortUI()
 	{
 		// 제작사 / 태그 / 컬렉션 탭은 따로 기억
 		m_comboSort.SetCurSel(CatSortCol());
-		SetDlgItemText(IDC_BTN_SORTDIR, CatSortAsc() ? L"▲ 오름차순" : L"▼ 내림차순");
+		SetSortDirButton(CatSortAsc());
 		AfxGetApp()->WriteProfileInt(L"Settings", CString(CatSortKey()) + L"Column", CatSortCol());
 		AfxGetApp()->WriteProfileInt(L"Settings", CString(CatSortKey()) + L"Asc", CatSortAsc() ? 1 : 0);
 		return;
 	}
 	m_comboSort.SetCurSel(m_sortColumn);
-	SetDlgItemText(IDC_BTN_SORTDIR, m_sortAsc ? L"▲ 오름차순" : L"▼ 내림차순");
+	SetSortDirButton(m_sortAsc);
 	// 배우 출연작 화면은 따로 저장
 	AfxGetApp()->WriteProfileInt(L"Settings", m_drillFilters ? DrillKey(L"SortColumn") : CString(L"SortColumn"), m_sortColumn);
 	AfxGetApp()->WriteProfileInt(L"Settings", m_drillFilters ? DrillKey(L"SortAsc") : CString(L"SortAsc"), m_sortAsc ? 1 : 0);
@@ -4190,6 +4246,10 @@ void CRuliManagerDlg::OnModeChanged(UINT nID)
 	for (std::set<CString>& s : m_catChecked)
 		s.clear();
 	m_videoChecked.clear();
+	// 탭을 바꾸면 배우 선택도 풂 (다른 화면에서 배우를 열어 배우 탭으로 올 때만 그 배우를 고름 - GoToActor)
+	m_actorSel = -1;
+	m_actorSelName = m_gotoActorName;
+	m_gotoActorName.Empty();
 	ApplyTabPageSize();   // 탭마다 따로 저장한 페이지당 개수
 	m_catSelKind = -1;
 	m_catSelValue.Empty();
@@ -6020,22 +6080,20 @@ void CRuliManagerDlg::UpdateLeftPane()
 	for (CDarkButton& b : m_genderBtns)
 		if (b.GetSafeHwnd())
 			b.ShowWindow(actorGrid ? SW_SHOW : SW_HIDE);   // [선택없음] [여성만] [남성만] 은 배우 격자에서만
-	for (int i = 0; i < 3; ++i)
-		if (m_videoModeBtns[i].GetSafeHwnd())
-		{
-			m_videoModeBtns[i].SetChecked(i == m_videoView);
-			m_videoModeBtns[i].ShowWindow(m_mode == MODE_VIDEO ? SW_SHOW : SW_HIDE);   // [격자] [리스트] [패키지] 는 영상 탭에서만
-		}
 	{
-		// [가로] [세로]: 영상 탭 · 배우 출연작(연도별 제외) · 제작사(레이블) 영상 · 태그 영상 화면, 선택은 그 화면 값
+		// [격자] [리스트] [패키지]: 영상 탭 · 배우 출연작(연도별 제외) · 제작사(레이블) · 태그 · 컬렉션 영상 화면, 선택은 그 화면 값
 		const int vs = VideoViewSlot();
-		for (int i = 0; i < 2; ++i)
-			if (m_videoViewBtns[i].GetSafeHwnd())
+		for (int i = 0; i < 3; ++i)
+			if (m_videoModeBtns[i].GetSafeHwnd())
 			{
 				if (vs >= 0)
-					m_videoViewBtns[i].SetChecked((i == 1) == m_videoPortrait[vs]);
-				m_videoViewBtns[i].ShowWindow(vs >= 0 ? SW_SHOW : SW_HIDE);
+					m_videoModeBtns[i].SetChecked(i == m_videoView[vs]);
+				m_videoModeBtns[i].ShowWindow(vs >= 0 ? SW_SHOW : SW_HIDE);
 			}
+		// 예전 [가로|세로] 는 [패키지] 로 옮겨서 쓰지 않음
+		for (CDarkButton& b : m_videoViewBtns)
+			if (b.GetSafeHwnd())
+				b.ShowWindow(SW_HIDE);
 	}
 	{
 		// [장르숨김] [전체]: 영상 탭 · 배우 출연작 · 제작사(레이블) 영상 화면 (연도별 보기 제외), 선택은 그 화면 값
@@ -6063,7 +6121,7 @@ void CRuliManagerDlg::UpdateLeftPane()
 	const UINT oldLabels[] = { IDC_STATIC_SEARCH, IDC_STATIC_FILTER, IDC_STATIC_SORT };
 	for (UINT id : oldLabels)
 		if (CWnd* w = GetDlgItem(id)) w->ShowWindow(SW_HIDE);
-	GetDlgItem(IDC_COMBO_FILTER)->ShowWindow(showVideos ? SW_SHOW : SW_HIDE);
+	GetDlgItem(IDC_COMBO_FILTER)->ShowWindow(SW_HIDE);   // 별점 거르기 콤보는 없앰 (어느 화면에서도 숨김, 거르기도 하지 않음)
 	GetDlgItem(IDC_COMBO_PAGESIZE)->ShowWindow(StudioListView() ? SW_HIDE : SW_SHOW);   // 제작사 [리스트]: 페이지당 개수 숨김 (전체 표시)
 	UpdateSortUI();   // 영상 / 배우 정렬 항목으로 콤보 채움
 	UpdatePager();
@@ -13416,6 +13474,14 @@ void CRuliManagerDlg::ApplyColors()
 		}
 	}
 
+	// 정렬 방향 버튼: 정렬 콤보와 붙은 한 묶음 (콤보 색 · 오른쪽 칸 모양, 아이콘만)
+	for (CDarkButton& b : m_darkButtons)
+		if (b.GetSafeHwnd() && b.GetDlgCtrlID() == IDC_BTN_SORTDIR)
+		{
+			b.SetColors(kComboColor, RGB(255, 255, 255), kBackColor);
+			b.SetSegment(CDarkButton::SEG_RIGHT);
+		}
+
 	// 제작사 탭 [격자] [리스트] · 영상 탭 [장르숨김] [전체] 토글 (테마 색 다시)
 	for (CDarkButton& b : m_studioViewBtns)
 		if (b.GetSafeHwnd())
@@ -14129,16 +14195,20 @@ void CRuliManagerDlg::OnBnClickedVideoModePackage() { SetVideoMode(2); }
 
 void CRuliManagerDlg::SetVideoMode(int mode)
 {
-	// 영상 탭: [격자] / [리스트] / [패키지] (레지스트리에 저장)
+	// [격자] / [리스트] / [패키지]: 지금 영상 화면(영상 탭 / 배우 출연작 / 제작사 / 태그 / 컬렉션 영상) 값만 바꿔 레지스트리에 저장
+	const int slot = VideoViewSlot();
+	if (slot < 0)
+		return;
 	mode = (std::max)(0, (std::min)(2, mode));
 	for (int i = 0; i < 3; ++i)
 		if (m_videoModeBtns[i].GetSafeHwnd())
 			m_videoModeBtns[i].SetChecked(i == mode);
-	if (mode == m_videoView)
+	if (mode == m_videoView[slot])
 		return;
-	m_videoView = mode;
+	m_videoView[slot] = mode;
 	const bool list = (mode == 1);
-	AfxGetApp()->WriteProfileInt(L"Settings", L"VideoViewMode", mode);
+	static const wchar_t* vkeys[5] = { L"VideoViewMode", L"VideoViewModeActor", L"VideoViewModeStudio", L"VideoViewModeTag", L"VideoViewModeCollection" };
+	AfxGetApp()->WriteProfileInt(L"Settings", vkeys[slot], mode);
 	if (list)
 		AutoSizeListColumns();
 	m_overlayFade.clear();
@@ -14544,8 +14614,8 @@ void CRuliManagerDlg::SetVideoPortrait(bool portrait)
 {
 	// [가로] ↔ [세로] 격자: 지금 화면(영상 탭 / 배우 출연작 / 제작사 영상 / 태그 영상) 값만 바꿔 레지스트리에 저장
 	const int s = VideoViewSlot();
-	if (s < 0)
-		return;
+	if (s < 0 || s >= 4)
+		return;   // (예전 [가로|세로] - 지금은 버튼을 숨겨 [패키지] 로 대신)
 	for (int i = 0; i < 2; ++i)
 		if (m_videoViewBtns[i].GetSafeHwnd())
 			m_videoViewBtns[i].SetChecked((i == 1) == portrait);
@@ -15113,7 +15183,11 @@ void CRuliManagerDlg::GoToActor(int idx)
 	const CString name = m_lib.actors[idx].name;   // 저장하면서 목록이 바뀌어도 이름으로 다시 찾음
 	m_actorSelName = name;   // 배우 탭으로 바뀌면 이 배우를 선택
 	if (m_mode != MODE_ACTOR)
+	{
+		m_gotoActorName = name;   // 탭 전환은 배우 선택을 풀므로 이 배우만 넘김
 		OnModeChanged(IDC_RADIO_ACTOR);
+		m_gotoActorName.Empty();
+	}
 	else if (!m_drill.IsEmpty())
 	{
 		BackToList();   // 출연작 화면이면 배우 목록으로 나옴

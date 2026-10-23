@@ -455,6 +455,58 @@ namespace VectorIcon
 		}
 	}
 
+	void ViewGrid(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddRoundRect(p, 2.0f, 4.5f, 9.2f, 6.6f, 1.3f);
+			AddRoundRect(p, 12.8f, 4.5f, 9.2f, 6.6f, 1.3f);
+			AddRoundRect(p, 2.0f, 12.9f, 9.2f, 6.6f, 1.3f);
+			AddRoundRect(p, 12.8f, 12.9f, 9.2f, 6.6f, 1.3f);
+		});
+	}
+
+	void ViewList(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			for (int i = 0; i < 3; ++i)
+			{
+				const float y = 3.5f + i * 6.2f;
+				AddRoundRect(p, 2.0f, y, 6.0f, 4.6f, 1.0f);          // 썸네일
+				AddRoundRect(p, 10.0f, y + 1.15f, 12.0f, 2.3f, 1.1f);  // 줄
+			}
+		});
+	}
+
+	void ViewYear(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddRoundRect(p, 2.5f, 4.0f, 19.0f, 17.5f, 2.2f);    // 달력 몸체
+			AddRoundRect(p, 4.3f, 9.2f, 15.4f, 10.5f, 0.8f);    // 날짜 칸 자리 (구멍)
+			for (int i = 0; i < 3; ++i)
+				for (int j = 0; j < 2; ++j)
+					AddRoundRect(p, 6.0f + i * 4.4f, 11.0f + j * 4.2f, 2.6f, 2.6f, 0.5f);   // 날짜 칸 (구멍 안 - 다시 칠해짐)
+		});
+		// 위쪽 고리 두 개 (몸체와 겹치므로 따로 칠함)
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddRoundRect(p, 6.5f, 2.0f, 2.4f, 4.5f, 1.1f);
+			AddRoundRect(p, 15.1f, 2.0f, 2.4f, 4.5f, 1.1f);
+		});
+	}
+
+	void ViewPackage(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddRoundRect(p, 5.0f, 2.0f, 14.0f, 20.0f, 1.8f);   // 케이스
+			AddRoundRect(p, 7.0f, 4.2f, 10.0f, 2.4f, 0.8f);    // 위쪽 띠 (구멍)
+			AddRoundRect(p, 7.0f, 8.4f, 10.0f, 11.4f, 0.8f);   // 표지 자리 (구멍)
+		});
+	}
+
 	void GenderFemale(CDC* dc, const CRect& area, COLORREF col, double fill)
 	{
 		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
@@ -482,6 +534,131 @@ namespace VectorIcon
 			AddCross(p, 9.5f, 11.5f, 18.0f, 23.5f, 7.3f, 13.7f, 20.0f, 21.8f);   // 아래 십자 (♀)
 			AddArrowNE(p, 23.0f, 14.6f, 18.25f, 0.78f, 21.0f, 2.0f, 5.5f);       // 오른쪽 위 화살표 (♂)
 		});
+	}
+
+	namespace
+	{
+		// 사람 실루엣 (24x24 설계 좌표): 머리 원 (hx, hy, hr) + 몸
+		void AddPersonFemale(Gdiplus::GraphicsPath& p, float hx, float hy, float hr, float top, float bottom, float topHalf, float bottomHalf)
+		{
+			p.StartFigure();
+			p.AddEllipse(hx - hr, hy - hr, hr * 2, hr * 2);
+			const Gdiplus::PointF dress[4] = {
+				{ hx - topHalf, top }, { hx + topHalf, top }, { hx + bottomHalf, bottom }, { hx - bottomHalf, bottom } };
+			p.AddPolygon(dress, 4);
+		}
+		void AddPersonMale(Gdiplus::GraphicsPath& p, float hx, float hy, float hr, float top, float bottom, float half, float r)
+		{
+			p.StartFigure();
+			p.AddEllipse(hx - hr, hy - hr, hr * 2, hr * 2);
+			AddRoundRect(p, hx - half, top, half * 2, bottom - top, r);
+		}
+	}
+
+	void PersonFemale(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddPersonFemale(p, 12.0f, 5.0f, 3.7f, 10.0f, 22.5f, 3.1f, 7.0f);
+		});
+	}
+
+	void PersonMale(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddPersonMale(p, 12.0f, 5.0f, 3.7f, 10.0f, 22.5f, 5.6f, 2.6f);
+		});
+	}
+
+	namespace
+	{
+		// 정렬 방향: 왼쪽 세로 화살표 (up = 위로) + 오른쪽 막대 3개 (widths 위→아래)
+		void AddSortIcon(Gdiplus::GraphicsPath& p, bool up, const float widths[3])
+		{
+			const float sx0 = 5.4f, sx1 = 7.8f;            // 몸통 x
+			const float tipY = up ? 3.0f : 21.0f;          // 화살촉 끝
+			const float baseY = up ? 9.2f : 14.8f;         // 화살촉 밑변
+			const float tailY = up ? 21.0f : 3.0f;         // 몸통 끝
+			const Gdiplus::PointF head[3] = { { 6.6f, tipY }, { 12.0f, baseY }, { 1.2f, baseY } };
+			p.AddPolygon(head, 3);
+			const float top = (std::min)(baseY, tailY), bottom = (std::max)(baseY, tailY);
+			p.StartFigure();
+			p.AddRectangle(Gdiplus::RectF(sx0, top - (up ? 0.3f : 0.0f), sx1 - sx0, bottom - top + 0.3f));
+			for (int i = 0; i < 3; ++i)
+				AddRoundRect(p, 14.0f, 4.2f + i * 6.4f, widths[i], 2.8f, 1.0f);
+		}
+	}
+
+	void SortAsc(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			const float w[3] = { 3.6f, 6.0f, 8.6f };
+			AddSortIcon(p, true, w);
+		});
+	}
+
+	void SortDesc(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			const float w[3] = { 8.6f, 6.0f, 3.6f };
+			AddSortIcon(p, false, w);
+		});
+	}
+
+	void GenderPair(CDC* dc, const CRect& area, COLORREF colF, COLORREF colM, double fill)
+	{
+		if (area.IsRectEmpty())
+			return;
+		const double side = (std::min)(area.Width(), area.Height()) * fill;
+		const double cx = area.left + area.Width() / 2.0;
+		const double cy = area.top + area.Height() / 2.0;
+		const int sub = static_cast<int>(side * 0.82 + 0.5);   // 기호 하나 크기
+		auto rectAt = [sub](double x, double y)
+		{
+			const int l = static_cast<int>(x - sub / 2.0 + 0.5);
+			const int t = static_cast<int>(y - sub / 2.0 + 0.5);
+			return CRect(l, t, l + sub, t + sub);
+		};
+		GenderFemale(dc, rectAt(cx - side * 0.17, cy + side * 0.02), colF, 1.0);   // 왼쪽 ♀
+		GenderMale(dc, rectAt(cx + side * 0.15, cy), colM, 1.0);                   // 오른쪽 ♂ (위에 겹침)
+	}
+
+	void PersonPair(CDC* dc, const CRect& area, COLORREF colF, COLORREF colM, double fill)
+	{
+		if (area.IsRectEmpty())
+			return;
+		EnsureGdiPlus();
+		const double side = (std::min)(area.Width(), area.Height()) * fill;
+		const double scale = side / 24.0;
+		const double x = area.left + (area.Width() - side) / 2.0;
+		const double y = area.top + (area.Height() - side) / 2.0;
+
+		Gdiplus::Graphics g(dc->GetSafeHdc());
+		g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+		g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+		g.TranslateTransform(static_cast<Gdiplus::REAL>(x), static_cast<Gdiplus::REAL>(y));
+		g.ScaleTransform(static_cast<Gdiplus::REAL>(scale), static_cast<Gdiplus::REAL>(scale));
+
+		Gdiplus::GraphicsPath female(Gdiplus::FillModeWinding);
+		AddPersonFemale(female, 8.4f, 6.4f, 3.1f, 10.8f, 22.0f, 2.6f, 5.8f);   // 앞 (왼쪽)
+		Gdiplus::GraphicsPath male(Gdiplus::FillModeWinding);
+		AddPersonMale(male, 15.8f, 5.6f, 3.0f, 9.8f, 21.4f, 4.4f, 2.2f);       // 뒤 (오른쪽)
+
+		// 뒤 사람은 앞 사람 + 테두리(틈) 만큼 빼고 칠함
+		Gdiplus::GraphicsPath gap(Gdiplus::FillModeWinding);
+		gap.AddPath(&female, FALSE);
+		Gdiplus::Pen gapPen(Gdiplus::Color(255, 0, 0, 0), 2.0f);
+		gap.Widen(&gapPen);
+		Gdiplus::Region backRgn(&male);
+		backRgn.Exclude(&female);
+		backRgn.Exclude(&gap);
+		Gdiplus::SolidBrush mb(Gdiplus::Color(255, GetRValue(colM), GetGValue(colM), GetBValue(colM)));
+		g.FillRegion(&mb, &backRgn);
+		Gdiplus::SolidBrush fb(Gdiplus::Color(255, GetRValue(colF), GetGValue(colF), GetBValue(colF)));
+		g.FillPath(&fb, &female);
 	}
 
 	void Gear(CDC* dc, const CRect& area, COLORREF col, double fill)
