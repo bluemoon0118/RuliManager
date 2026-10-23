@@ -1,4 +1,5 @@
 ﻿#include "pch.h"
+#include "DarkControls.h"   // DarkMenu: 테마 색 오른쪽 클릭 메뉴
 #include "DropCounter.h"
 #include "VectorIcons.h"
 
@@ -116,7 +117,7 @@ void CDropCounter::OnRButtonUp(UINT nFlags, CPoint point)
 	menu.AppendMenu(MF_STRING | (m_count > 0 ? 0 : MF_GRAYED), kCmdReset, L"초기화");
 	CPoint sp = point;
 	ClientToScreen(&sp);
-	const UINT cmd = menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD | TPM_NONOTIFY, sp.x, sp.y, this);
+	const UINT cmd = DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD | TPM_NONOTIFY, sp.x, sp.y, this);
 	if (cmd == kCmdReset)
 		Change(0);
 	(void)nFlags;

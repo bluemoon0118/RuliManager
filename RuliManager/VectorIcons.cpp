@@ -263,6 +263,170 @@ namespace VectorIcon
 		});
 	}
 
+	// --- 메뉴 아이콘 (24x24 설계, 겹친 도형은 구멍 - 따로 칠할 부분은 Paint 를 나눠 부름) ---
+
+	void Trash(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddRoundRect(p, 9.0f, 1.8f, 6.0f, 2.4f, 0.8f);        // 손잡이
+			AddRoundRect(p, 3.5f, 4.6f, 17.0f, 2.6f, 1.0f);       // 뚜껑
+			p.StartFigure();                                        // 몸통 (아래가 좁은 사다리꼴)
+			p.AddLine(5.2f, 8.4f, 18.8f, 8.4f);
+			p.AddLine(18.8f, 8.4f, 17.6f, 21.0f);
+			p.AddLine(17.6f, 21.0f, 6.4f, 21.0f);
+			p.CloseFigure();
+			AddRoundRect(p, 8.6f, 11.0f, 1.8f, 7.4f, 0.9f);       // 홈 (구멍)
+			AddRoundRect(p, 13.6f, 11.0f, 1.8f, 7.4f, 0.9f);
+		});
+	}
+
+	void MinusCircle(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			p.AddEllipse(2.0f, 2.0f, 20.0f, 20.0f);
+			AddRoundRect(p, 6.5f, 10.6f, 11.0f, 2.8f, 1.2f);      // 빼기 (구멍)
+		});
+	}
+
+	void PlusCircle(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			p.AddEllipse(2.0f, 2.0f, 20.0f, 20.0f);
+			// 더하기 (구멍) - 가로 · 세로 막대를 한 도형으로 (겹치면 가운데가 다시 채워지므로)
+			const float a = 6.5f, b = 10.6f, c = 13.4f, d = 17.5f;
+			const Gdiplus::PointF pts[12] = {
+				{ b, a }, { c, a }, { c, b }, { d, b }, { d, c }, { c, c },
+				{ c, d }, { b, d }, { b, c }, { a, c }, { a, b }, { b, b } };
+			p.AddPolygon(pts, 12);
+		});
+	}
+
+	void Pencil(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			const Gdiplus::PointF body[5] = { { 3.0f, 21.0f }, { 4.4f, 15.6f }, { 15.2f, 4.8f }, { 19.2f, 8.8f }, { 8.4f, 19.6f } };
+			p.AddPolygon(body, 5);                                  // 몸통 + 촉
+			const Gdiplus::PointF cap[4] = { { 16.4f, 3.6f }, { 18.0f, 2.0f }, { 22.0f, 6.0f }, { 20.4f, 7.6f } };
+			p.AddPolygon(cap, 4);                                   // 지우개 쪽 (몸통과 떨어짐)
+		});
+	}
+
+	void Refresh(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			// 고리 (330° 에서 시계 반대 방향으로 280° - 50° 까지), 끝에 화살촉
+			p.StartFigure();
+			p.AddArc(3.0f, 3.0f, 18.0f, 18.0f, 330.0f, -280.0f);
+			p.AddArc(6.0f, 6.0f, 12.0f, 12.0f, 50.0f, 280.0f);
+			p.CloseFigure();
+			const float c = 12.0f;
+			const float cs = 0.8660254f, sn = -0.5f;                // cos / sin(-30°)
+			const Gdiplus::PointF head[3] = {
+				{ c + 11.3f * cs, c + 11.3f * sn },                 // 바깥
+				{ c + 3.7f * cs, c + 3.7f * sn },                   // 안쪽
+				{ c + 7.5f * cs + 4.6f * 0.5f, c + 7.5f * sn + 4.6f * 0.8660254f } };   // 끝 (시계 방향)
+			p.AddPolygon(head, 3);
+		});
+	}
+
+	void Folder(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p) { AddFolderShape(p); });
+	}
+
+	void Play(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			const Gdiplus::PointF tri[3] = { { 6.5f, 3.5f }, { 20.0f, 12.0f }, { 6.5f, 20.5f } };
+			p.AddPolygon(tri, 3);
+		});
+	}
+
+	void Paste(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddRoundRect(p, 4.0f, 4.0f, 16.0f, 18.5f, 2.2f);      // 판
+			AddRoundRect(p, 6.4f, 8.4f, 11.2f, 11.8f, 0.8f);      // 안쪽 (구멍)
+		});
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddRoundRect(p, 8.3f, 1.8f, 7.4f, 4.8f, 1.2f);        // 집게 (판 위에 따로 칠함)
+		});
+	}
+
+	void TextDoc(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddRoundRect(p, 4.5f, 2.0f, 15.0f, 20.0f, 2.2f);      // 종이
+			AddRoundRect(p, 7.5f, 6.6f, 9.0f, 1.8f, 0.9f);        // 글 줄 (구멍)
+			AddRoundRect(p, 7.5f, 10.6f, 9.0f, 1.8f, 0.9f);
+			AddRoundRect(p, 7.5f, 14.6f, 6.0f, 1.8f, 0.9f);
+		});
+	}
+
+	void Picture(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddRoundRect(p, 2.0f, 4.0f, 20.0f, 16.0f, 2.2f);      // 틀
+			AddRoundRect(p, 4.2f, 6.2f, 15.6f, 11.6f, 0.8f);      // 안쪽 (구멍)
+		});
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			const Gdiplus::PointF hill[5] = { { 5.4f, 16.6f }, { 10.0f, 10.6f }, { 13.4f, 14.6f }, { 15.4f, 12.4f }, { 18.6f, 16.6f } };
+			p.AddPolygon(hill, 5);                                  // 산 (안쪽에 따로)
+			p.AddEllipse(14.2f, 7.6f, 3.0f, 3.0f);                  // 해
+		});
+	}
+
+	void Merge(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			p.AddEllipse(1.5f, 5.0f, 14.0f, 14.0f);                 // 겹친 곳은 구멍 (합쳐지는 모양)
+			p.AddEllipse(8.5f, 5.0f, 14.0f, 14.0f);
+		});
+	}
+
+	void Eraser(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			const Gdiplus::PointF body[4] = { { 9.6f, 3.4f }, { 20.6f, 14.4f }, { 14.6f, 20.4f }, { 3.6f, 9.4f } };
+			p.AddPolygon(body, 4);
+			const Gdiplus::PointF band[4] = { { 9.4f, 10.4f }, { 13.6f, 14.6f }, { 12.6f, 15.6f }, { 8.4f, 11.4f } };
+			p.AddPolygon(band, 4);                                  // 띠 (구멍)
+			AddRoundRect(p, 3.0f, 21.0f, 18.0f, 1.6f, 0.8f);      // 바닥 선
+		});
+	}
+
+	void CheckOn(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddRoundRect(p, 3.0f, 3.0f, 18.0f, 18.0f, 3.2f);
+			const Gdiplus::PointF mark[6] = { { 6.6f, 12.2f }, { 8.4f, 10.4f }, { 10.6f, 12.6f }, { 15.8f, 7.4f }, { 17.6f, 9.2f }, { 10.6f, 16.2f } };
+			p.AddPolygon(mark, 6);                                  // 체크 (구멍)
+		});
+	}
+
+	void CheckOff(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddRoundRect(p, 3.0f, 3.0f, 18.0f, 18.0f, 3.2f);
+			AddRoundRect(p, 5.2f, 5.2f, 13.6f, 13.6f, 1.6f);      // 안쪽 (구멍)
+		});
+	}
+
 	void Gear(CDC* dc, const CRect& area, COLORREF col, double fill)
 	{
 		// 톱니 8개 (사다리꼴) + 가운데 구멍

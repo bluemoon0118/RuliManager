@@ -2,6 +2,18 @@
 
 #include <functional>
 
+// ---------------------------------------------------------------------------
+// 테마 색 오른쪽 클릭 메뉴 (직접 그리기)
+//  CMenu::TrackPopupMenu 대신 DarkMenu::Track(menu, 플래그, x, y, 주인 창) - 인자 · 반환값은 TrackPopupMenu 와 같음
+//  - 메뉴(하위 메뉴 포함) 항목을 직접 그리기로 바꿔 테마 색으로: 배경 TC_COMBO, 글자 TC_TEXT, 마우스 오버 = 버튼 파랑 + 흰 글자,
+//    비활성 = 흐린 글자, 구분선, 오른쪽 단축키 글자(\t 뒤), 기본 항목은 굵게, 체크 표시, 하위 메뉴 화살표
+//  - Windows 11: 메뉴 테두리 색도 테마 색 (Windows 10 은 시스템 테두리 그대로)
+//  - 메뉴가 떠 있는 동안만 주인 창의 메시지를 가로채 그리기 메시지(WM_MEASUREITEM / WM_DRAWITEM)를 처리
+namespace DarkMenu
+{
+	BOOL Track(CMenu& menu, UINT flags, int x, int y, CWnd* owner);
+}
+
 // 직접 그린 스크롤바가 대상 창에 스크롤 위치를 지정할 때 보내는 메시지 (wParam = 위치, lParam = 1 이면 가로 스크롤바)
 const UINT WM_DARKSCROLL_SETPOS = WM_APP + 50;
 

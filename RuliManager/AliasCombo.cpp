@@ -1,4 +1,5 @@
 ﻿#include "pch.h"
+#include "DarkControls.h"   // DarkMenu: 테마 색 오른쪽 클릭 메뉴
 #include "AliasCombo.h"
 #include "DarkTheme.h"
 
@@ -187,7 +188,7 @@ void CAliasPopup::OnContextMenu(CWnd*, CPoint point)
 	CMenu menu;
 	menu.CreatePopupMenu();
 	menu.AppendMenu(MF_STRING, 1, L"'" + text + L"' 삭제\tDel");
-	if (menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON,
+	if (DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON,
 		point.x, point.y, this) == 1)
 		DeleteSelected();
 }
