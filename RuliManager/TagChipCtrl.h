@@ -90,7 +90,19 @@ public:
 	std::function<void(const CString&)> m_onSelect;
 
 	bool Create(CWnd* parent, UINT id);
-	void SetFontPtr(CFont* f) { m_font = f; }
+	// 칩 글꼴: 받은 글꼴의 굵은 꼴로 그리고 잼 (만들지 못하면 받은 글꼴 그대로)
+	void SetFontPtr(CFont* f)
+	{
+		m_boldFont.DeleteObject();
+		m_font = f;
+		LOGFONT lf = {};
+		if (f && f->GetLogFont(&lf))
+		{
+			lf.lfWeight = FW_BOLD;
+			if (m_boldFont.CreateFontIndirect(&lf))
+				m_font = &m_boldFont;
+		}
+	}
 	void SetItems(const std::vector<Item>& items, int total, const CString& selected);
 	int  CalcHeight(int width);   // 이 폭에서 필요한 높이 (픽셀)
 
@@ -101,7 +113,8 @@ protected:
 	CString m_sel;
 	int     m_hot = -1;
 	bool    m_tracking = false;
-	CFont*  m_font = nullptr;
+	CFont*  m_font = nullptr;
+	CFont   m_boldFont;   // m_font 가 가리키는 굵은 글꼴 (SetFontPtr)
 
 	CString ChipText(int i, CString& count) const;   // 칩 이름 · 건수 글자
 	int  DoLayout(CDC* dc, int width);

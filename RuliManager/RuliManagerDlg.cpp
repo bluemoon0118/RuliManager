@@ -1386,6 +1386,9 @@ BOOL CRuliManagerDlg::OnInitDialog()
 					m_genreBtns[i].SetToggle(kComboColor, TCOL(TC_TOGGLETEXT));
 					m_genreBtns[i].SetChecked((i == 1) == m_genreShow[0]);   // 화면이 바뀌면 UpdateLeftPane 이 그 화면 값으로
 					m_genreBtns[i].SetSegment(i == 0 ? CDarkButton::SEG_LEFT : CDarkButton::SEG_RIGHT);   // [장르숨김|전체] 한 묶음
+					// 글자 대신 아이콘 (빗금 꼬리표 / 꼬리표), 마우스를 올리면 이름
+					m_genreBtns[i].SetIcon(i == 0 ? CDarkButton::ICON_GENRE_OFF : CDarkButton::ICON_GENRE_ON);
+					m_genreBtns[i].SetTooltip(labels[i]);
 				}
 			}
 			// 영상 상세: 품번 칸 오른쪽 [복사] 버튼 (아이콘만)
@@ -2229,8 +2232,8 @@ int CRuliManagerDlg::LayoutListToolbar(int x, int y, int w)
 		row1.push_back({ IDC_BTN_SORTDIR, sh * 12 / 10, sh, 0 });
 	}
 	if (visible(IDC_COMBO_PAGESIZE)) row1.push_back({ IDC_COMBO_PAGESIZE, DX(42), DY(120), 0 });
-	if (visible(IDC_GENRE_HIDE)) row1.push_back({ IDC_GENRE_HIDE, DX(40), btnH, -DY(1) / 2, visible(IDC_GENRE_ALL) });   // 영상 화면 [장르숨김|전체] 붙은 한 묶음
-	if (visible(IDC_GENRE_ALL))  row1.push_back({ IDC_GENRE_ALL, DX(28), btnH, -DY(1) / 2 });
+	if (visible(IDC_GENRE_HIDE)) row1.push_back({ IDC_GENRE_HIDE, btnH * 13 / 10, btnH, -DY(1) / 2, visible(IDC_GENRE_ALL) });   // 영상 화면 [장르숨김|전체] 붙은 한 묶음 (아이콘 버튼)
+	if (visible(IDC_GENRE_ALL))  row1.push_back({ IDC_GENRE_ALL, btnH * 13 / 10, btnH, -DY(1) / 2 });
 	if (visible(IDC_ACTOR_GENDER_ALL)) row1.push_back({ IDC_ACTOR_GENDER_ALL, btnH * 13 / 10, btnH, -DY(1) / 2, true });   // 배우 탭 [선택없음|여성만|남성만] 붙은 한 묶음 (아이콘 버튼)
 	if (visible(IDC_ACTOR_GENDER_F))   row1.push_back({ IDC_ACTOR_GENDER_F, btnH * 13 / 10, btnH, -DY(1) / 2, true });
 	if (visible(IDC_ACTOR_GENDER_M))   row1.push_back({ IDC_ACTOR_GENDER_M, btnH * 13 / 10, btnH, -DY(1) / 2 });

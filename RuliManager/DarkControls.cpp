@@ -270,6 +270,13 @@ void CDarkButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		else if (m_icon == ICON_VIEW_YEAR) VectorIcon::ViewYear(&dc, tr, ic, 0.66);
 		else                               VectorIcon::ViewPackage(&dc, tr, ic, 0.66);
 	}
+	else if (m_icon == ICON_GENRE_OFF || m_icon == ICON_GENRE_ON)
+	{
+		// 장르 칩 [장르숨김|전체] 버튼: 글자 없이 가운데 빗금 꼬리표 / 꼬리표 (이름은 툴팁)
+		const COLORREF ic = disabled ? Dim(textColor) : textColor;
+		if (m_icon == ICON_GENRE_OFF) VectorIcon::GenreTagOff(&dc, tr, ic, 0.66);
+		else                          VectorIcon::GenreTag(&dc, tr, ic, 0.66);
+	}
 	else if (m_icon == ICON_SORT_ASC || m_icon == ICON_SORT_DESC)
 	{
 		// 정렬 방향 버튼: 글자 없이 가운데 화살표 + 막대 (이름은 툴팁)

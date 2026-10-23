@@ -479,6 +479,61 @@ namespace VectorIcon
 		});
 	}
 
+	namespace
+	{
+		// 장르 꼬리표: 왼쪽 네모 + 오른쪽 뾰족 + 왼쪽 구멍 (24x24 설계)
+		void AddGenreTag(Gdiplus::GraphicsPath& p)
+		{
+			const Gdiplus::PointF pts[5] = { { 3.0f, 5.0f }, { 12.5f, 5.0f }, { 21.0f, 12.0f }, { 12.5f, 19.0f }, { 3.0f, 19.0f } };
+			p.AddPolygon(pts, 5);
+			p.AddEllipse(7.6f - 2.0f, 12.0f - 2.0f, 4.0f, 4.0f);   // 구멍
+		}
+	}
+
+	void GenreTag(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p) { AddGenreTag(p); });
+	}
+
+	void GenreTagOff(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		if (area.IsRectEmpty())
+			return;
+		EnsureGdiPlus();
+		const double side = (std::min)(area.Width(), area.Height()) * fill;
+		const double scale = side / 24.0;
+		const double x = area.left + (area.Width() - side) / 2.0;
+		const double y = area.top + (area.Height() - side) / 2.0;
+
+		Gdiplus::Graphics g(dc->GetSafeHdc());
+		g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+		g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+		g.TranslateTransform(static_cast<Gdiplus::REAL>(x), static_cast<Gdiplus::REAL>(y));
+		g.ScaleTransform(static_cast<Gdiplus::REAL>(scale), static_cast<Gdiplus::REAL>(scale));
+
+		// 빗금 (왼쪽 아래 → 오른쪽 위), 꼬리표는 빗금 + 양옆 틈만큼 빼고 칠함
+		Gdiplus::GraphicsPath slash(Gdiplus::FillModeWinding);
+		slash.AddLine(4.0f, 20.0f, 20.0f, 4.0f);
+		Gdiplus::GraphicsPath gap(Gdiplus::FillModeWinding);
+		gap.AddLine(4.0f, 20.0f, 20.0f, 4.0f);
+		Gdiplus::Pen slashPen(Gdiplus::Color(255, 0, 0, 0), 2.2f);
+		slashPen.SetStartCap(Gdiplus::LineCapRound);
+		slashPen.SetEndCap(Gdiplus::LineCapRound);
+		Gdiplus::Pen gapPen(Gdiplus::Color(255, 0, 0, 0), 4.6f);
+		gapPen.SetStartCap(Gdiplus::LineCapRound);
+		gapPen.SetEndCap(Gdiplus::LineCapRound);
+		slash.Widen(&slashPen);
+		gap.Widen(&gapPen);
+
+		Gdiplus::GraphicsPath tag(Gdiplus::FillModeAlternate);
+		AddGenreTag(tag);
+		Gdiplus::Region tagRgn(&tag);
+		tagRgn.Exclude(&gap);
+		Gdiplus::SolidBrush brush(Gdiplus::Color(255, GetRValue(col), GetGValue(col), GetBValue(col)));
+		g.FillRegion(&brush, &tagRgn);
+		g.FillPath(&brush, &slash);
+	}
+
 	void ViewYear(CDC* dc, const CRect& area, COLORREF col, double fill)
 	{
 		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
