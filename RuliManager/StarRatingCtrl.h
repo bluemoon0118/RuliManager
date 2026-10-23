@@ -24,6 +24,11 @@ public:
 	static CString ScoreText(int halfUnits);                 // 표시용 점수: "3" / "3.5" (5점 만점) · "7" (10점 만점)
 	static CString ScoreLabel(int halfUnits);                // 카드 리본 · 정보용: "3.5" / "7/10"
 	void SetColors(COLORREF back, COLORREF star, COLORREF empty, COLORREF text);
+	// 이 컨트롤과 같은 모양으로 다른 곳(영상 [리스트] 별점 열 등)에 그리기 / 클릭 위치 → 값
+	//  band: 별 줄 영역 (별 크기 = 높이 - 4, 왼쪽부터), 배경은 칠하지 않음, shown = 반 별 단위 값, 오른쪽에 점수 글자
+	static void DrawStars(CDC* dc, const CRect& band, int shown, int maxStars, COLORREF star, COLORREF empty, COLORREF text, CFont* font, bool enabled = true);
+	static int  HitStarIn(const CRect& band, CPoint pt, int maxStars);   // 반 별 단위 값 (별 밖이면 0)
+	static int  StarsWidth(int bandH, int maxStars);                     // 별 줄 폭 (점수 글자 제외)
 
 protected:
 	static int  s_mode;

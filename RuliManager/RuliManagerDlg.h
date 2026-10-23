@@ -7,6 +7,7 @@
 #include "ImageViewerWnd.h"
 #include "VideoGrid.h"
 #include "DarkControls.h"
+#include "DarkTheme.h"   // CDarkHeader (영상 [리스트] 보기 열 머리글)
 #include "SuggestEdit.h"
 #include "TagChipCtrl.h"
 #include "ZoomSlider.h"
@@ -126,22 +127,53 @@ protected:
 	// 영상 보기: [가로] 격자 (기존 영상 카드) / [세로] 격자 (배우 카드처럼 세로 3:4, 이미지만) - 영상 탭 · 배우 출연작 · 제작사 영상 · 태그 영상 화면별로 저장
 	//  세로: 가로가 더 긴 이미지 = 오른쪽 절반, 세로가 더 긴 이미지 = 폭에 맞춰 비율 유지 (넘치면 위아래를 잘라 가운데)
 	CDarkButton m_videoViewBtns[2];
-	bool m_videoPortrait[4] = {};      // 화면별: [0] 영상 탭, [1] 배우 출연작, [2] 제작사 · 레이블 영상, [3] 태그 영상 (레지스트리 VideoPortrait / …Actor / …Studio / …Tag)
+	bool m_videoPortrait[4] = {};      // 화면별: [1] 배우 출연작, [2] 제작사 · 레이블 영상, [3] 태그 영상 (레지스트리 …Actor / …Studio / …Tag) - [0] 영상 탭은 [패키지] 보기로 옮김
 	bool m_coverPortrait = false;      // GetVideoCover: 세로 카드용으로 자른 커버 (그리는 동안만 켬)
 	int  m_pcardW = 160, m_pcardH = 213;   // 세로 카드 크기
 	int  VideoViewSlot() const           // [가로|세로] 버튼이 있는 화면 (-1 = 없음)
 	{
-		if (m_mode == MODE_VIDEO) return 0;
+		if (m_mode == MODE_VIDEO) return -1;   // 영상 탭은 [가로|세로] 없음 ([격자|리스트|패키지] 로)
 		if (m_drill.IsEmpty()) return -1;
 		if (m_mode == MODE_ACTOR) return YearViewActive() ? -1 : 1;   // 배우 출연작 [연도별] 보기는 제외
 		if (m_mode == MODE_STUDIO) return 2;
 		if (m_mode == MODE_TAG) return 3;
 		return -1;
 	}
-	bool VideoPortraitActive() const { const int s = VideoViewSlot(); return s >= 0 && m_videoPortrait[s]; }
+	bool VideoPortraitActive() const   // 세로 카드 (이미지만): 영상 탭 [패키지] / 다른 영상 화면 [세로]
+	{
+		if (m_mode == MODE_VIDEO) return m_videoView == 2;
+		const int s = VideoViewSlot();
+		return s >= 0 && m_videoPortrait[s];
+	}
 	void SetVideoPortrait(bool portrait);
 	afx_msg void OnBnClickedVideoViewH();
 	afx_msg void OnBnClickedVideoViewV();
+	// 영상 탭 보기 방식: [격자] (카드 - [가로|세로]) / [리스트] (스프레드시트 - 숨겨 두던 목록 컨트롤을 보임) - 레지스트리 Settings\VideoList
+	CDarkButton m_videoModeBtns[3];
+	CDarkHeader m_listHeader;          // [리스트] 열 머리글 (어두운 색 + 정렬 삼각형)
+	int  m_videoView = 0;              // 영상 탭 보기: 0 = [격자] (가로 카드), 1 = [리스트] (스프레드시트), 2 = [패키지] (세로 카드, 이미지만 - 예전 격자 세로) - 레지스트리 Settings\VideoViewMode
+	bool VideoListActive() const { return m_mode == MODE_VIDEO && m_videoView == 1; }
+	void SetVideoMode(int mode);
+	afx_msg void OnBnClickedVideoModeGrid();
+	afx_msg void OnBnClickedVideoModeList();
+	afx_msg void OnBnClickedVideoModePackage();
+	afx_msg void OnNmClickList(NMHDR* pNMHDR, LRESULT* pResult);   // [리스트] 체크 칸 클릭
+	afx_msg void OnNmCustomDrawList(NMHDR* pNMHDR, LRESULT* pResult);   // [리스트] 첫 열(체크 칸 오른쪽)에 커버 이미지
+	CFont      m_listFont;             // [리스트] 글꼴 (기본 글꼴 + 1pt, 머리글 · 별점 숫자 · 태그 칩도)
+	CFont      m_listCodeFont;         // [리스트] 품번 글꼴 (목록 글꼴 + 1pt, 굵게)
+	CString    ListPartLabel(int itemIdx) const;   // 분할 영상 순번 "(2/3)" (아니면 빈 문자열)
+	CImageList m_listRowImages;        // [리스트] 줄 높이용 빈 이미지 목록 (작은 아이콘 높이 = 커버 높이)
+	int  m_listCoverW = 96, m_listCoverH = 64;   // [리스트] 커버 칸 크기
+	bool ListCoverRect(int row, CRect& rc);      // 그 줄의 커버 그릴 자리 (목록 클라이언트 좌표)
+	// [리스트] 별점 열: 영상 상세 별점 컨트롤과 같은 별 (마우스 오버 = 미리 보기, 클릭 = 그 별점으로 저장, 같은 별 다시 = 없음)
+	int  m_listStarBandH = 20;                   // 별 줄 높이 (상세 별점 컨트롤 높이와 같게)
+	int  m_listStarHoverRow = -1, m_listStarHoverVal = -1;
+	bool m_listTrackLeave = false;
+	bool ListStarBand(int row, CRect& band);     // 그 줄의 별 줄 자리 (목록 클라이언트 좌표)
+	void DrawListTagChips(CDC* dc, const CRect& cell, const CString& tags);
+	void AutoSizeListColumns();                  // [리스트] 열 폭: 목록 폭에 꽉 차게 (열마다 최소 폭, 남는 폭은 비율로 나눔 - 커버 · 별점은 고정)   // [리스트] 태그 열: 칩 (보기 전용, 칸 폭에서 줄바꿈, 넘치면 +N)
+	void SetListStarHover(int row, int val);
+	BOOL PreTranslateMessage(MSG* pMsg) override;
 	// 배우 탭(배우 격자) 성별 거르기: [선택없음|여성만|남성만] (목록 도구줄) - 레지스트리 Settings\ActorGender
 	CDarkButton m_genderBtns[3];
 	int  m_actorGender = 0;            // 0 = 선택없음(전체), 1 = 여성만, 2 = 남성만 (배우 정보의 성별 값이 "여성" / "남성" 인 배우)
@@ -648,6 +680,8 @@ protected:
 	// 영상 카드 덧그림(로고 · 별점 리본 · 해상도 / 재생 시간) 페이드: 행 → 지금 불투명도 (0 ~ 255, 바뀌는 중인 카드만)
 	std::map<int, int> m_overlayFade;
 	UINT_PTR m_fadeTimer = 0;
+	static const UINT_PTR kListMediaTimer = 0x4C4D;   // [리스트] 재생 시간 · 해상도를 받으면 모아서 한 번만 다시 그림
+	bool m_listMediaTimer = false;
 	static const UINT_PTR kOverlayFadeTimer = 0x4F46;
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	static CString FindImageFor(const CString& videoPath);

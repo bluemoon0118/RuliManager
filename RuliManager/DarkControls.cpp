@@ -247,7 +247,13 @@ void CDarkButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	else if (m_icon != ICON_NONE)
 	{
 		// [아이콘] 글자 : 아이콘+글자를 가운데 정렬
-		const COLORREF iconColor = disabled ? Dim(textColor) : textColor;
+		COLORREF iconColor = disabled ? Dim(textColor) : textColor;
+		if (!disabled && !(m_toggle && m_checked))
+		{
+			// 성별 기호: 꺼진(고르지 않은) 버튼에서는 배우 카드의 성별 기호 색 (켜지면 버튼 글자색)
+			if (m_icon == ICON_FEMALE) iconColor = RGB(0xF5, 0x49, 0x8B);
+			else if (m_icon == ICON_MALE) iconColor = RGB(0x48, 0xAF, 0xF0);
+		}
 		// 아이콘 크기는 버튼 높이가 아니라 글자 높이에 맞춰 네 버튼 모두 같게
 		TEXTMETRIC tm = {};
 		dc.GetTextMetrics(&tm);
@@ -272,6 +278,12 @@ void CDarkButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 			VectorIcon::Tag(&dc, sq, iconColor, 1.0);      // 태그: 꼬리표 (태그 기본 이미지)
 		else if (m_icon == ICON_COLLECTION)
 			VectorIcon::Collection(&dc, sq, iconColor, 1.0);   // 컬렉션: 겹친 화면 + 재생
+		else if (m_icon == ICON_GENDER_ALL)
+			VectorIcon::GenderBoth(&dc, sq, iconColor, 0.95);
+		else if (m_icon == ICON_FEMALE)
+			VectorIcon::GenderFemale(&dc, sq, iconColor, 0.95);
+		else if (m_icon == ICON_MALE)
+			VectorIcon::GenderMale(&dc, sq, iconColor, 0.95);
 
 		CRect textRc(left + iconW + gap, tr.top, tr.right, tr.bottom);
 		dc.DrawText(text, &textRc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);

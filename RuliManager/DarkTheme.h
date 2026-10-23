@@ -22,7 +22,11 @@ namespace DarkColors
 // 목록(그리드)의 열 머리글 - 어두운 배경에 흰 글자로 직접 그림
 class CDarkHeader : public CHeaderCtrl
 {
+public:
+	void SetBold(bool bold) { m_bold = bold; if (GetSafeHwnd()) Invalidate(); }   // 머리글 글자를 굵게 (영상 [리스트])
 protected:
+	bool  m_bold = false;
+	CFont m_boldFont;
 	afx_msg void OnPaint();
 	afx_msg BOOL OnEraseBkgnd(CDC*) { return TRUE; }
 	DECLARE_MESSAGE_MAP()

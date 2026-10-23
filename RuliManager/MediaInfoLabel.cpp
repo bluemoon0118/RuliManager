@@ -131,6 +131,254 @@ namespace
 		if (SUCCEEDED(co))
 			::CoUninitialize();
 	}
+
+	// ---------------------------------------------------------------------------
+	// Matroska (mkv / webm) 헤더 직접 읽기: Windows 속성 · Media Foundation 이 못 읽은 mkv 용 (코덱 · 설정과 상관없음)
+	//  - EBML 요소: [ID (1~4바이트)][크기 (1~8바이트 가변 길이)][내용]
+	//  - Segment 안의 Info (TimecodeScale · Duration) 와 Tracks (영상 트랙의 PixelWidth / PixelHeight · DefaultDuration) 만 읽고,
+	//    Cluster (실제 영상 데이터) 등은 크기만큼 건너뜀 → 파일 앞부분 조금만 읽음
+	class CEbmlFile
+	{
+	public:
+		explicit CEbmlFile(const CString& path)
+		{
+			m_h = ::CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
+			LARGE_INTEGER sz = {};
+			if (m_h != INVALID_HANDLE_VALUE && ::GetFileSizeEx(m_h, &sz))
+				m_size = static_cast<ULONGLONG>(sz.QuadPart);
+		}
+		~CEbmlFile() { if (m_h != INVALID_HANDLE_VALUE) ::CloseHandle(m_h); }
+		bool Ok() const { return m_h != INVALID_HANDLE_VALUE && m_size > 0; }
+		ULONGLONG Size() const { return m_size; }
+		ULONGLONG Pos() const { return m_pos; }
+		bool Seek(ULONGLONG pos)
+		{
+			if (pos > m_size)
+				return false;
+			LARGE_INTEGER li;
+			li.QuadPart = static_cast<LONGLONG>(pos);
+			if (!::SetFilePointerEx(m_h, li, nullptr, FILE_BEGIN))
+				return false;
+			m_pos = pos;
+			return true;
+		}
+		bool Read(void* buf, DWORD n)
+		{
+			DWORD got = 0;
+			if (n == 0)
+				return true;
+			if (!::ReadFile(m_h, buf, n, &got, nullptr) || got != n)
+				return false;
+			m_pos += n;
+			return true;
+		}
+		// 요소 ID (표시 비트 포함 그대로)
+		bool ReadId(UINT32& id)
+		{
+			BYTE b = 0;
+			if (!Read(&b, 1) || b == 0)
+				return false;
+			int len = 1;
+			for (BYTE mask = 0x80; !(b & mask) && len <= 4; mask >>= 1)
+				++len;
+			if (len > 4)
+				return false;
+			id = b;
+			for (int i = 1; i < len; ++i)
+			{
+				BYTE c = 0;
+				if (!Read(&c, 1))
+					return false;
+				id = (id << 8) | c;
+			}
+			return true;
+		}
+		// 요소 크기 (표시 비트 뺌), unknown = 모든 비트가 1 (크기를 모름)
+		bool ReadSize(ULONGLONG& size, bool& unknown)
+		{
+			BYTE b = 0;
+			if (!Read(&b, 1) || b == 0)
+				return false;
+			int len = 1;
+			BYTE mask = 0x80;
+			while (!(b & mask) && len <= 8)
+			{
+				mask >>= 1;
+				++len;
+			}
+			if (len > 8)
+				return false;
+			ULONGLONG v = b & (mask - 1);
+			bool allOnes = (v == static_cast<ULONGLONG>(mask - 1));
+			for (int i = 1; i < len; ++i)
+			{
+				BYTE c = 0;
+				if (!Read(&c, 1))
+					return false;
+				v = (v << 8) | c;
+				if (c != 0xFF)
+					allOnes = false;
+			}
+			size = v;
+			unknown = allOnes;
+			return true;
+		}
+		bool ReadUInt(ULONGLONG size, ULONGLONG& v)
+		{
+			if (size == 0 || size > 8)
+				return false;
+			BYTE buf[8] = {};
+			if (!Read(buf, static_cast<DWORD>(size)))
+				return false;
+			v = 0;
+			for (ULONGLONG i = 0; i < size; ++i)
+				v = (v << 8) | buf[i];
+			return true;
+		}
+		bool ReadFloat(ULONGLONG size, double& v)
+		{
+			BYTE buf[8] = {};
+			if ((size != 4 && size != 8) || !Read(buf, static_cast<DWORD>(size)))
+				return false;
+			if (size == 4)
+			{
+				UINT32 u = (static_cast<UINT32>(buf[0]) << 24) | (static_cast<UINT32>(buf[1]) << 16) | (static_cast<UINT32>(buf[2]) << 8) | buf[3];
+				float f = 0;
+				memcpy(&f, &u, 4);
+				v = f;
+			}
+			else
+			{
+				ULONGLONG u = 0;
+				for (int i = 0; i < 8; ++i)
+					u = (u << 8) | buf[i];
+				memcpy(&v, &u, 8);
+			}
+			return true;
+		}
+	private:
+		HANDLE    m_h = INVALID_HANDLE_VALUE;
+		ULONGLONG m_size = 0;
+		ULONGLONG m_pos = 0;
+	};
+
+	void ReadInfoMatroska(const CString& path, CMediaInfoLabel::Info& info)
+	{
+		CEbmlFile f(path);
+		if (!f.Ok())
+			return;
+		// EBML 머리 (1A 45 DF A3) 가 아니면 Matroska 아님
+		UINT32 id = 0;
+		ULONGLONG size = 0;
+		bool unknown = false;
+		if (!f.ReadId(id) || id != 0x1A45DFA3 || !f.ReadSize(size, unknown) || unknown || !f.Seek(f.Pos() + size))
+			return;
+		// Segment
+		if (!f.ReadId(id) || id != 0x18538067 || !f.ReadSize(size, unknown))
+			return;
+		const ULONGLONG segEnd = unknown ? f.Size() : (std::min)(f.Size(), f.Pos() + size);
+
+		ULONGLONG timecodeScale = 1000000;   // 기본 1ms (나노초 단위)
+		double duration = 0;                 // TimecodeScale 단위
+		UINT32 width = 0, height = 0;
+		ULONGLONG defaultDuration = 0;       // 영상 프레임 하나 길이 (나노초)
+		bool gotInfo = false, gotTracks = false;
+
+		for (int guard = 0; guard < 256 && f.Pos() < segEnd && !(gotInfo && gotTracks); ++guard)
+		{
+			if (!f.ReadId(id) || !f.ReadSize(size, unknown))
+				break;
+			const ULONGLONG start = f.Pos();
+			if (unknown)
+				break;   // 크기를 모르는 요소 (스트리밍 Cluster 등) - 더 못 감
+			const ULONGLONG end = start + size;
+			if (id == 0x1549A966)   // Info
+			{
+				gotInfo = true;
+				while (f.Pos() < end)
+				{
+					UINT32 cid = 0;
+					ULONGLONG csz = 0;
+					bool cu = false;
+					if (!f.ReadId(cid) || !f.ReadSize(csz, cu) || cu)
+						break;
+					const ULONGLONG cend = f.Pos() + csz;
+					if (cid == 0x2AD7B1)      { ULONGLONG v = 0; if (f.ReadUInt(csz, v) && v > 0) timecodeScale = v; }
+					else if (cid == 0x4489)   { double d = 0; if (f.ReadFloat(csz, d) && d > 0) duration = d; }
+					if (!f.Seek(cend))
+						break;
+				}
+			}
+			else if (id == 0x1654AE6B)   // Tracks
+			{
+				gotTracks = true;
+				while (f.Pos() < end && width == 0)
+				{
+					UINT32 tid = 0;
+					ULONGLONG tsz = 0;
+					bool tu = false;
+					if (!f.ReadId(tid) || !f.ReadSize(tsz, tu) || tu)
+						break;
+					const ULONGLONG tend = f.Pos() + tsz;
+					if (tid == 0xAE)   // TrackEntry
+					{
+						ULONGLONG type = 0, dd = 0;
+						UINT32 w = 0, h = 0;
+						while (f.Pos() < tend)
+						{
+							UINT32 eid = 0;
+							ULONGLONG esz = 0;
+							bool eu = false;
+							if (!f.ReadId(eid) || !f.ReadSize(esz, eu) || eu)
+								break;
+							const ULONGLONG eend = f.Pos() + esz;
+							if (eid == 0x83)            f.ReadUInt(esz, type);   // TrackType (1 = 영상)
+							else if (eid == 0x23E383)   f.ReadUInt(esz, dd);     // DefaultDuration
+							else if (eid == 0xE0)        // Video
+							{
+								while (f.Pos() < eend)
+								{
+									UINT32 vid = 0;
+									ULONGLONG vsz = 0;
+									bool vu = false;
+									if (!f.ReadId(vid) || !f.ReadSize(vsz, vu) || vu)
+										break;
+									const ULONGLONG vend = f.Pos() + vsz;
+									ULONGLONG v = 0;
+									if (vid == 0xB0 && f.ReadUInt(vsz, v))        w = static_cast<UINT32>(v);   // PixelWidth
+									else if (vid == 0xBA && f.ReadUInt(vsz, v))   h = static_cast<UINT32>(v);   // PixelHeight
+									if (!f.Seek(vend))
+										break;
+								}
+							}
+							if (!f.Seek(eend))
+								break;
+						}
+						if (type == 1 && w > 0 && h > 0)   // 첫 영상 트랙
+						{
+							width = w;
+							height = h;
+							defaultDuration = dd;
+						}
+					}
+					if (!f.Seek(tend))
+						break;
+				}
+			}
+			if (!f.Seek(end))
+				break;
+		}
+
+		if (info.duration100ns == 0 && duration > 0)
+			info.duration100ns = static_cast<ULONGLONG>(duration * static_cast<double>(timecodeScale) / 100.0);   // 나노초 → 100ns
+		if ((info.width == 0 || info.height == 0) && width > 0 && height > 0)
+		{
+			info.width = width;
+			info.height = height;
+		}
+		if (info.fps <= 0 && defaultDuration > 0)
+			info.fps = 1000000000.0 / static_cast<double>(defaultDuration);
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -283,9 +531,13 @@ CMediaInfoLabel::Info CMediaInfoLabel::ReadInfoCached(const CString& path)
 		auto it = g_disk.find(key);
 		if (it != g_disk.end())
 		{
-			if (it->second.size == size && it->second.mtime == mtime)
-				return it->second.info;   // 저장해 둔 값 (파일을 열지 않음)
-			g_disk.erase(it);             // 파일이 바뀜 → 다시 읽음
+			const CMediaInfoLabel::Info& ci = it->second.info;
+			const bool partial = (ci.width == 0 || ci.height == 0 || ci.duration100ns == 0);
+			// 저장해 둔 값 (파일을 열지 않음) - 단, 값이 일부만 있는 것(예전에 mkv 해상도를 못 읽은 것 등)은 실행마다 한 번 다시 읽어 봄
+			static std::set<CString> retried;
+			if (it->second.size == size && it->second.mtime == mtime && (!partial || !retried.insert(key).second))
+				return ci;
+			g_disk.erase(it);             // 파일이 바뀜 / 다시 읽어 봄
 			g_diskDirty = true;
 		}
 	}
@@ -321,6 +573,9 @@ CMediaInfoLabel::Info CMediaInfoLabel::ReadInfo(const CString& path)
 	// 속성에 없는 값(해상도 · fps · 재생 시간)은 파일을 직접 열어서 채움
 	if (info.width == 0 || info.height == 0 || info.duration100ns == 0 || info.fps <= 0)
 		ReadInfoMediaFoundation(path, info);
+	// 그래도 모자라면 Matroska(mkv / webm) 헤더를 직접 읽음 (Windows 의 mkv 지원 · 코덱과 상관없음, Matroska 가 아니면 아무것도 안 함)
+	if (info.width == 0 || info.height == 0 || info.duration100ns == 0 || info.fps <= 0)
+		ReadInfoMatroska(path, info);
 	info.ok = (info.width > 0 && info.height > 0) || info.fps > 0 || info.duration100ns > 0;
 	return info;
 }
