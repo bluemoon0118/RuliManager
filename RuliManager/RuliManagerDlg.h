@@ -142,6 +142,11 @@ protected:
 	void SetVideoPortrait(bool portrait);
 	afx_msg void OnBnClickedVideoViewH();
 	afx_msg void OnBnClickedVideoViewV();
+	// 배우 탭(배우 격자) 성별 거르기: [선택없음|여성만|남성만] (목록 도구줄) - 레지스트리 Settings\ActorGender
+	CDarkButton m_genderBtns[3];
+	int  m_actorGender = 0;            // 0 = 선택없음(전체), 1 = 여성만, 2 = 남성만 (배우 정보의 성별 값이 "여성" / "남성" 인 배우)
+	void SetActorGender(int g);
+	afx_msg void OnGenderButton(UINT nID);
 	// 장르(태그) 칩: [장르숨김][전체] (목록 도구줄) - [전체] 면 도구줄 아래에 태그 칩 줄, 칩 하나를 골라 그 태그 영상만
 	//  화면별(영상 탭 / 배우 출연작 / 제작사 · 레이블 영상)로 따로: 레지스트리 Settings\GenreBar · GenreBarActor · GenreBarStudio
 	CDarkButton   m_genreBtns[2];

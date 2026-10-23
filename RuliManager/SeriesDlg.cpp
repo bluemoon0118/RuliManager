@@ -1,4 +1,5 @@
 ﻿#include "pch.h"
+#include "DarkControls.h"   // DarkMenu: 테마 색 오른쪽 클릭 메뉴
 #include "RuliManager.h"
 #include "SeriesDlg.h"
 #include "TextInfoDlg.h"
@@ -273,7 +274,9 @@ void CSeriesDlg::ShowItem(int code)
 		m_staticTitle.SetWindowText(L"(왼쪽에서 제작사 / 레이블을 고르세요)");
 	}
 	m_dirty = false;
-	m_grid.EnableWindow(m_cur >= 0);
+	// 품번 표는 비활성으로 만들지 않음 (비활성 목록은 시스템 회색 · 흰 배경으로 그려져 테마 색과 어긋남)
+	//  제작사 / 레이블을 고르지 않았으면 행이 없고, 더블클릭 · 오른쪽 클릭은 각 처리에서 무시
+	m_grid.EnableWindow(TRUE);
 	GetDlgItem(IDC_SR_PASTE)->EnableWindow(m_cur >= 0);
 	FillGrid();
 }
@@ -502,7 +505,7 @@ void CSeriesDlg::OnGridRClick(NMHDR* pNMHDR, LRESULT* pResult)
 	}
 	CPoint pt;
 	::GetCursorPos(&pt);
-	const UINT cmd = menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD, pt.x, pt.y, this);
+	const UINT cmd = DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD, pt.x, pt.y, this);
 	if (cmd == 1)
 	{
 		m_seriesRows.push_back(SeriesInfo());

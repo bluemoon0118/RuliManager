@@ -662,6 +662,7 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_STUDIO_VIEW_LIST, &CRuliManagerDlg::OnBnClickedStudioViewList)
 	ON_BN_CLICKED(IDC_VIDEO_VIEW_H, &CRuliManagerDlg::OnBnClickedVideoViewH)
 	ON_BN_CLICKED(IDC_VIDEO_VIEW_V, &CRuliManagerDlg::OnBnClickedVideoViewV)
+	ON_COMMAND_RANGE(IDC_ACTOR_GENDER_ALL, IDC_ACTOR_GENDER_M, &CRuliManagerDlg::OnGenderButton)
 	ON_BN_CLICKED(IDC_GENRE_HIDE, &CRuliManagerDlg::OnBnClickedGenreHide)
 	ON_BN_CLICKED(IDC_BTN_COPYCODE, &CRuliManagerDlg::OnBnClickedCopyCode)
 	ON_BN_CLICKED(IDC_GENRE_ALL, &CRuliManagerDlg::OnBnClickedGenreAll)
@@ -1220,6 +1221,27 @@ BOOL CRuliManagerDlg::OnInitDialog()
 					m_studioViewBtns[i].SetToggle(kComboColor, TCOL(TC_TOGGLETEXT));
 					m_studioViewBtns[i].SetChecked(i == m_studioView);
 					m_studioViewBtns[i].SetSegment(i == 0 ? CDarkButton::SEG_LEFT : CDarkButton::SEG_RIGHT);   // [격자|리스트] 한 묶음
+				}
+			}
+		}
+		{
+			// 배우 탭: [선택없음] [여성만] [남성만] 성별 거르기 (목록 도구줄 - 정렬 오른쪽)
+			m_actorGender = (std::max)(0, (std::min)(2, static_cast<int>(AfxGetApp()->GetProfileInt(L"Settings", L"ActorGender", 0))));
+			const wchar_t* labels[3] = { L"선택없음", L"여성만", L"남성만" };
+			for (int i = 0; i < 3; ++i)
+			{
+				const UINT id = IDC_ACTOR_GENDER_ALL + i;
+				HWND h = ::CreateWindowExW(0, L"BUTTON", labels[i], WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON, 0, 0, 10, 10,
+					m_hWnd, reinterpret_cast<HMENU>(static_cast<UINT_PTR>(id)), AfxGetInstanceHandle(), nullptr);
+				if (!h)
+					continue;
+				::SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(GetFont()->GetSafeHandle()), TRUE);
+				if (m_genderBtns[i].Attach(id, this))
+				{
+					m_genderBtns[i].SetColors(kButtonColor, RGB(255, 255, 255), kBackColor);
+					m_genderBtns[i].SetToggle(kComboColor, TCOL(TC_TOGGLETEXT));
+					m_genderBtns[i].SetChecked(i == m_actorGender);
+					m_genderBtns[i].SetSegment(i == 0 ? CDarkButton::SEG_LEFT : (i == 2 ? CDarkButton::SEG_RIGHT : CDarkButton::SEG_MIDDLE));   // 붙은 한 묶음
 				}
 			}
 		}
@@ -2034,7 +2056,7 @@ int CRuliManagerDlg::LeftPaneWidth(int cx)
 const UINT* CRuliManagerDlg::ToolbarIds(int& count)
 {
 	static const UINT ids[] = {
-		IDC_EDIT_SEARCH, IDC_COMBO_FILTER, IDC_COMBO_SORT, IDC_BTN_SORTDIR, IDC_STUDIO_VIEW_GRID, IDC_STUDIO_VIEW_LIST, IDC_VIDEO_VIEW_H, IDC_VIDEO_VIEW_V, IDC_GENRE_HIDE, IDC_GENRE_ALL, IDC_COMBO_PAGESIZE, IDC_ZOOM_SLIDER,
+		IDC_EDIT_SEARCH, IDC_COMBO_FILTER, IDC_COMBO_SORT, IDC_BTN_SORTDIR, IDC_STUDIO_VIEW_GRID, IDC_STUDIO_VIEW_LIST, IDC_VIDEO_VIEW_H, IDC_VIDEO_VIEW_V, IDC_ACTOR_GENDER_ALL, IDC_ACTOR_GENDER_F, IDC_ACTOR_GENDER_M, IDC_GENRE_HIDE, IDC_GENRE_ALL, IDC_COMBO_PAGESIZE, IDC_ZOOM_SLIDER,
 		IDC_PAGE_FIRST, IDC_PAGE_PREV, IDC_PAGE_N1, IDC_PAGE_N2, IDC_PAGE_N3, IDC_PAGE_N4, IDC_PAGE_N5, IDC_PAGE_NEXT, IDC_PAGE_LAST,
 		IDC_STATIC_PAGEINFO, IDC_GENRE_CHIPS   // 장르 칩 줄도 격자의 자식으로 (빠져 있어서 대화상자 자식으로 남아 격자와 겹쳐 그려졌음)
 	};
@@ -2097,6 +2119,9 @@ int CRuliManagerDlg::LayoutListToolbar(int x, int y, int w)
 	if (visible(IDC_BTN_SORTDIR))  row1.push_back({ IDC_BTN_SORTDIR, DX(50), btnH, -DY(1) / 2 });
 	if (visible(IDC_STUDIO_VIEW_GRID)) row1.push_back({ IDC_STUDIO_VIEW_GRID, DX(28), btnH, -DY(1) / 2, visible(IDC_STUDIO_VIEW_LIST) });   // 제작사 탭 [격자|리스트] 붙은 한 묶음
 	if (visible(IDC_STUDIO_VIEW_LIST)) row1.push_back({ IDC_STUDIO_VIEW_LIST, DX(32), btnH, -DY(1) / 2 });
+	if (visible(IDC_ACTOR_GENDER_ALL)) row1.push_back({ IDC_ACTOR_GENDER_ALL, DX(40), btnH, -DY(1) / 2, true });   // 배우 탭 [선택없음|여성만|남성만] 붙은 한 묶음
+	if (visible(IDC_ACTOR_GENDER_F))   row1.push_back({ IDC_ACTOR_GENDER_F, DX(34), btnH, -DY(1) / 2, true });
+	if (visible(IDC_ACTOR_GENDER_M))   row1.push_back({ IDC_ACTOR_GENDER_M, DX(34), btnH, -DY(1) / 2 });
 	if (visible(IDC_VIDEO_VIEW_H)) row1.push_back({ IDC_VIDEO_VIEW_H, DX(28), btnH, -DY(1) / 2, visible(IDC_VIDEO_VIEW_V) });   // 영상 탭 [가로|세로] 붙은 한 묶음
 	if (visible(IDC_VIDEO_VIEW_V)) row1.push_back({ IDC_VIDEO_VIEW_V, DX(28), btnH, -DY(1) / 2 });
 	if (visible(IDC_GENRE_HIDE)) row1.push_back({ IDC_GENRE_HIDE, DX(40), btnH, -DY(1) / 2, visible(IDC_GENRE_ALL) });   // 영상 탭 [장르숨김|전체] 붙은 한 묶음
@@ -5324,7 +5349,7 @@ void CRuliManagerDlg::OnBnClickedActors()
 	menu.AppendMenu(MF_STRING, ID_MANAGE_SERIES,  L"품번 관리...");
 	CRect rc;
 	GetDlgItem(IDC_BTN_ACTORS)->GetWindowRect(&rc);
-	menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_TOPALIGN | TPM_LEFTBUTTON, rc.left, rc.bottom, this);
+	DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_LEFTBUTTON, rc.left, rc.bottom, this);
 }
 
 void CRuliManagerDlg::OnManageActors()
@@ -5577,7 +5602,7 @@ void CRuliManagerDlg::OnActorChipMenu(int index, CPoint screenPt)
 		menu.AppendMenu(MF_STRING | (names[i].CompareNoCase(current) == 0 ? MF_CHECKED : 0), static_cast<UINT_PTR>(i + 1), names[i]);
 	menu.AppendMenu(MF_SEPARATOR);
 	menu.AppendMenu(MF_STRING, 1000, L"배우 관리에서 편집...");
-	const UINT cmd = menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD | TPM_NONOTIFY, screenPt.x, screenPt.y, this);
+	const UINT cmd = DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD | TPM_NONOTIFY, screenPt.x, screenPt.y, this);
 	if (cmd == 0)
 		return;
 	if (cmd == 1000)
@@ -5730,7 +5755,7 @@ void CRuliManagerDlg::OnBnClickedPickVAliases()
 
 	CRect rc;
 	GetDlgItem(IDC_BTN_PICKVALIASES)->GetWindowRect(&rc);
-	const UINT cmd = menu.TrackPopupMenu(TPM_RIGHTALIGN | TPM_TOPALIGN | TPM_RETURNCMD | TPM_NONOTIFY,
+	const UINT cmd = DarkMenu::Track(menu, TPM_RIGHTALIGN | TPM_TOPALIGN | TPM_RETURNCMD | TPM_NONOTIFY,
 		rc.right, rc.bottom, this);
 	if (cmd == 0)
 		return;
@@ -5834,6 +5859,9 @@ void CRuliManagerDlg::UpdateLeftPane()
 	for (CDarkButton& b : m_studioViewBtns)
 		if (b.GetSafeHwnd())
 			b.ShowWindow(catList && m_mode == MODE_STUDIO ? SW_SHOW : SW_HIDE);   // [격자] [리스트] 는 제작사 카드 목록에서만
+	for (CDarkButton& b : m_genderBtns)
+		if (b.GetSafeHwnd())
+			b.ShowWindow(actorGrid ? SW_SHOW : SW_HIDE);   // [선택없음] [여성만] [남성만] 은 배우 격자에서만
 	{
 		// [가로] [세로]: 영상 탭 · 배우 출연작(연도별 제외) · 제작사(레이블) 영상 · 태그 영상 화면, 선택은 그 화면 값
 		const int vs = VideoViewSlot();
@@ -5964,6 +5992,10 @@ void CRuliManagerDlg::RebuildActorGrid()
 	for (size_t i = 0; i < m_lib.actors.size(); ++i)
 	{
 		const ActorInfo& a = m_lib.actors[i];
+		if (m_actorGender == 1 && a.gender != L"여성")
+			continue;   // 성별 거르기: 여성만
+		if (m_actorGender == 2 && a.gender != L"남성")
+			continue;   // 남성만
 		if (!query.IsEmpty())
 		{
 			CString hay = a.name + L"\n" + a.aliases;
@@ -12042,7 +12074,7 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 		CMenu menu;
 		menu.CreatePopupMenu();
 		menu.AppendMenu(MF_STRING, 1, L"태그 관리...");
-		const UINT cmd = menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD, point.x, point.y, this);
+		const UINT cmd = DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD, point.x, point.y, this);
 		if (cmd == 1)
 			OpenListManager(LIST_TAG, select);
 		return;
@@ -12080,7 +12112,7 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 		menu.AppendMenu(MF_STRING | ((has && !ro) ? 0 : MF_GRAYED), 3, L"비우기");
 		if (!ro)
 			menu.SetDefaultItem(1);
-		const UINT cmd = menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD, point.x, point.y, this);
+		const UINT cmd = DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD, point.x, point.y, this);
 		if (cmd == 1)
 			OnBnClickedPickStudio();
 		else if (cmd == 2)
@@ -12138,7 +12170,7 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 			menu.AppendMenu(MF_STRING, ID_ACTOR_DELETECHECKED, del);
 			menu.AppendMenu(MF_SEPARATOR);
 			menu.AppendMenu(MF_STRING, ID_ACTOR_UNCHECKALL, L"체크 모두 해제");
-			menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
+			DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
 			return;
 		}
 		menu.AppendMenu(MF_STRING, ID_ACTOR_SHOWVIDEOS, L"출연작 보기\tEnter");
@@ -12149,7 +12181,7 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 		menu.AppendMenu(MF_STRING, ID_ACTOR_MERGE,      L"다른 배우와 합치기...");
 		menu.AppendMenu(MF_STRING, ID_ACTOR_DELETE,     L"배우 삭제\tDel");
 		menu.SetDefaultItem(ID_ACTOR_SHOWVIDEOS);
-		menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
+		DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
 		return;
 	}
 
@@ -12182,7 +12214,7 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 			menu.AppendMenu(MF_STRING, ID_CAT_DELETECHECKED, del);
 			menu.AppendMenu(MF_SEPARATOR);
 			menu.AppendMenu(MF_STRING, ID_CAT_UNCHECKALL, L"체크 모두 해제");
-			menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
+			DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
 			return;
 		}
 		menu.AppendMenu(MF_STRING, ID_ACTOR_SHOWVIDEOS, L"영상 보기\tEnter");
@@ -12200,7 +12232,7 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 			menu.AppendMenu(MF_STRING, ID_CAT_DELETE, L"삭제");
 		}
 		menu.SetDefaultItem(ID_ACTOR_SHOWVIDEOS);
-		menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
+		DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
 		return;
 	}
 
@@ -12240,7 +12272,7 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 			menu.AppendMenu(MF_STRING, ID_CAT_DELETE, L"삭제");
 		}
 		menu.SetDefaultItem(ID_ACTOR_SHOWVIDEOS);
-		menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
+		DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
 		return;
 	}
 
@@ -12293,7 +12325,7 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 			menu.AppendMenu(MF_STRING, ID_VIDEO_DELETECHECKED, del);
 			menu.AppendMenu(MF_SEPARATOR);
 			menu.AppendMenu(MF_STRING, ID_VIDEO_UNCHECKALL, L"체크 모두 해제");
-			menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
+			DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
 			return;
 		}
 	}
@@ -12354,7 +12386,7 @@ void CRuliManagerDlg::ShowVideoContextMenu(int row, CPoint point)
 	menu.AppendMenu(MF_STRING, IDC_BTN_DELETE,      L"DB에서 삭제 (파일 유지)\tDel");
 	if (!ro)
 		menu.SetDefaultItem(IDC_BTN_OPENDEFAULT);
-	menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
+	DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
 }
 
 // ---------------------------------------------------------------------------
@@ -12439,7 +12471,7 @@ void CRuliManagerDlg::ShowNewItemMenu(CPoint screenPt)
 	}
 	if (menu.GetMenuItemCount() <= 0)
 		return;   // 보여 줄 항목 없음 (빈 컬렉션 영상 화면)
-	menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, screenPt.x, screenPt.y, this);
+	DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, screenPt.x, screenPt.y, this);
 }
 
 bool CRuliManagerDlg::AskNewName(const CString& caption, const CString& prompt, CString& name)
@@ -13202,6 +13234,12 @@ void CRuliManagerDlg::ApplyColors()
 			b.SetColors(kButtonColor, RGB(255, 255, 255), kBackColor);
 			b.SetToggle(kComboColor, TCOL(TC_TOGGLETEXT));
 		}
+	for (CDarkButton& b : m_genderBtns)
+		if (b.GetSafeHwnd())
+		{
+			b.SetColors(kButtonColor, RGB(255, 255, 255), kBackColor);
+			b.SetToggle(kComboColor, TCOL(TC_TOGGLETEXT));
+		}
 	if (m_genreBar.GetSafeHwnd())
 		m_genreBar.Invalidate(FALSE);
 	if (m_btnCopyCode.GetSafeHwnd())
@@ -13850,6 +13888,30 @@ void CRuliManagerDlg::RelayoutToolbarHeader()
 	const int gap = DX(4);
 	const int tbH = LayoutListToolbar(0, gap, hc.Width());
 	m_toolbarHost->SetHeaderHeight(tbH + gap);
+}
+
+void CRuliManagerDlg::OnGenderButton(UINT nID)
+{
+	SetActorGender(static_cast<int>(nID) - IDC_ACTOR_GENDER_ALL);
+}
+
+void CRuliManagerDlg::SetActorGender(int g)
+{
+	// 배우 격자 성별 거르기 (레지스트리에 저장) - 첫 페이지부터
+	g = (std::max)(0, (std::min)(2, g));
+	for (int i = 0; i < 3; ++i)
+		if (m_genderBtns[i].GetSafeHwnd())
+			m_genderBtns[i].SetChecked(i == g);
+	if (g == m_actorGender)
+		return;
+	m_actorGender = g;
+	AfxGetApp()->WriteProfileInt(L"Settings", L"ActorGender", g);
+	m_pageActor = 0;
+	RebuildActorGrid();
+	m_actorGrid.ScrollToTop();
+	if (m_actorSel < 0)
+		ShowActorInfo(-1);   // 고르던 배우가 걸러져 빠졌으면 오른쪽 정보도 비움
+	m_actorGrid.SetFocus();
 }
 
 void CRuliManagerDlg::OnBnClickedVideoViewH() { SetVideoPortrait(false); }

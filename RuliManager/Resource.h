@@ -252,6 +252,9 @@
 #define IDC_BTN_COPYCODE                1313
 #define IDC_VIDEO_VIEW_H                1314
 #define IDC_VIDEO_VIEW_V                1315
+#define IDC_ACTOR_GENDER_ALL            1316
+#define IDC_ACTOR_GENDER_F              1317
+#define IDC_ACTOR_GENDER_M              1318
 #define IDC_SET_MERGE_PARTS             1277
 #define IDC_SET_DETAIL_RIGHT            1278
 #define IDC_SET_DETAIL_LEFT             1279
@@ -312,7 +315,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        145
 #define _APS_NEXT_COMMAND_VALUE         33045
-#define _APS_NEXT_CONTROL_VALUE         1316
+#define _APS_NEXT_CONTROL_VALUE         1319
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
