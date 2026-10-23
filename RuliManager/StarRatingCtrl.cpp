@@ -98,6 +98,70 @@ void CStarRatingCtrl::SetColors(COLORREF back, COLORREF star, COLORREF empty, CO
 	if (GetSafeHwnd()) Invalidate(FALSE);
 }
 
+int CStarRatingCtrl::StarsWidth(int bandH, int maxStars)
+{
+	const int size = (std::max)(8, bandH - 4), gap = (std::max)(2, size / 6);
+	return maxStars * (size + gap) + gap;
+}
+
+int CStarRatingCtrl::HitStarIn(const CRect& band, CPoint pt, int maxStars)
+{
+	const int size = (std::max)(8, band.Height() - 4), gap = (std::max)(2, size / 6);
+	const int step = size + gap;
+	const int x = pt.x - band.left;
+	if (x < 0 || pt.y < band.top || pt.y >= band.bottom)
+		return 0;
+	const int i = (x + gap / 2) / step;   // 별 사이 틈은 가까운 별로
+	if (i >= maxStars)
+		return 0;
+	if (HalfStep() && x < i * step + size / 2)
+		return i * 2 + 1;   // 별의 왼쪽 절반 = 반 별
+	return i * 2 + 2;
+}
+
+void CStarRatingCtrl::DrawStars(CDC* dc, const CRect& band, int shown, int maxStars, COLORREF star, COLORREF empty, COLORREF text, CFont* font, bool enabled)
+{
+	const int size = (std::max)(8, band.Height() - 4), gap = (std::max)(2, size / 6);
+	const float top = band.top + (band.Height() - size) / 2.0f;
+	const BYTE alpha = enabled ? 255 : 110;
+	EnsureGdiPlus();
+	{
+		Gdiplus::Graphics g(dc->GetSafeHdc());
+		g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+		Gdiplus::SolidBrush fill(ToColor(star, alpha));
+		Gdiplus::Pen outline(ToColor(empty, alpha), (std::max)(1.0f, size / 12.0f));
+		outline.SetLineJoin(Gdiplus::LineJoinRound);
+		for (int i = 0; i < maxStars; ++i)
+		{
+			Gdiplus::GraphicsPath path;
+			const float pad = size * 0.06f;
+			const float sx = static_cast<float>(band.left + i * (size + gap));
+			StarPath(path, sx + pad, top + pad, size - pad * 2);
+			if (shown >= i * 2 + 2)
+				g.FillPath(&fill, &path);
+			else if (shown == i * 2 + 1)
+			{
+				g.DrawPath(&outline, &path);
+				g.SetClip(Gdiplus::RectF(sx, static_cast<Gdiplus::REAL>(band.top), size / 2.0f, static_cast<Gdiplus::REAL>(band.Height())));
+				g.FillPath(&fill, &path);
+				g.ResetClip();
+			}
+			else
+				g.DrawPath(&outline, &path);
+		}
+	}
+	if (shown > 0)
+	{
+		CFont* oldFont = font ? dc->SelectObject(font) : nullptr;
+		dc->SetBkMode(TRANSPARENT);
+		dc->SetTextColor(enabled ? text : RGB(0x80, 0x8C, 0x96));
+		CRect tr(band.left + maxStars * (size + gap) + gap, band.top, band.right, band.bottom);
+		dc->DrawText(ScoreText(shown), tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+		if (oldFont)
+			dc->SelectObject(oldFont);
+	}
+}
+
 int CStarRatingCtrl::StarSize() const
 {
 	CRect rc;

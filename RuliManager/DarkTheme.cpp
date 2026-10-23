@@ -27,6 +27,19 @@ void CDarkHeader::OnPaint()
 	bmp.CreateCompatibleBitmap(&paint, client.Width(), client.Height());
 	CBitmap* oldBmp = mem.SelectObject(&bmp);
 	CFont* font = GetFont();
+	if (m_bold && font)
+	{
+		// 굵은 글꼴: 머리글 글꼴과 같은 크기 · 모양으로 한 번 만들어 둠
+		if (!m_boldFont.GetSafeHandle())
+		{
+			LOGFONT lf = {};
+			font->GetLogFont(&lf);
+			lf.lfWeight = FW_BOLD;
+			m_boldFont.CreateFontIndirect(&lf);
+		}
+		if (m_boldFont.GetSafeHandle())
+			font = &m_boldFont;
+	}
 	CFont* oldFont = font ? mem.SelectObject(font) : nullptr;
 
 	const COLORREF back = TCOL(TC_THUMB);
@@ -53,6 +66,22 @@ void CDarkHeader::OnPaint()
 		if ((item.fmt & HDF_JUSTIFYMASK) == HDF_CENTER) align = DT_CENTER;
 		CRect tr = rc;
 		tr.DeflateRect(6, 0);
+		if (item.fmt & (HDF_SORTUP | HDF_SORTDOWN))
+		{
+			// 정렬 표시: 오른쪽 끝 작은 삼각형 (▲ 오름차순 / ▼ 내림차순)
+			const int s = (std::max)(3, rc.Height() / 6);
+			const int cx = rc.right - 6 - s, cy = (rc.top + rc.bottom) / 2;
+			const bool up = (item.fmt & HDF_SORTUP) != 0;
+			POINT pts[3] = { { cx - s, up ? cy + s / 2 : cy - s / 2 }, { cx + s, up ? cy + s / 2 : cy - s / 2 }, { cx, up ? cy - s / 2 - 1 : cy + s / 2 + 1 } };
+			CBrush ab(RGB(220, 226, 232));
+			CPen ap(PS_SOLID, 1, RGB(220, 226, 232));
+			CBrush* ob = mem.SelectObject(&ab);
+			CPen* op = mem.SelectObject(&ap);
+			mem.Polygon(pts, 3);
+			mem.SelectObject(ob);
+			mem.SelectObject(op);
+			tr.right -= s * 2 + 6;
+		}
 		mem.DrawText(text, tr, align | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS);
 		mem.FillSolidRect(rc.right - 1, rc.top + 3, 1, rc.Height() - 6, line);   // 열 구분선
 	}

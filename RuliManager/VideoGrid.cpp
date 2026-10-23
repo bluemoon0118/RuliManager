@@ -279,6 +279,15 @@ void CVideoGrid::UpdateLayout()
 	const int rows = RowCount(count);
 	const int total = m_headerH + rows * m_tileH;
 
+	if (m_scrollHidden)
+	{
+		// 머리 영역만 쓰는 중: 스크롤바 없이 맨 위로
+		ShowScrollBar(SB_VERT, FALSE);
+		SetScroll(0);
+		return;
+	}
+	if (!(GetStyle() & WS_VSCROLL))
+		ShowScrollBar(SB_VERT, TRUE);   // 숨겼다가 다시 쓸 때
 	SCROLLINFO si = { sizeof(si) };
 	si.fMask = SIF_RANGE | SIF_PAGE | SIF_DISABLENOSCROLL;
 	si.nMin = 0;

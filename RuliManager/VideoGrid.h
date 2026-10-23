@@ -60,12 +60,15 @@ public:
 	int  HeaderHeight() const { return m_headerH; }
 	int  ScrollY() const { return m_scroll; }
 	void ScrollToTop() { if (GetSafeHwnd()) SetScroll(0); }   // 맨 위로 (탭 전환 · 카드로 들어갈 때)
+	// 세로 스크롤바 숨김 (머리 영역(도구줄)만 쓸 때 - 영상 탭 [리스트] 보기)
+	void SetScrollHidden(bool hidden) { if (m_scrollHidden == hidden) return; m_scrollHidden = hidden; if (GetSafeHwnd()) { UpdateLayout(); Invalidate(FALSE); } }
 
 	// 줄 배치 (리스트 보기): 비우면 보통 바둑판, 주면 줄마다 새 화면 줄에서 시작 (Refresh 전에 호출)
 	void SetLines(const std::vector<GridLine>& lines);
 	bool LineMode() const { return !m_lines.empty(); }
 
 protected:
+	bool m_scrollHidden = false;
 	IVideoGridOwner* m_owner = nullptr;
 	CImageList* m_images = nullptr;
 	int  m_thumbW = 160;

@@ -32,6 +32,10 @@ namespace VectorIcon
 	void Eraser(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);      // 지우개 (비우기 · 초기화)
 	void CheckOn(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);     // 체크된 칸 (전체 체크)
 	void CheckOff(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);    // 빈 칸 (체크 모두 해제)
+	// 성별 기호 (배우 탭 성별 거르기 버튼)
+	void GenderFemale(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);   // ♀
+	void GenderMale(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);     // ♂
+	void GenderBoth(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);     // ⚥ (원 + 위 화살표 + 아래 십자)
 	void Heart(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);       // 하트 (즐겨찾기)
 	void Drops(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);       // 물방울 (영상 카운트)
 	void ArrowRight(CDC* dc, double x0, double x1, double cy, double thick, COLORREF col);   // 오른쪽 화살표 → (x0~x1, 세로 중심 cy, 선 굵기)

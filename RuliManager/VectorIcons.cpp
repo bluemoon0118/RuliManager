@@ -427,6 +427,63 @@ namespace VectorIcon
 		});
 	}
 
+	// --- 성별 기호 (고리 + 십자 / 화살표, 닿기만 하고 겹치지 않게 - 겹치면 구멍) ---
+	namespace
+	{
+		void AddRing(Gdiplus::GraphicsPath& p, float cx, float cy, float ro, float ri)
+		{
+			p.AddEllipse(cx - ro, cy - ro, ro * 2, ro * 2);
+			p.AddEllipse(cx - ri, cy - ri, ri * 2, ri * 2);   // 안쪽 (구멍)
+		}
+		// 십자 (세로 x0~x1 · y0~y2, 가로 y1a~y1b · xa~xb) 를 한 도형으로
+		void AddCross(Gdiplus::GraphicsPath& p, float x0, float x1, float y0, float y2, float xa, float xb, float ya, float yb)
+		{
+			const Gdiplus::PointF pts[12] = {
+				{ x0, y0 }, { x1, y0 }, { x1, ya }, { xb, ya }, { xb, yb }, { x1, yb },
+				{ x1, y2 }, { x0, y2 }, { x0, yb }, { xa, yb }, { xa, ya }, { x0, ya } };
+			p.AddPolygon(pts, 12);
+		}
+		// 오른쪽 위 45° 화살표: 몸통 (x+y = sum 위, sx → ex) + 직각 화살촉 (끝 tx, ty, 다리 길이 leg)
+		void AddArrowNE(Gdiplus::GraphicsPath& p, float sum, float sx, float ex, float half, float tx, float ty, float leg)
+		{
+			const Gdiplus::PointF body[4] = {
+				{ sx + half, sum - sx + half }, { sx - half, sum - sx - half },
+				{ ex - half, sum - ex - half }, { ex + half, sum - ex + half } };
+			p.AddPolygon(body, 4);
+			const Gdiplus::PointF head[3] = { { tx, ty }, { tx, ty + leg }, { tx - leg, ty } };
+			p.AddPolygon(head, 3);
+		}
+	}
+
+	void GenderFemale(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddRing(p, 12.0f, 8.6f, 6.6f, 4.3f);
+			AddCross(p, 10.9f, 13.1f, 15.2f, 23.0f, 7.8f, 16.2f, 18.0f, 20.2f);   // 고리 아래에 닿게 (y 15.2)
+		});
+	}
+
+	void GenderMale(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddRing(p, 9.5f, 14.5f, 6.5f, 4.3f);
+			// 몸통: x + y = 24 위 (고리 45° 바깥 r 6.7 에서 시작), 화살촉 빗변 x - y = 11.6 에 닿음
+			AddArrowNE(p, 24.0f, 14.27f, 17.8f, 0.78f, 21.0f, 3.0f, 6.4f);
+		});
+	}
+
+	void GenderBoth(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddRing(p, 10.5f, 12.5f, 5.5f, 3.5f);
+			AddCross(p, 9.5f, 11.5f, 18.0f, 23.5f, 7.3f, 13.7f, 20.0f, 21.8f);   // 아래 십자 (♀)
+			AddArrowNE(p, 23.0f, 14.6f, 18.25f, 0.78f, 21.0f, 2.0f, 5.5f);       // 오른쪽 위 화살표 (♂)
+		});
+	}
+
 	void Gear(CDC* dc, const CRect& area, COLORREF col, double fill)
 	{
 		// 톱니 8개 (사다리꼴) + 가운데 구멍
