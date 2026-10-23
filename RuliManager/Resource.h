@@ -289,6 +289,11 @@
 #define ID_COL_REMOVE                   32833
 #define ID_COL_ADD_FIRST                32840
 #define ID_COL_ADD_LAST                 33039
+#define ID_CAT_DELETECHECKED            33040
+#define ID_CAT_UNCHECKALL               33041
+#define ID_VIDEO_DELETECHECKED          33042
+#define ID_VIDEO_UNCHECKALL             33043
+#define ID_CHECK_ALL                    33044
 #define ID_MANAGE_SERIES                32822
 #define ID_CAT_MERGE                    32823
 #define ID_VIDEO_SCREENSHOT             32824
@@ -304,7 +309,7 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        145
-#define _APS_NEXT_COMMAND_VALUE         33040
+#define _APS_NEXT_COMMAND_VALUE         33045
 #define _APS_NEXT_CONTROL_VALUE         1314
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
