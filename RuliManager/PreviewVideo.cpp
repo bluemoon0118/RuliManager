@@ -239,7 +239,7 @@ namespace PreviewVideo
 			start = (std::max)(0.0, (std::min)(start, durationSec - segLen));
 			inputs += L" -ss " + Num(start) + L" -t " + Num(segLen) + L" -i \"" + videoPath + L"\"";
 			CString part;
-			part.Format(L"[%d:v:0]scale=480:-2,setsar=1,fps=24,format=yuv420p[v%d];", i, i);
+			part.Format(L"[%d:v:0]scale=480:-2,setsar=1,fps=15,format=yuv420p[v%d];", i, i);   // 초당 15장 (재생 부담 줄임)
 			filter += part;
 			CString lab;
 			lab.Format(L"[v%d]", i);
@@ -255,7 +255,7 @@ namespace PreviewVideo
 			L" -filter_complex \"" + filter + L"\" -map \"[out]\" -an ";
 		// H.264 (libx264) 우선, 없는 ffmpeg 이면 MPEG-4 Part 2 로 다시
 		const CString encoders[] = {
-			L"-c:v libx264 -preset veryfast -crf 28 -movflags +faststart -f mp4 \"",
+			L"-c:v libx264 -preset veryfast -tune fastdecode -crf 28 -movflags +faststart -f mp4 \"",   // fastdecode: 풀기 쉬운 압축 (월 모드 여러 칸 동시 재생 CPU 줄임)
 			L"-c:v mpeg4 -q:v 6 -movflags +faststart -f mp4 \"" };
 		bool made = false;
 		for (const CString& enc : encoders)
@@ -355,14 +355,22 @@ CPreviewPlayer::~CPreviewPlayer()
 
 bool CPreviewPlayer::Start(CWnd* parent, const CString& file, COLORREF border)
 {
+	if (!parent || !parent->GetSafeHwnd())
+		return false;
+	CRect rc;
+	parent->GetClientRect(&rc);
+	return StartAt(parent, rc, file, border);
+}
+
+bool CPreviewPlayer::StartAt(CWnd* parent, const CRect& rcInParent, const CString& file, COLORREF border)
+{
 	Stop();
 	if (!parent || !parent->GetSafeHwnd() || file.IsEmpty() || !::PathFileExistsW(file))
 		return false;
 	m_border = border;
-	CRect rc;
-	parent->GetClientRect(&rc);
 	const CString cls = AfxRegisterWndClass(CS_HREDRAW | CS_VREDRAW, ::LoadCursor(nullptr, IDC_ARROW), nullptr, nullptr);
-	if (!CreateEx(0, cls, L"", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS, rc, parent, 0))
+	// 숨긴 채 만들고 영상을 열면(MEDIAITEM_SET) 보임 (여는 동안 검은 칸이 비치지 않게)
+	if (!CreateEx(0, cls, L"", WS_CHILD | WS_CLIPSIBLINGS, rcInParent, parent, 0))
 		return false;
 	m_file = file;
 	m_cb = new CPreviewPlayerCallback(this);
@@ -470,6 +478,8 @@ void CPreviewPlayer::Stop()
 	if (GetSafeHwnd())
 		DestroyWindow();
 	m_popup = false;
+	m_paused = false;
+	m_showOnResume = false;
 }
 
 void CPreviewPlayer::MoveToAnchor(const CRect& anchorScreen)
@@ -479,6 +489,41 @@ void CPreviewPlayer::MoveToAnchor(const CRect& anchorScreen)
 	m_anchor = anchorScreen;
 	if (IsWindowVisible())
 		PlacePopup();   // 아직 안 보이면(영상 여는 중) 보일 때 새 자리로
+}
+
+void CPreviewPlayer::Pause()
+{
+	if (m_paused)
+		return;
+	m_paused = true;
+	if (m_player)
+		m_player->Pause();
+}
+
+void CPreviewPlayer::Resume()
+{
+	if (!m_paused)
+		return;
+	m_paused = false;
+	if (m_showOnResume && !m_popup && GetSafeHwnd() && !IsWindowVisible())
+		ShowWindow(SW_SHOWNA);
+	m_showOnResume = false;
+	if (m_player)
+		m_player->Play();
+}
+
+void CPreviewPlayer::MoveTo(const CRect& rcInParent)
+{
+	if (!GetSafeHwnd() || m_popup)
+		return;
+	CWnd* parent = GetParent();
+	if (!parent)
+		return;
+	CRect cur;
+	GetWindowRect(&cur);
+	parent->ScreenToClient(&cur);
+	if (cur != rcInParent)
+		SetWindowPos(nullptr, rcInParent.left, rcInParent.top, rcInParent.Width(), rcInParent.Height(), SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 void CPreviewPlayer::FitToParent()
@@ -507,6 +552,13 @@ void CPreviewPlayer::OnPlayerEvent(int type)
 		m_player->SetAspectRatioMode(MFVideoARMode_PreservePicture);
 		m_player->SetBorderColor(m_border);
 		PlacePopup();   // 팝업: 영상 비율로 크기를 정하고 보임
+		if (m_paused)
+		{
+			m_showOnResume = true;   // 멈춘 상태: 다시 재생할 때 보임 (그동안은 커버 이미지)
+			return;
+		}
+		if (!m_popup && GetSafeHwnd() && !IsWindowVisible())
+			ShowWindow(SW_SHOWNA);   // 자식 창: 영상이 준비되면 보임
 		m_player->Play();
 	}
 	else if (type == MFP_EVENT_TYPE_PLAYBACK_ENDED)
@@ -556,3 +608,61 @@ LRESULT CPreviewPlayer::OnNcHitTest(CPoint /*point*/)
 {
 	return HTTRANSPARENT;   // 마우스는 아래(부모 - 커버 이미지 칸)로
 }
+
+// ===========================================================================
+// CWallOverlay
+
+BEGIN_MESSAGE_MAP(CWallOverlay, CWnd)
+	ON_WM_PAINT()
+	ON_WM_ERASEBKGND()
+	ON_WM_NCHITTEST()
+	ON_WM_MOUSEACTIVATE()
+END_MESSAGE_MAP()
+
+void CWallOverlay::ShowOver(CWnd* owner, const CRect& screenRc)
+{
+	if (!owner || !owner->GetSafeHwnd() || screenRc.IsRectEmpty())
+	{
+		HideOverlay();
+		return;
+	}
+	if (!GetSafeHwnd())
+	{
+		const CString cls = AfxRegisterWndClass(0, ::LoadCursor(nullptr, IDC_ARROW), nullptr, nullptr);
+		if (!CreateEx(WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, cls, L"", WS_POPUP,
+			screenRc, owner, 0))
+			return;
+		::SetLayeredWindowAttributes(GetSafeHwnd(), kKey, 0, LWA_COLORKEY);
+	}
+	CRect cur;
+	GetWindowRect(&cur);
+	if (cur != screenRc || !IsWindowVisible())
+	{
+		SetWindowPos(&CWnd::wndTop, screenRc.left, screenRc.top, screenRc.Width(), screenRc.Height(), SWP_NOACTIVATE | SWP_SHOWWINDOW);
+		Invalidate(FALSE);   // 내용이 바뀐 경우는 주인이 따로 Invalidate (매번 다시 그리지 않음)
+	}
+}
+
+void CWallOverlay::HideOverlay()
+{
+	if (GetSafeHwnd() && IsWindowVisible())
+		ShowWindow(SW_HIDE);
+}
+
+void CWallOverlay::OnPaint()
+{
+	CPaintDC paint(this);
+	CRect rc;
+	GetClientRect(&rc);
+	CDC mem;
+	mem.CreateCompatibleDC(&paint);
+	CBitmap bmp;
+	bmp.CreateCompatibleBitmap(&paint, (std::max)(1, rc.Width()), (std::max)(1, rc.Height()));
+	CBitmap* old = mem.SelectObject(&bmp);
+	mem.FillSolidRect(rc, kKey);   // 투명
+	if (m_onDraw)
+		m_onDraw(&mem, rc);
+	paint.BitBlt(0, 0, rc.Width(), rc.Height(), &mem, 0, 0, SRCCOPY);
+	mem.SelectObject(old);
+}
+

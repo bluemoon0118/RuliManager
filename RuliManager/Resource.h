@@ -283,6 +283,8 @@
 #define IDC_SET_PREVIEW_DEL             1324
 #define IDC_SET_PREVIEW_REGEN           1325
 #define IDC_SET_PREVIEW_STOP            1326
+#define IDC_VIDEO_MODE_WALL             1327
+#define IDC_DETAIL_BAR                  1328
 #define ID_ACTOR_SHOWVIDEOS             32800
 #define ID_ACTOR_EDIT                   32801
 #define ID_MANAGE_ACTORS                32810
@@ -325,7 +327,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        145
 #define _APS_NEXT_COMMAND_VALUE         33047
-#define _APS_NEXT_CONTROL_VALUE         1327
+#define _APS_NEXT_CONTROL_VALUE         1329
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

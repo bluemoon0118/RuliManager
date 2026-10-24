@@ -54,7 +54,8 @@ int CVideoGrid::OnCreate(LPCREATESTRUCT lpcs)
 	dc.GetTextMetrics(&tm);
 	dc.SelectObject(old);
 	m_lineH = tm.tmHeight + tm.tmExternalLeading + 1;
-	m_pad = (std::max)(6, m_lineH / 2);
+	m_basePad = (std::max)(6, m_lineH / 2);
+	m_pad = (m_padOverride >= 0) ? m_padOverride : m_basePad;
 	if (m_tip.Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX))
 	{
 		m_tip.AddTool(this, L"");
@@ -92,6 +93,20 @@ void CVideoGrid::SetFixedTile(int cardW, int cardH)
 {
 	m_fixedW = cardW;
 	m_fixedH = cardH;
+	if (GetSafeHwnd())
+	{
+		UpdateLayout();
+		Invalidate(FALSE);
+	}
+}
+
+void CVideoGrid::SetTilePad(int pad)
+{
+	m_padOverride = pad;
+	const int newPad = (pad >= 0) ? pad : m_basePad;
+	if (newPad == m_pad)
+		return;
+	m_pad = newPad;
 	if (GetSafeHwnd())
 	{
 		UpdateLayout();

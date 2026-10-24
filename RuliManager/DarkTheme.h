@@ -19,6 +19,15 @@ namespace DarkColors
 	inline const COLORREF& Preview     = TCOL(TC_PREVIEW);   // 이미지 영역
 }
 
+// 에디트 · 콤보박스 테두리를 어두운 색(TC_EDGE)으로 - 기본 테두리(흰색 · 밝은 회색)를 그린 뒤 그 위에 덧그림 (서브클래스)
+//  - 에디트 WS_BORDER: 1px, WS_EX_CLIENTEDGE: 바깥 1px 테두리 색 + 안쪽 1px 에디트 바탕색 (WM_NCPAINT)
+//  - 콤보박스: 클라이언트 가장자리 1px (WM_PAINT · 마우스 오버 · 펼침 뒤)
+namespace DarkEdge
+{
+	void Attach(HWND edit);       // 에디트 또는 콤보박스 하나 (여러 번 불러도 됨)
+	void AttachAll(HWND root);    // root 아래 모든 에디트 · 콤보박스 (자식의 자식까지)
+}
+
 // 목록(그리드)의 열 머리글 - 어두운 배경에 흰 글자로 직접 그림
 class CDarkHeader : public CHeaderCtrl
 {

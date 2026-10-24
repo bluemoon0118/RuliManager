@@ -112,7 +112,7 @@ public:
 
 	// 글자 왼쪽 아이콘
 	enum Icon { ICON_NONE = 0, ICON_PLAY, ICON_PERSON, ICON_CAMERA, ICON_TAG, ICON_GEAR, ICON_COLLECTION, ICON_COPY, ICON_GENDER_ALL, ICON_FEMALE, ICON_MALE,
-		ICON_VIEW_GRID, ICON_VIEW_LIST, ICON_VIEW_PACKAGE, ICON_VIEW_YEAR, ICON_GENRE_OFF, ICON_GENRE_ON, ICON_SYMBOL_ALL, ICON_SYMBOL_F, ICON_SYMBOL_M, ICON_SORT_ASC, ICON_SORT_DESC };   // SORT_ASC / DESC: 글자 없이 가운데 정렬 방향 (화살표 + 막대)   // SYMBOL_ALL / F / M: 글자 없이 가운데 성별 기호 (♀♂ 나란히 / ♀ 분홍 / ♂ 파랑 - 배우 성별 거르기)   // VIEW_*: 글자 없이 가운데 보기 방식 아이콘 ([격자|리스트|패키지])   // GENDER_ALL / FEMALE / MALE: ⚥ / ♀ / ♂ (배우 성별 거르기 - 꺼진 상태면 분홍 / 파랑)   // COPY: 글자 없이 가운데 겹친 두 장 (품번 복사)   // COLLECTION: 겹친 화면 (컬렉션 탭)   // GEAR: 글자 없이 가운데 톱니바퀴   // PLAY: 원 안의 재생(▶), PERSON: 사람, CAMERA: 비디오 카메라, TAG: 꼬리표
+		ICON_VIEW_GRID, ICON_VIEW_LIST, ICON_VIEW_PACKAGE, ICON_VIEW_YEAR, ICON_VIEW_WALL, ICON_GENRE_OFF, ICON_GENRE_ON, ICON_SYMBOL_ALL, ICON_SYMBOL_F, ICON_SYMBOL_M, ICON_SORT_ASC, ICON_SORT_DESC };   // SORT_ASC / DESC: 글자 없이 가운데 정렬 방향 (화살표 + 막대)   // SYMBOL_ALL / F / M: 글자 없이 가운데 성별 기호 (♀♂ 나란히 / ♀ 분홍 / ♂ 파랑 - 배우 성별 거르기)   // VIEW_*: 글자 없이 가운데 보기 방식 아이콘 ([격자|리스트|패키지])   // GENDER_ALL / FEMALE / MALE: ⚥ / ♀ / ♂ (배우 성별 거르기 - 꺼진 상태면 분홍 / 파랑)   // COPY: 글자 없이 가운데 겹친 두 장 (품번 복사)   // COLLECTION: 겹친 화면 (컬렉션 탭)   // GEAR: 글자 없이 가운데 톱니바퀴   // PLAY: 원 안의 재생(▶), PERSON: 사람, CAMERA: 비디오 카메라, TAG: 꼬리표
 	void SetIcon(int icon) { m_icon = icon; if (GetSafeHwnd()) Invalidate(FALSE); }
 	void SetIconAngle(double deg) { if (deg != m_iconAngle) { m_iconAngle = deg; if (GetSafeHwnd()) Invalidate(FALSE); } }   // 톱니바퀴 회전
 

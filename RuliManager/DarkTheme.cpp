@@ -1,7 +1,9 @@
 ﻿#include "pch.h"
 #include "DarkTheme.h"
 
-#include <uxtheme.h>
+#include <uxtheme.h>
+#include <commctrl.h>
+#pragma comment(lib, "comctl32.lib")   // SetWindowSubclass (에디트 어두운 테두리)
 #pragma comment(lib, "uxtheme.lib")
 
 #ifdef _DEBUG
@@ -95,6 +97,135 @@ void CDarkHeader::OnPaint()
 
 // ---------------------------------------------------------------------------
 
+namespace
+{
+	bool IsComboClass(HWND h)
+	{
+		wchar_t cls[16] = {};
+		::GetClassNameW(h, cls, 16);
+		return _wcsicmp(cls, L"ComboBox") == 0;
+	}
+
+	// 콤보박스: 테두리를 컨트롤이 직접(WM_PAINT, 클라이언트 영역 가장자리) 그리므로 그 바깥 1px 을 덧칠
+	void PaintComboEdge(HWND h)
+	{
+		RECT rc = {};
+		::GetClientRect(h, &rc);
+		if (rc.right <= 0 || rc.bottom <= 0)
+			return;
+		// 선택 칸 높이만 (콤보를 옮길 때 잠깐 펼친 목록 높이만큼 창이 커지는 순간에 그리면 그 길이로 테두리 흔적이 남음)
+		COMBOBOXINFO cbi = { sizeof(cbi) };
+		if (::GetComboBoxInfo(h, &cbi) && cbi.rcButton.bottom > 0)
+		{
+			const LONG fieldH = cbi.rcButton.bottom + cbi.rcButton.top;   // 버튼은 위아래 같은 여백
+			if (rc.bottom > fieldH + 2)
+				return;   // 지금은 크기가 바뀌는 중 - 제 크기가 되면 다시 그려짐
+		}
+		HDC dc = ::GetDC(h);
+		if (!dc)
+			return;
+		HBRUSH edge = ::CreateSolidBrush(TCOL(TC_EDGE));
+		::FrameRect(dc, &rc, edge);
+		::DeleteObject(edge);
+		::ReleaseDC(h, dc);
+	}
+
+	// focus: 1 = 포커스 있음, 0 = 없음, -1 = 지금 포커스로 판단 (WM_KILLFOCUS 처리 중에는 GetFocus 가 아직 바뀌지 않았을 수 있어 직접 넘김)
+	void PaintEditEdge(HWND h, int focus = -1)
+	{
+		if (IsComboClass(h))
+		{
+			PaintComboEdge(h);
+			return;
+		}
+		const bool focused = (focus < 0) ? (::GetFocus() == h) : (focus != 0);
+		const LONG style = ::GetWindowLongW(h, GWL_STYLE);
+		const LONG ex = ::GetWindowLongW(h, GWL_EXSTYLE);
+		const bool client = (ex & WS_EX_CLIENTEDGE) != 0;
+		if (!client && !(style & WS_BORDER))
+			return;
+		RECT wr = {};
+		::GetWindowRect(h, &wr);
+		RECT rc = { 0, 0, wr.right - wr.left, wr.bottom - wr.top };
+		HDC dc = ::GetWindowDC(h);
+		if (!dc)
+			return;
+		// 포커스가 있으면 파란 강조 테두리 (버튼과 같은 강조색), 없으면 어두운 테두리
+		const bool hot = focused && ::IsWindowEnabled(h) && !(style & ES_READONLY);
+		HBRUSH edge = ::CreateSolidBrush(hot ? TCOL(TC_ACCENT) : TCOL(TC_EDGE));
+		::FrameRect(dc, &rc, edge);
+		::DeleteObject(edge);
+		if (client)
+		{
+			// 2px 테두리의 안쪽 줄은 에디트 바탕색 (어두운 1px 테두리처럼 보이게)
+			::InflateRect(&rc, -1, -1);
+			HBRUSH inner = ::CreateSolidBrush(::IsWindowEnabled(h) ? TCOL(TC_EDIT) : TCOL(TC_BACK));
+			::FrameRect(dc, &rc, inner);
+			::DeleteObject(inner);
+		}
+		::ReleaseDC(h, dc);
+	}
+
+	LRESULT CALLBACK EditEdgeProc(HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR)
+	{
+		switch (msg)
+		{
+		case WM_NCPAINT:
+		{
+			const LRESULT r = ::DefSubclassProc(h, msg, wp, lp);   // 기본 테두리 · 스크롤바 먼저
+			PaintEditEdge(h);
+			return r;
+		}
+		case WM_SETFOCUS:
+		case WM_KILLFOCUS:
+		case WM_ENABLE:
+		case WM_MOUSELEAVE:
+		{
+			// 테마 에디트는 포커스 · 마우스 오버 때 테두리를 다시 그리므로 그 뒤에 덧그림 (포커스 = 파란 테두리)
+			const LRESULT r = ::DefSubclassProc(h, msg, wp, lp);
+			PaintEditEdge(h, msg == WM_SETFOCUS ? 1 : (msg == WM_KILLFOCUS ? 0 : -1));
+			return r;
+		}
+		case WM_NCDESTROY:
+			::RemoveWindowSubclass(h, EditEdgeProc, id);
+			break;
+		}
+		const LRESULT r = ::DefSubclassProc(h, msg, wp, lp);
+		if (msg == WM_MOUSEMOVE || msg == WM_PAINT || msg == WM_LBUTTONUP || msg == WM_TIMER ||
+			msg == CB_SHOWDROPDOWN || msg == WM_CAPTURECHANGED)
+			PaintEditEdge(h);   // 마우스 오버 · 눌림 · 펼침 · 테마 애니메이션 뒤에도 (콤보)
+		return r;
+	}
+
+	BOOL CALLBACK AttachEdgeEnum(HWND h, LPARAM)
+	{
+		DarkEdge::Attach(h);
+		return TRUE;
+	}
+}
+
+namespace DarkEdge
+{
+	void Attach(HWND edit)
+	{
+		if (!edit || !::IsWindow(edit))
+			return;
+		wchar_t cls[16] = {};
+		::GetClassNameW(edit, cls, 16);
+		if (_wcsicmp(cls, L"Edit") != 0 && _wcsicmp(cls, L"ComboBox") != 0)
+			return;   // 에디트 · 콤보박스만
+		::SetWindowSubclass(edit, EditEdgeProc, 0x45444745 /* 'EDGE' */, 0);   // 이미 있으면 그대로
+		::SetWindowPos(edit, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);   // 테두리 다시 그리기
+		::InvalidateRect(edit, nullptr, FALSE);   // 콤보는 클라이언트 영역에 테두리
+	}
+
+	void AttachAll(HWND root)
+	{
+		if (root && ::IsWindow(root))
+			::EnumChildWindows(root, AttachEdgeEnum, 0);
+	}
+}
+
 void CDarkDialogTheme::ThemeChild(HWND hwnd)
 {
 	wchar_t cls[32] = {};
@@ -114,6 +245,7 @@ void CDarkDialogTheme::ThemeChild(HWND hwnd)
 	{
 		if (style & ES_MULTILINE)
 			::SetWindowTheme(hwnd, L"DarkMode_Explorer", nullptr);       // 메모 칸 스크롤바
+		DarkEdge::Attach(hwnd);                                         // 어두운 테두리
 	}
 	else if (_wcsicmp(cls, L"ListBox") == 0)
 	{
@@ -122,6 +254,7 @@ void CDarkDialogTheme::ThemeChild(HWND hwnd)
 	else if (_wcsicmp(cls, L"ComboBox") == 0)
 	{
 		::SetWindowTheme(hwnd, L"DarkMode_CFD", nullptr);                // 어두운 콤보 테두리/버튼
+		DarkEdge::Attach(hwnd);                                         // 테두리를 에디트와 같은 어두운 색으로
 	}
 }
 

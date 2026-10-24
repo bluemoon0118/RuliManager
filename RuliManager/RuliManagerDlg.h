@@ -146,13 +146,35 @@ protected:
 		const int s = VideoViewSlot();
 		return s >= 0 && m_videoView[s] == 2;
 	}
+	bool VideoWallActive() const        // [월 모드]: 16:9 이미지만 빈틈없이 붙임 + 미리보기 자동 재생
+	{
+		const int s = VideoViewSlot();
+		return s >= 0 && m_videoView[s] == 3;
+	}
+	bool VideoImageCardActive() const { return VideoPortraitActive() || VideoWallActive(); }   // 이미지만 그리는 카드 ([패키지] · [월 모드])
+	// [월 모드] 미리보기 자동 재생: 화면에 보이는 칸마다 미리보기가 있으면 격자의 자식 창으로 재생 (스크롤하면 같이 움직임)
+	std::map<int, std::unique_ptr<CPreviewPlayer>> m_wallPlayers;   // 영상 항목 → 재생 창
+	int  m_wallSyncTick = 0;
+	int  m_wallSelItem = -1;           // 고른 칸 (재생 창을 안쪽으로 줄여 선택 테두리가 보이게)
+	void SyncWallPlayers();
+	void StopWallPlayers();
+	CWallOverlay m_wallOverlay;        // [월 모드] 칸 위쪽 글자 (제목 · 출연 배우 · 발매일, 흰 글자 + 그림자, 재생 창 위에도 보이게 따로 겹친 투명 창)
+	void UpdateWallOverlay();
+	// [월 모드] CPU 줄이기: 프로그램이 뒤에 있거나(최소화 포함) 스크롤하는 동안 모든 칸 일시정지
+	bool      m_wallPlaying = true;
+	ULONGLONG m_wallScrollTick = 0;     // 마지막 스크롤 시각 (멈춘 뒤 0.3초 지나면 재생)
+	size_t    m_wallOverlaySig = 0;     // 글자 창 내용 (보이는 칸 · 자리 · 글자) - 바뀔 때만 다시 그림
+	bool WallShouldPlay();
+	void ApplyWallPlayState(bool play);
+	void DrawWallOverlay(CDC* dc, const CRect& rc);
+	afx_msg void OnBnClickedVideoModeWall();
 	void SetVideoPortrait(bool portrait);
 	afx_msg void OnBnClickedVideoViewH();
 	afx_msg void OnBnClickedVideoViewV();
 	// 영상 탭 보기 방식: [격자] (카드 - [가로|세로]) / [리스트] (스프레드시트 - 숨겨 두던 목록 컨트롤을 보임) - 레지스트리 Settings\VideoList
-	CDarkButton m_videoModeBtns[3];
+	CDarkButton m_videoModeBtns[4];   // [격자] [리스트] [패키지] [월 모드]
 	CDarkHeader m_listHeader;          // [리스트] 열 머리글 (어두운 색 + 정렬 삼각형)
-	// 영상 화면별 보기: 0 = [격자] (가로 카드), 1 = [리스트] (스프레드시트), 2 = [패키지] (세로 카드, 이미지만)
+	// 영상 화면별 보기: 0 = [격자] (가로 카드), 1 = [리스트] (스프레드시트), 2 = [패키지] (세로 카드, 이미지만), 3 = [월 모드] (16:9 이미지만 빈틈없이 + 미리보기 자동 재생)
 	//  [0] 영상 탭, [1] 배우 출연작, [2] 제작사 · 레이블 영상, [3] 태그 영상, [4] 컬렉션 영상 - 레지스트리 Settings\VideoViewMode / …Actor / …Studio / …Tag / …Collection
 	int  m_videoView[5] = {};
 	bool VideoListActive() const { const int s = VideoViewSlot(); return s >= 0 && m_videoView[s] == 1; }
@@ -205,6 +227,12 @@ protected:
 	afx_msg void OnBnClickedGenreHide();
 	// 영상 상세: 품번 칸 오른쪽 [복사] (품번을 클립보드로)
 	CDarkButton m_btnCopyCode;
+	// 상세 화면 접기 바: 격자와 상세 화면 사이의 얇은 세로 바 - 누르면 상세 화면을 숨김 / 펼침 (레지스트리 Settings\DetailCollapsed)
+	CDarkButton m_detailBar;
+	bool        m_detailCollapsed = false;
+	int  DetailBarW() { return DX(9); }
+	void UpdateDetailBar();             // 화살표 · 툴팁 (상세 화면이 있는 쪽 / 접힘에 맞춰)
+	afx_msg void OnBnClickedDetailBar();
 	afx_msg void OnBnClickedCopyCode();
 	afx_msg void OnBnClickedGenreAll();
 	bool DrillHeaderShown() const { return m_mode == MODE_ACTOR && !m_drill.IsEmpty() && m_drillActorIdx >= 0; }
@@ -307,6 +335,27 @@ protected:
 	void UpdateNamedActorStrip(int kind, const CString& name);   // 제작사 탭 상세 하단 배우 카드 (kind: 0 = 숨김, 1 = 제작사, 2 = 레이블)
 	void RefreshActorStrip();                                        // 숨긴 배우 칸 값으로 카드 띠 갱신
 	void DrawStripCard(CDC* dc, int i, const CRect& rc, bool hot);   // 카드 띠의 배우 카드 하나
+	void DrawStripCardFor(CDC* dc, int actorIdx, const CRect& rc, bool hot, bool stripHeartHot = true);   // 배우 번호로 (출연 배우 카드 모양)
+	// 영상 카드 아래 배우 수에 마우스 → 카드 아래에 출연 배우 카드(작게, 좌우로) 팝업
+	CCardPopup       m_castPopup;
+	std::vector<int> m_castActors;      // 팝업에 그릴 배우 번호 (DB 에 있는 배우만)
+	int              m_castMore = 0;    // 화면 폭을 넘어 못 그린 배우 수 ("+N")
+	int              m_castItem = -1;   // 마우스가 올라간 배우 수의 영상 항목
+	ULONGLONG        m_castTick = 0;
+	bool VideoCardCountZone(int g, const CRect& card, int which, CRect& zone);   // 영상 카드(가로) 아래 개수 줄의 자리 (which 0 = 태그 수, 1 = 배우 수 - 격자 좌표, 0 개면 false)
+	int              m_castKind = 0;    // 팝업 종류: 1 = 출연 배우 카드, 2 = 태그 칩
+	CRect            m_castCardRect;    // 개수 자리 배경을 칠한 카드 (격자 좌표 - 바뀌면 다시 그림)
+	CString          m_castTags;        // 태그 팝업에 그릴 태그 (쉼표 목록)
+	void CheckCastHover();
+	// 모든 카드 아래 집계(아이콘 + 숫자) 마우스 오버 배경
+	HWND   m_countHotGrid = nullptr;   // 아래 줄을 강조 중인 격자
+	CRect  m_countHotBand;             // 그 카드의 아래 줄 (격자 좌표)
+	CPoint m_countHotPt;
+	bool CountHoverAllowed() const;    // 프로그램이 앞에 있고 메뉴가 없을 때
+	void HotCountBack(CDC* dc, CVideoGrid& grid, int left, int width, int y);   // 집계 한 묶음 자리에 마우스가 있으면 배경
+	void CheckCountHover();
+	int  CastCardH();                                           // 출연 배우 팝업 카드 높이 (사진 + 이름 한 줄)
+	void DrawCastCard(CDC* dc, int actorIdx, const CRect& rc);   // 출연 배우 팝업 카드 (사진 + 이름만)
 	void OpenActorFromStrip(int i);                                  // 더블클릭: 배우 탭에서 그 배우 선택
 	void GoToActor(int actorIdx);                                    // 배우 탭(배우 목록)으로 가서 그 배우 선택
 	CRect StripHeartRect(const CRect& card);                          // 카드 띠 카드의 즐겨찾기 하트 자리
@@ -481,6 +530,11 @@ protected:
 		return (m_mode >= MODE_VIDEO && m_mode <= MODE_TAG) ? m_mode : MODE_VIDEO;
 	}
 	double ZoomFactor() const;
+	// 영상 화면 카드 크기: 해상도별 · 확대 단계별 "가로 몇 개" 표 (상세 화면을 접었을 때의 격자 폭 기준)
+	int  VideoColumns(int step, bool wall, int monitorW) const;   // 가로 칸 수
+	int  VideoRefGridWidth(int* monitorW = nullptr);              // 기준 격자 폭 (창이 놓인 모니터에서 최대화 + 상세 화면 접힘일 때의 격자 안쪽 폭)
+	int  m_lastRefGridW = 0;                                      // 기준 격자 폭 (처음 한 번 계산 - 모니터를 옮겨도 그대로)
+	int  m_refMonitorW = 0;                                       // 그때의 모니터 가로 픽셀 (해상도 표 고르기)
 	void OnZoomChanged(int pos);
 	void DrawActorCard(CDC* dc, int row, const CRect& card, bool selected, bool focused);
 	void DrawActorCardFor(CDC* dc, int idx, const CRect& card, bool selected, bool focused, bool heartHot, bool showCounts = true);   // 배우 번호로 (배우 탭 카드 모양, showCounts = 아래 구분선 + ▶ 출연 수)
@@ -849,9 +903,9 @@ protected:
 	afx_msg void OnVideoMakePreview();
 	afx_msg void OnVideoMakePreviewChecked();
 	afx_msg LRESULT OnPreviewDone(WPARAM wParam, LPARAM lParam);
-	// 미리보기 재생: 영상 격자 카드에 마우스를 0.5초 올려 두면 카드 위에 팝업 창을 띄워 소리 없이 반복
+	// 미리보기 재생: 영상 격자 카드 이미지에 마우스를 올리면 바로 카드 위에 팝업 창을 띄워 소리 없이 반복
 	CPreviewPlayer m_previewPlayer;
-	static const UINT_PTR kPreviewHoverTimer = 0x5056;   // 마우스 위치 살피기 (0.12초마다)
+	static const UINT_PTR kPreviewHoverTimer = 0x5056;   // 마우스 위치 살피기 (0.06초마다)
 	int       m_hoverItem = -1;          // 마우스가 올라가 있는 영상 카드의 항목 (-1: 없음)
 	ULONGLONG m_hoverTick = 0;           // 그 카드에 올라간 시각
 	CRect     m_hoverAnchor;             // 팝업을 띄운 카드 이미지 영역 (화면 좌표 - 스크롤 등으로 카드가 움직이면 닫음)

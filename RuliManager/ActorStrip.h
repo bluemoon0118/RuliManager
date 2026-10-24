@@ -87,7 +87,7 @@ class CCardPopup : public CWnd
 public:
 	std::function<void(CDC*, const CRect&)> m_onDraw;
 	bool CreatePopup(CWnd* owner);
-	void ShowNear(const CRect& anchorScreen, CSize size);   // 기준 영역 위(공간이 없으면 아래)에 표시
+	void ShowNear(const CRect& anchorScreen, CSize size, bool preferBelow = false);   // 기준 영역 위(공간이 없으면 아래)에 표시, preferBelow = 아래 먼저 (공간이 없으면 위)
 	void Hide();
 	COLORREF m_back = TCOL(TC_BACK);
 

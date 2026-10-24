@@ -552,6 +552,23 @@ namespace VectorIcon
 		});
 	}
 
+	void ViewWall(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			// 가로 칸 3×3 (칸 사이 아주 얇은 틈), 가운데 칸에 재생 삼각형 (구멍)
+			const float gap = 0.9f, w = (20.0f - gap * 2) / 3, h = (15.0f - gap * 2) / 3;
+			for (int r = 0; r < 3; ++r)
+				for (int c = 0; c < 3; ++c)
+				{
+					p.StartFigure();
+					p.AddRectangle(Gdiplus::RectF(2.0f + c * (w + gap), 4.5f + r * (h + gap), w, h));
+				}
+			const Gdiplus::PointF tri[3] = { { 10.9f, 10.2f }, { 10.9f, 13.8f }, { 13.9f, 12.0f } };
+			p.AddPolygon(tri, 3);
+		});
+	}
+
 	void ViewPackage(CDC* dc, const CRect& area, COLORREF col, double fill)
 	{
 		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
