@@ -14149,6 +14149,8 @@ int CRuliManagerDlg::PreviewItemAt(CPoint screen, CRect& anchorScreen) const
 	int viewRow = row;
 	// 팝업 기준 = 카드의 이미지 영역 (DrawVideoCard · PartZoneAt 과 같음 - [패키지] 는 카드 전체가 이미지)
 	CRect anchor(card.left, card.top, card.right, VideoPortraitActive() ? card.bottom : card.top + m_vcardImgH);
+	if (!anchor.PtInRect(pt))
+		return -1;   // 이미지 영역 밖(제목 · 정보 줄): 미리보기 대상 아님 (팝업은 이미지 영역에만 뜨므로 바로 닫히며 깜빡이던 것)
 	const int z = PartZoneAt(g, card, pt);
 	auto it = m_gridParts.find(g);
 	if (z >= 0 && it != m_gridParts.end() && z < static_cast<int>(it->second.size()))
