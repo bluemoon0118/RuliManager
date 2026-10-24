@@ -25,7 +25,9 @@ public:
 	// 마우스 위치의 풍선 도움말 글자 (비우면 표시 안 함 - 예: 영상 카드에서 잘린 제목 전체)
 	virtual CString GridTipText(int /*row*/, const CRect& /*card*/, CPoint /*pt*/) { return CString(); }
 	// 화면 바로 위 · 아래(한 화면씩)의 카드 범위 [first, last] - 이미지를 미리 읽어 두기용 (스크롤할 때 "불러오는 중" 깜빡임 줄임)
-	virtual void GridPrefetch(int /*first*/, int /*last*/) {}
+	virtual void GridPrefetch(int /*first*/, int /*last*/) {}
+	// 세로 스크롤 위치가 바뀜 (카드 위에 띄운 미리보기 팝업을 따라 옮기기용)
+	virtual void GridScrolled() {}
 };
 
 // 줄 배치(리스트 보기)의 한 줄: start 번 카드부터 다음 줄 start 전까지 - 한 화면 줄에 모두 (넘치면 좌우 스크롤)

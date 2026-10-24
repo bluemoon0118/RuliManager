@@ -17,7 +17,12 @@ BEGIN_MESSAGE_MAP(CSettingsDlg, CDialogEx)
 	ON_WM_CTLCOLOR()
 	ON_BN_CLICKED(IDC_SET_DEL_BTN, &CSettingsDlg::OnBnClickedDeleteDb)
 	ON_BN_CLICKED(IDC_SET_EXPORT, &CSettingsDlg::OnBnClickedExportList)
-	ON_BN_CLICKED(IDC_SET_IMPORT, &CSettingsDlg::OnBnClickedImportList)
+	ON_BN_CLICKED(IDC_SET_IMPORT, &CSettingsDlg::OnBnClickedImportList)
+	ON_BN_CLICKED(IDC_SET_PREVIEW_BTN, &CSettingsDlg::OnBnClickedMakePreviews)
+	ON_BN_CLICKED(IDC_SET_PREVIEW_DEL, &CSettingsDlg::OnBnClickedDeletePreviews)
+	ON_BN_CLICKED(IDC_SET_PREVIEW_REGEN, &CSettingsDlg::OnBnClickedRegenPreviews)
+	ON_BN_CLICKED(IDC_SET_PREVIEW_STOP, &CSettingsDlg::OnBnClickedStopPreviews)
+	ON_WM_TIMER()
 	ON_BN_CLICKED(IDC_SET_DEL_VIDEO, &CSettingsDlg::OnCheckChanged)
 	ON_BN_CLICKED(IDC_SET_DEL_ACTOR, &CSettingsDlg::OnCheckChanged)
 	ON_BN_CLICKED(IDC_SET_DEL_STUDIO, &CSettingsDlg::OnCheckChanged)
@@ -175,7 +180,7 @@ BOOL CSettingsDlg::OnInitDialog()
 			m_tabs[i].SetToggle(DarkColors::Combo, TCOL(TC_TOGGLETEXT));
 		}
 	}
-	m_theme.Apply(this, { IDC_SET_DEL_BTN });   // 삭제 버튼은 빨간색
+	m_theme.Apply(this, { IDC_SET_DEL_BTN, IDC_SET_PREVIEW_DEL });   // 삭제 버튼은 빨간색
 	// 페이지 나누기: 리소스의 x 위치(400 DLU 단위)로 페이지를 정하고 첫 페이지 자리로 옮김
 	{
 		CRect unit(0, 0, 400, 0);
@@ -250,7 +255,27 @@ BOOL CSettingsDlg::OnInitDialog()
 	}
 
 	ShowPage(g_lastSettingsPage);
+	UpdatePreviewButtons();
+	SetTimer(1, 300, nullptr);   // [만들기 중단] 활성 상태 (미리보기를 만드는 중일 때만)
 	return TRUE;
+}
+
+void CSettingsDlg::UpdatePreviewButtons()
+{
+	const bool busy = m_isPreviewBusy && m_isPreviewBusy();
+	if (CWnd* w = GetDlgItem(IDC_SET_PREVIEW_STOP))
+		if ((w->IsWindowEnabled() != FALSE) != busy)
+			w->EnableWindow(busy);
+}
+
+void CSettingsDlg::OnTimer(UINT_PTR nIDEvent)
+{
+	if (nIDEvent == 1)
+	{
+		UpdatePreviewButtons();
+		return;
+	}
+	CDialogEx::OnTimer(nIDEvent);
 }
 
 void CSettingsDlg::ShowPage(int page)

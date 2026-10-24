@@ -278,6 +278,11 @@
 #define IDC_SET_IO_KIND                 1294
 #define IDC_SET_EXPORT                  1295
 #define IDC_SET_IMPORT                  1296
+#define IDC_SET_PREVIEW_INFO            1322
+#define IDC_SET_PREVIEW_BTN             1323
+#define IDC_SET_PREVIEW_DEL             1324
+#define IDC_SET_PREVIEW_REGEN           1325
+#define IDC_SET_PREVIEW_STOP            1326
 #define ID_ACTOR_SHOWVIDEOS             32800
 #define ID_ACTOR_EDIT                   32801
 #define ID_MANAGE_ACTORS                32810
@@ -302,6 +307,8 @@
 #define ID_VIDEO_DELETECHECKED          33042
 #define ID_VIDEO_UNCHECKALL             33043
 #define ID_CHECK_ALL                    33044
+#define ID_VIDEO_MAKEPREVIEW            33045
+#define ID_VIDEO_MAKEPREVIEWCHECKED     33046
 #define ID_MANAGE_SERIES                32822
 #define ID_CAT_MERGE                    32823
 #define ID_VIDEO_SCREENSHOT             32824
@@ -317,8 +324,8 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        145
-#define _APS_NEXT_COMMAND_VALUE         33045
-#define _APS_NEXT_CONTROL_VALUE         1322
+#define _APS_NEXT_COMMAND_VALUE         33047
+#define _APS_NEXT_CONTROL_VALUE         1327
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

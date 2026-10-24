@@ -716,10 +716,10 @@ namespace VectorIcon
 		g.FillPath(&fb, &female);
 	}
 
-	void Gear(CDC* dc, const CRect& area, COLORREF col, double fill)
+	void Gear(CDC* dc, const CRect& area, COLORREF col, double fill, double rotateDeg)
 	{
-		// 톱니 8개 (사다리꼴) + 가운데 구멍
-		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		// 톱니 8개 (사다리꼴) + 가운데 구멍 (rotateDeg 만큼 돌려서)
+		Paint(dc, area, fill, col, [rotateDeg](Gdiplus::GraphicsPath& p)
 		{
 			const double cx = 12.0, cy = 12.0;
 			const double rOut = 11.0, rIn = 8.4;    // 톱니 끝 / 톱니 뿌리
@@ -729,7 +729,7 @@ namespace VectorIcon
 			std::vector<Gdiplus::PointF> pts;
 			for (int i = 0; i < teeth; ++i)
 			{
-				const double a = -pi / 2 + i * step;
+				const double a = -pi / 2 + i * step + rotateDeg * pi / 180.0;
 				const double tw = step * 0.20;      // 톱니 끝 반폭 (각도)
 				const double bw = step * 0.30;      // 톱니 뿌리 반폭
 				auto pt = [&](double r, double ang)

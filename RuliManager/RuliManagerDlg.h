@@ -22,7 +22,8 @@
 #include <atomic>
 #include "DropCounter.h"
 #include "ScreenshotExtractor.h"
-#include "YearView.h"
+#include "YearView.h"
+#include "PreviewVideo.h"
 
 // 컬렉션 · 제작사 영상 화면 위쪽 정보 (배우 출연작 화면의 배우 정보 자리): 제목(크게) · 정보 줄 · 메모 + (제작사) 하위 레이블 이미지 칸
 //  - 더블클릭 = 편집 (m_onDblClick), 레이블 칸 더블클릭 = 그 레이블 영상 (m_onSubDblClick)
@@ -695,7 +696,8 @@ protected:
 	std::map<CString, UINT64> m_coverUse;                        // 마지막으로 쓴 순번 (많아지면 오래 안 쓴 것부터 지움)
 	UINT64 m_coverTick = 0;
 	CBitmap* GetVideoCover(int itemIdx, int w, int h, bool* loading = nullptr, bool prefetch = false);   // 없으면 백그라운드 읽기 요청 (*loading = 읽는 중, prefetch = 미리 읽기 - 나중 순서)
-	void GridPrefetch(int first, int last) override;
+	void GridPrefetch(int first, int last) override;
+	void GridScrolled() override;   // 스크롤: 미리보기 팝업이 카드를 따라감
 	// 스튜디오 로고 (영상 카드 오른쪽 위에 반투명으로), 이미지 경로(소문자) → GDI+ 이미지
 	std::map<CString, std::unique_ptr<Gdiplus::Bitmap>> m_studioLogos;
 	std::map<CString, std::unique_ptr<Gdiplus::Bitmap>> m_logoMarks;   // 영상 카드 오른쪽 위 로고: 카드 크기로 줄이고 75% 불투명을 미리 적용한 사본 (경로|폭x높이)
@@ -828,6 +830,43 @@ protected:
 	void UpdateShotTitle();        // 창 제목: "스크린샷 추출 중 (3 / 15) · 대기 2"
 	int  ShotQueuePos(const CString& path) const;   // 대기열 순번 (1부터, 없으면 0)
 	afx_msg void OnVideoScreenshot();
+	// 미리보기 영상 (오른쪽 클릭 [미리보기 만들기] - ffmpeg, 백그라운드 스레드 하나 · 대기열, 진행은 아래 상태 줄)
+	struct PreviewJob { CString path; CString out; };
+	std::deque<PreviewJob> m_prevQueue;
+	std::thread       m_prevThread;
+	std::atomic<bool> m_prevCancel{ false };
+	bool              m_prevBusy = false;
+	CString           m_prevBusyPath;      // 만드는 중인 영상 (그 영상은 재생하지 않음)
+	CString           m_ffmpegPath;
+	int               m_prevDone = 0, m_prevTotal = 0, m_prevOk = 0;
+	CString           m_prevFirstError;    // 실패한 첫 영상과 이유 (모두 끝나면 한 번 알림)
+	CString PreviewFileOf(int idx) const;   // 영상 항목 → 미리보기 파일 경로 (없어도 경로는 돌려줌)
+	void QueuePreviews(const std::vector<int>& items);
+	void MakeAllPreviews(CWnd* parent, bool regen = false);   // 설정 [미리보기 일괄 만들기]: 미리보기가 없는 영상만 (확인 후), regen = [미리보기 재생성]: 이미 있는 것도 다시
+	void DeleteAllPreviews(CWnd* parent); // 설정 [미리보기 모두 삭제]: previews 폴더의 미리보기 파일 모두 지움 (확인 후, 만드는 중이면 멈춤)   // 설정 [미리보기 일괄 만들기]: 미리보기가 없는 영상 모두 대기열에 (확인 후)
+	void StartNextPreview();
+	void UpdatePreviewStatus();
+	afx_msg void OnVideoMakePreview();
+	afx_msg void OnVideoMakePreviewChecked();
+	afx_msg LRESULT OnPreviewDone(WPARAM wParam, LPARAM lParam);
+	// 미리보기 재생: 영상 격자 카드에 마우스를 0.5초 올려 두면 카드 위에 팝업 창을 띄워 소리 없이 반복
+	CPreviewPlayer m_previewPlayer;
+	static const UINT_PTR kPreviewHoverTimer = 0x5056;   // 마우스 위치 살피기 (0.12초마다)
+	int       m_hoverItem = -1;          // 마우스가 올라가 있는 영상 카드의 항목 (-1: 없음)
+	ULONGLONG m_hoverTick = 0;           // 그 카드에 올라간 시각
+	CRect     m_hoverAnchor;             // 팝업을 띄운 카드 이미지 영역 (화면 좌표 - 스크롤 등으로 카드가 움직이면 닫음)
+	void StopPreviewPlayer();
+	void CheckPreviewHover();
+	bool CardAnchorOfItem(int item, CRect& anchorScreen);   // 지금 페이지 격자에서 그 영상 카드의 이미지 영역 (화면 좌표, 없으면 false)
+	void FollowPreviewPopup();                              // 미리보기 팝업을 카드 자리로 (카드가 사라졌거나 격자 밖이면 닫음)
+	// 미리보기를 만드는 동안 설정 버튼 톱니바퀴가 돌아감 (모두 끝나면 멈춤)
+	static const UINT_PTR kGearSpinTimer = 0x4753;
+	double m_gearAngle = 0.0;
+	bool   m_gearSpinning = false;
+	void SetGearSpin(bool on);
+	bool   m_prevStopped = false;   // [만들기 중단]: 대기열을 비우고 지금 것을 멈춤 (끝 알림이 오면 정리)
+	void StopPreviews();
+	int  PreviewItemAt(CPoint screen, CRect& anchorScreen) const;   // 마우스 아래 영상 카드의 항목 (분할 영상은 그 파트 칸의 파트, -1: 없음)
 	afx_msg void OnVideoRefreshItem();   // 영상 카드 오른쪽 클릭 → 이 영상만 새로고침 (이미지 · 해상도/재생 시간 · 파일 크기 · 스크린샷 다시 읽기)
 	afx_msg LRESULT OnShotProgress(WPARAM wParam, LPARAM lParam);
 	afx_msg LRESULT OnShotDone(WPARAM wParam, LPARAM lParam);

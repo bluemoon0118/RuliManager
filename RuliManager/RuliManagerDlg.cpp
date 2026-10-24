@@ -42,7 +42,8 @@ namespace
 	};
 	void DrawDefaultActorImage(CDC* dc, const CRect& img, const ActorInfo& a);   // 아래에서 정의 (사진 없는 배우 카드의 기본 이미지)
 	const UINT WM_APP_SHOT_PROGRESS = WM_APP + 4;   // 스크린샷 추출 진행 (wParam = 끝난 장수, lParam = 전체)
-	const UINT WM_APP_SHOT_DONE = WM_APP + 5;       // 스크린샷 추출 끝 (lParam = ShotResult*)
+	const UINT WM_APP_SHOT_DONE = WM_APP + 5;       // 스크린샷 추출 끝 (lParam = ShotResult*)
+	const UINT WM_APP_PREVIEW_DONE = WM_APP + 6;    // 미리보기 영상 만들기 끝 (lParam = PreviewVideo::Result*)
 	const UINT WM_APP_COVER_READY = WM_APP + 3;  // 백그라운드에서 영상 카드 이미지를 읽음 (lParam = CoverResult*)
 	struct CoverResult
 	{
@@ -705,6 +706,9 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_COMMAND(ID_VIDEO_REFRESHITEM, &CRuliManagerDlg::OnVideoRefreshItem)
 	ON_MESSAGE(WM_APP_SHOT_PROGRESS, &CRuliManagerDlg::OnShotProgress)
 	ON_MESSAGE(WM_APP_SHOT_DONE, &CRuliManagerDlg::OnShotDone)
+	ON_COMMAND(ID_VIDEO_MAKEPREVIEW, &CRuliManagerDlg::OnVideoMakePreview)
+	ON_COMMAND(ID_VIDEO_MAKEPREVIEWCHECKED, &CRuliManagerDlg::OnVideoMakePreviewChecked)
+	ON_MESSAGE(WM_APP_PREVIEW_DONE, &CRuliManagerDlg::OnPreviewDone)
 	ON_COMMAND(ID_NEW_ACTOR, &CRuliManagerDlg::OnNewActor)
 	ON_COMMAND(ID_NEW_STUDIO, &CRuliManagerDlg::OnNewStudio)
 	ON_COMMAND(ID_NEW_LABEL, &CRuliManagerDlg::OnNewLabel)
@@ -1169,6 +1173,7 @@ BOOL CRuliManagerDlg::OnInitDialog()
 	m_preview.SetPlaceholder(L"동영상을 선택하세요.");
 	m_preview.ModifyStyle(0, SS_NOTIFY);   // 마우스(더블클릭)를 받도록
 	m_preview.m_onDblClick = [this]() { OpenImageViewer(); };   // 영상 상세: 원본 이미지 보기 창
+	SetTimer(kPreviewHoverTimer, 120, nullptr);   // 영상 카드 마우스 오버 → 미리보기 팝업 (CheckPreviewHover)
 	// 탐색기에서 이미지 파일을 끌어다 놓기 (영상 상세의 이미지 영역) - 관리자 권한으로 실행해도 받도록 메시지 허용
 	DragAcceptFiles(TRUE);
 	::ChangeWindowMessageFilterEx(m_hWnd, WM_DROPFILES, MSGFLT_ALLOW, nullptr);
@@ -2248,7 +2253,7 @@ int CRuliManagerDlg::LayoutListToolbar(int x, int y, int w)
 	}
 	if (visible(IDC_VIDEO_VIEW_H)) row1.push_back({ IDC_VIDEO_VIEW_H, DX(28), btnH, -DY(1) / 2, visible(IDC_VIDEO_VIEW_V) });   // 예전 [가로|세로] (지금은 늘 숨김)
 	if (visible(IDC_VIDEO_VIEW_V)) row1.push_back({ IDC_VIDEO_VIEW_V, DX(28), btnH, -DY(1) / 2 });
-	row1.push_back({ IDC_ZOOM_SLIDER, DX(56), btnH, 0 });
+	if (visible(IDC_ZOOM_SLIDER)) row1.push_back({ IDC_ZOOM_SLIDER, DX(56), btnH, 0 });   // 영상 [리스트] 보기에서는 숨김
 	int total = 0;
 	for (const Item& it : row1)
 		total += it.w + (it.joinNext ? 0 : gap);
@@ -3833,6 +3838,19 @@ void CRuliManagerDlg::OnDestroy()
 	m_shotCancel = true;
 	if (m_shotThread.joinable())
 		m_shotThread.join();
+	// 미리보기 영상: 재생 멈춤, 만드는 중이면 ffmpeg 를 끝내고 기다림, 남은 결과 메시지 정리
+	KillTimer(kPreviewHoverTimer);
+	KillTimer(kGearSpinTimer);
+	StopPreviewPlayer();
+	m_prevQueue.clear();
+	m_prevCancel = true;
+	if (m_prevThread.joinable())
+		m_prevThread.join();
+	{
+		MSG msg;
+		while (::PeekMessageW(&msg, GetSafeHwnd(), WM_APP_PREVIEW_DONE, WM_APP_PREVIEW_DONE, PM_REMOVE))
+			delete reinterpret_cast<PreviewVideo::Result*>(msg.lParam);
+	}
 	{
 		MSG msg;
 		while (::PeekMessageW(&msg, GetSafeHwnd(), WM_APP_SHOT_DONE, WM_APP_SHOT_DONE, PM_REMOVE))
@@ -5382,7 +5400,12 @@ void CRuliManagerDlg::OnBnClickedSettings()
 {
 	CommitDetails();
 	CSettingsDlg dlg(m_lib, this);
-	dlg.m_onDeleteDb = [this](int mask) { DeleteDb(mask); };
+	dlg.m_onDeleteDb = [this](int mask) { DeleteDb(mask); };
+	dlg.m_onMakePreviews = [this, &dlg]() { MakeAllPreviews(&dlg); };
+	dlg.m_onDeletePreviews = [this, &dlg]() { DeleteAllPreviews(&dlg); };
+	dlg.m_onRegenPreviews = [this, &dlg]() { MakeAllPreviews(&dlg, true); };
+	dlg.m_onStopPreviews = [this]() { StopPreviews(); };
+	dlg.m_isPreviewBusy = [this]() { return m_prevBusy && !m_prevStopped; };
 	dlg.m_onExportList = [this, &dlg](int what) { ExportListText(what, &dlg); };
 	dlg.m_onImportList = [this, &dlg](int what) { ImportListText(what, &dlg); };
 	dlg.m_cardMedia = m_showCardMedia;
@@ -6071,6 +6094,8 @@ void CRuliManagerDlg::UpdateLeftPane()
 	const bool videoList = VideoListActive();
 	m_list.ShowWindow(videoList ? SW_SHOW : SW_HIDE);
 	m_grid.SetScrollHidden(videoList);
+	if (m_zoomSlider.GetSafeHwnd())
+		m_zoomSlider.ShowWindow(videoList ? SW_HIDE : SW_SHOW);   // [리스트] 보기는 카드가 없으므로 확대 슬라이더 숨김
 	m_grid.ShowWindow(showVideos && !YearViewActive() ? SW_SHOW : SW_HIDE);   // 연도별 보기에서는 격자(도구줄 포함) 숨김
 	if (m_yearView.GetSafeHwnd())
 		m_yearView.ShowWindow(showVideos && YearViewActive() ? SW_SHOW : SW_HIDE);   // 배우 출연작 [연도별]
@@ -9701,6 +9726,21 @@ void CRuliManagerDlg::OnTimer(UINT_PTR nIDEvent)
 			m_list.Invalidate(FALSE);
 		return;
 	}
+	if (nIDEvent == kGearSpinTimer)
+	{
+		// 미리보기를 만드는 동안 설정 버튼 톱니바퀴를 돌림
+		m_gearAngle += 9.0;
+		if (m_gearAngle >= 360.0)
+			m_gearAngle -= 360.0;
+		if (m_btnSettings.GetSafeHwnd())
+			m_btnSettings.SetIconAngle(m_gearAngle);
+		return;
+	}
+	if (nIDEvent == kPreviewHoverTimer)
+	{
+		CheckPreviewHover();   // 영상 카드 마우스 오버 → 0.5초 뒤 미리보기 팝업
+		return;
+	}
 	if (nIDEvent != kOverlayFadeTimer)
 	{
 		CDialogEx::OnTimer(nIDEvent);
@@ -12572,6 +12612,9 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 			CString del;
 			del.Format(L"DB에서 삭제(%d) (파일 유지)\tDel", CheckedItemCount());
 			menu.AppendMenu(MF_STRING, ID_VIDEO_DELETECHECKED, del);
+			CString prev;
+			prev.Format(L"미리보기 만들기(%d)", CheckedItemCount());
+			menu.AppendMenu(MF_STRING, ID_VIDEO_MAKEPREVIEWCHECKED, prev);
 			menu.AppendMenu(MF_SEPARATOR);
 			menu.AppendMenu(MF_STRING, ID_VIDEO_UNCHECKALL, L"체크 모두 해제");
 			DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
@@ -12594,6 +12637,9 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 		CString del;
 		del.Format(L"DB에서 삭제(%d) (파일 유지)\tDel", CheckedItemCount());
 		menu.AppendMenu(MF_STRING, ID_VIDEO_DELETECHECKED, del);
+		CString prev;
+		prev.Format(L"미리보기 만들기(%d)", CheckedItemCount());
+		menu.AppendMenu(MF_STRING, ID_VIDEO_MAKEPREVIEWCHECKED, prev);
 		menu.AppendMenu(MF_SEPARATOR);
 		menu.AppendMenu(MF_STRING, ID_VIDEO_UNCHECKALL, L"체크 모두 해제");
 		DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
@@ -12614,6 +12660,12 @@ void CRuliManagerDlg::ShowVideoContextMenu(int row, CPoint point)
 	menu.AppendMenu(MF_STRING | ro, ID_VIDEO_TEXTINFO,   L"텍스트로 정보 입력...");
 	menu.AppendMenu(MF_STRING | ro, ID_VIDEO_PASTEINFO,  L"웹페이지 내용 붙여넣기...");
 	menu.AppendMenu(MF_STRING | ro, ID_VIDEO_SCREENSHOT, L"스크린샷 추출...");   // 추출 중이면 대기열에
+	{
+		// 미리보기 영상 (이미 있으면 "다시 만들기")
+		const int ci = (row >= 0 && row < static_cast<int>(m_view.size())) ? m_view[row] : -1;
+		const bool has = (ci >= 0) && ::PathFileExistsW(PreviewFileOf(ci));
+		menu.AppendMenu(MF_STRING | ro, ID_VIDEO_MAKEPREVIEW, has ? L"미리보기 다시 만들기" : L"미리보기 만들기");
+	}
 	menu.AppendMenu(MF_STRING | ro, ID_VIDEO_REFRESHITEM, L"이 영상 새로고침");      // 이미지 · 해상도 · 크기 · 스크린샷 다시 읽기
 	{
 		// [컬렉션에 추가 ▸]: 컬렉션 목록 (이미 들어 있으면 체크 · 누르면 뺌) + [새 컬렉션...]
@@ -14003,6 +14055,492 @@ LRESULT CRuliManagerDlg::OnShotDone(WPARAM, LPARAM lParam)
 	return 0;
 }
 
+// ---------------------------------------------------------------------------
+// 미리보기 영상 (ffmpeg)
+
+CString CRuliManagerDlg::PreviewFileOf(int idx) const
+{
+	if (idx < 0 || idx >= static_cast<int>(m_lib.items.size()))
+		return CString();
+	const CString& path = m_lib.items[idx].path;
+	return PreviewVideo::PreviewFileFor(path, m_lib.CoverCacheFile(path));
+}
+
+void CRuliManagerDlg::StopPreviewPlayer()
+{
+	if (m_previewPlayer.IsPlaying())
+		m_previewPlayer.Stop();
+}
+
+void CRuliManagerDlg::GridScrolled()
+{
+	FollowPreviewPopup();   // 스크롤하자마자 팝업을 카드 자리로 (마우스가 벗어났는지는 CheckPreviewHover 가 살핌)
+}
+
+bool CRuliManagerDlg::CardAnchorOfItem(int item, CRect& anchorScreen)
+{
+	if (item < 0 || !m_grid.GetSafeHwnd())
+		return false;
+	const int count = GridGetCount();
+	for (int g = 0; g < count; ++g)
+	{
+		const int row = GridRowOf(g);
+		if (row < 0 || row >= static_cast<int>(m_view.size()))
+			continue;
+		bool match = (m_view[row] == item);
+		if (!match)
+		{
+			auto it = m_gridParts.find(g);   // 분할 영상을 합친 카드: 파트 중 하나
+			if (it != m_gridParts.end())
+				for (int r : it->second)
+					if (r >= 0 && r < static_cast<int>(m_view.size()) && m_view[r] == item)
+						match = true;
+		}
+		if (!match)
+			continue;
+		CRect card;
+		if (!m_grid.GetCardRect(g, card))
+			return false;
+		anchorScreen = CRect(card.left, card.top, card.right, VideoPortraitActive() ? card.bottom : card.top + m_vcardImgH);   // 이미지 영역 (PreviewItemAt 과 같음)
+		m_grid.ClientToScreen(&anchorScreen);
+		return true;
+	}
+	return false;
+}
+
+void CRuliManagerDlg::FollowPreviewPopup()
+{
+	if (!m_previewPlayer.IsPlaying())
+		return;
+	CRect a;
+	CRect gr;
+	if (m_grid.GetSafeHwnd())
+		m_grid.GetWindowRect(&gr);
+	if (!CardAnchorOfItem(m_hoverItem, a) || !gr.PtInRect(a.CenterPoint()))
+	{
+		// 카드가 이 페이지에서 사라졌거나 격자 밖으로 (절반 넘게) 나감: 닫음 (마우스 아래 카드에서 0.5초 뒤 다시)
+		StopPreviewPlayer();
+		m_hoverItem = -1;
+		m_hoverTick = ::GetTickCount64();
+		return;
+	}
+	if (a != m_hoverAnchor)
+	{
+		m_hoverAnchor = a;
+		m_previewPlayer.MoveToAnchor(a);
+	}
+}
+
+int CRuliManagerDlg::PreviewItemAt(CPoint screen, CRect& anchorScreen) const
+{
+	// 마우스 아래 영상 카드 → 항목 (분할 영상을 합친 카드는 이미지 위 파트 칸의 파트)
+	//  anchorScreen = 팝업을 겹칠 곳: 카드 이미지 영역 (팝업은 이 크기 그대로)
+	CRect gr;
+	m_grid.GetWindowRect(&gr);
+	if (!gr.PtInRect(screen))
+		return -1;
+	CPoint pt = screen;
+	m_grid.ScreenToClient(&pt);
+	const int g = m_grid.HitTest(pt);
+	const int row = (g >= 0) ? GridRowOf(g) : -1;
+	CRect card;
+	if (row < 0 || row >= static_cast<int>(m_view.size()) || !m_grid.GetCardRect(g, card))
+		return -1;
+	int viewRow = row;
+	// 팝업 기준 = 카드의 이미지 영역 (DrawVideoCard · PartZoneAt 과 같음 - [패키지] 는 카드 전체가 이미지)
+	CRect anchor(card.left, card.top, card.right, VideoPortraitActive() ? card.bottom : card.top + m_vcardImgH);
+	const int z = PartZoneAt(g, card, pt);
+	auto it = m_gridParts.find(g);
+	if (z >= 0 && it != m_gridParts.end() && z < static_cast<int>(it->second.size()))
+		viewRow = it->second[z];   // 분할 영상: 그 파트 칸의 파트 (팝업은 이미지 영역 전체에)
+	if (viewRow < 0 || viewRow >= static_cast<int>(m_view.size()))
+		return -1;
+	anchorScreen = anchor;
+	m_grid.ClientToScreen(&anchorScreen);
+	return m_view[viewRow];
+}
+
+void CRuliManagerDlg::CheckPreviewHover()
+{
+	// 영상 격자(격자 · 패키지) 카드에 마우스를 0.5초 올려 두면 카드 위에 미리보기 팝업 (미리보기 영상이 있는 카드만)
+	//  - 팝업이 보이는 동안: 마우스가 팝업 영역 안이면 유지, 벗어나면 닫음 (같은 카드에서는 다시 띄우지 않음 - 다른 카드로 가야 다시 0.5초)
+	//  - 팝업이 아직 안 보일 때(영상 여는 중): 다른 카드로 가면 취소
+	//  - 프로그램이 앞에 없거나 메뉴가 열려 있으면 닫음
+	int item = -1;
+	CRect cardScreen;
+	{
+		CPoint cur;
+		::GetCursorPos(&cur);
+		GUITHREADINFO gti = { sizeof(gti) };
+		const bool inMenu = ::GetGUIThreadInfo(::GetCurrentThreadId(), &gti) && (gti.flags & (GUI_INMENUMODE | GUI_POPUPMENUMODE));
+		const bool gridOk = ShowVideoDetail() && !VideoListActive() && !YearViewActive()
+			&& m_grid.GetSafeHwnd() && m_grid.IsWindowVisible() && ::GetForegroundWindow() == GetSafeHwnd() && !inMenu;
+		if (m_previewPlayer.IsPlaying() && m_previewPlayer.IsWindowVisible())
+		{
+			// 카드가 움직였으면(휠 스크롤 등) 팝업도 따라감 - 카드가 사라졌거나 격자 밖으로 나가면 닫힘
+			FollowPreviewPopup();
+			if (m_previewPlayer.IsPlaying())
+			{
+				CRect popup;
+				m_previewPlayer.GetWindowRect(&popup);
+				if (gridOk && popup.PtInRect(cur))
+					return;   // 팝업 안: 그대로 재생
+			}
+			// 팝업 밖: 닫음 - 보던 카드 위면 다시 띄우지 않고(다른 카드로 가야 다시), 다른 카드 위면 그 카드로 0.5초 기다림
+			StopPreviewPlayer();
+			const int playing = m_hoverItem;   // 팝업은 m_hoverItem 카드로 열었음
+			CRect dummy;
+			m_hoverItem = gridOk ? PreviewItemAt(cur, dummy) : -1;
+			m_hoverTick = ::GetTickCount64();
+			if (m_hoverItem >= 0 && m_hoverItem == playing)
+				m_hoverTick += 0x7FFFFFFFFFFFULL;   // 같은 카드에 있는 동안은 다시 열지 않음
+			return;
+		}
+		if (gridOk)
+			item = PreviewItemAt(cur, cardScreen);
+	}
+	if (item != m_hoverItem)
+	{
+		// 다른 카드 (또는 카드 밖): 팝업 닫고 다시 0.5초 기다림
+		m_hoverItem = item;
+		m_hoverTick = ::GetTickCount64();
+		StopPreviewPlayer();
+		return;
+	}
+	if (item < 0 || m_previewPlayer.IsPlaying() || ::GetTickCount64() < m_hoverTick + 500)   // 0.5초 머물면
+		return;
+	if (IsSfwMosaic() || IsItemOffline(item))
+		return;   // SFW(모자이크) 옵션 · 연결 안 된 영상은 재생하지 않음
+	if (m_prevBusy && m_lib.items[item].path.CompareNoCase(m_prevBusyPath) == 0)
+		return;   // 만드는 중
+	const CString file = PreviewFileOf(item);
+	if (!::PathFileExistsW(file))
+		return;
+	// 팝업 = 카드 이미지 영역과 같은 크기 · 같은 자리 (확대 배율을 따라감, 영상은 비율 유지 - 남는 곳은 검정)
+	m_hoverAnchor = cardScreen;   // 이 카드가 움직이면(스크롤 등) 닫음
+	if (!m_previewPlayer.StartPopup(this, cardScreen, 0, file, RGB(0, 0, 0)))
+		m_hoverTick = ::GetTickCount64() + 60000;   // 열지 못하면 이 카드에서는 한동안 다시 시도하지 않음
+}
+
+void CRuliManagerDlg::OnVideoMakePreview()
+{
+	const int idx = GetSelectedItem();
+	if (idx < 0)
+		return;
+	QueuePreviews({ idx });
+}
+
+void CRuliManagerDlg::OnVideoMakePreviewChecked()
+{
+	std::vector<int> items;
+	for (size_t i = 0; i < m_lib.items.size(); ++i)
+		if (IsItemChecked(static_cast<int>(i)))
+			items.push_back(static_cast<int>(i));
+	QueuePreviews(items);
+}
+
+void CRuliManagerDlg::QueuePreviews(const std::vector<int>& items)
+{
+	if (items.empty())
+		return;
+	m_ffmpegPath = PreviewVideo::FindFfmpeg();
+	if (m_ffmpegPath.IsEmpty())
+	{
+		AfxMessageBox(L"ffmpeg.exe 를 찾을 수 없습니다.\n\n"
+			L"ffmpeg.exe 를 프로그램(RuliManager.exe) 폴더에 넣은 뒤 다시 시도하세요.\n"
+			L"(프로그램 폴더\\ffmpeg\\bin\\ffmpeg.exe 또는 PATH 에 있어도 됩니다)", MB_ICONINFORMATION);
+		return;
+	}
+	int added = 0, skipped = 0;
+	for (int idx : items)
+	{
+		if (idx < 0 || idx >= static_cast<int>(m_lib.items.size()) || IsItemOffline(idx))
+		{
+			++skipped;
+			continue;
+		}
+		const CString path = m_lib.items[idx].path;
+		bool dup = (m_prevBusy && path.CompareNoCase(m_prevBusyPath) == 0);
+		for (const PreviewJob& j : m_prevQueue)
+			if (j.path.CompareNoCase(path) == 0)
+				dup = true;
+		if (dup || !::PathFileExistsW(path))
+		{
+			++skipped;
+			continue;
+		}
+		m_prevQueue.push_back({ path, PreviewFileOf(idx) });
+		++m_prevTotal;
+		m_prevStopped = false;   // 멈추는 중에 새로 넣으면 이어서 만듦
+		++added;
+	}
+	if (added == 0)
+	{
+		if (skipped > 0)
+			AfxMessageBox(L"미리보기를 만들 영상이 없습니다.\n(연결 안 된 영상 · 파일이 없는 영상 · 이미 만드는 중인 영상은 건너뜀)", MB_ICONINFORMATION);
+		return;
+	}
+	if (!m_prevBusy)
+		StartNextPreview();
+	else
+		UpdatePreviewStatus();
+}
+
+void CRuliManagerDlg::MakeAllPreviews(CWnd* parent, bool regen)
+{
+	// 미리보기가 없는 영상만 (연결 안 된 영상 · 파일 없는 영상 · 이미 대기 중이거나 만드는 중인 영상은 빼고)
+	//  regen = [미리보기 재생성]: 이미 있는 영상도 다시 만듦 (덮어씀)
+	const LPCWSTR caption = regen ? L"미리보기 재생성" : L"미리보기 일괄 만들기";
+	if (PreviewVideo::FindFfmpeg().IsEmpty())
+	{
+		::MessageBoxW(parent ? parent->GetSafeHwnd() : GetSafeHwnd(),
+			L"ffmpeg.exe 를 찾을 수 없습니다.\n\nffmpeg.exe 를 프로그램(RuliManager.exe) 폴더에 넣은 뒤 다시 시도하세요.\n"
+			L"(프로그램 폴더\\ffmpeg\\bin\\ffmpeg.exe 또는 PATH 에 있어도 됩니다)", caption, MB_ICONINFORMATION);
+		return;
+	}
+	CWaitCursor wait;
+	std::vector<int> items;
+	int has = 0;
+	for (size_t i = 0; i < m_lib.items.size(); ++i)
+	{
+		const int idx = static_cast<int>(i);
+		if (IsItemOffline(idx))
+			continue;
+		const CString& path = m_lib.items[idx].path;
+		if (m_prevBusy && path.CompareNoCase(m_prevBusyPath) == 0)
+			continue;
+		bool queued = false;
+		for (const PreviewJob& j : m_prevQueue)
+			if (j.path.CompareNoCase(path) == 0) { queued = true; break; }
+		if (queued)
+			continue;
+		if (::PathFileExistsW(PreviewFileOf(idx)))
+		{
+			++has;
+			if (!regen)
+				continue;   // 재생성이면 이미 있는 것도 다시
+		}
+		if (::PathFileExistsW(path))
+			items.push_back(idx);
+	}
+	const HWND owner = parent ? parent->GetSafeHwnd() : GetSafeHwnd();
+	if (items.empty())
+	{
+		CString t;
+		if (regen)
+			t = L"미리보기를 만들 영상이 없습니다.";
+		else
+			t.Format(L"미리보기를 새로 만들 영상이 없습니다.\n(이미 미리보기가 있는 영상 %d편)", has);
+		::MessageBoxW(owner, t, caption, MB_ICONINFORMATION);
+		return;
+	}
+	CString t;
+	if (regen)
+		t.Format(L"영상 %d편의 미리보기를 모두 다시 만듭니다.\n(이미 있는 미리보기 %d개는 새로 만든 것으로 바뀜)\n\n"
+			L"백그라운드에서 한 편씩 만들고 진행은 아래 상태 줄에 표시됩니다.\n영상이 많으면 오래 걸릴 수 있습니다. 계속할까요?",
+			static_cast<int>(items.size()), has);
+	else
+		t.Format(L"미리보기가 없는 영상 %d편의 미리보기를 만듭니다.\n(이미 있는 영상 %d편은 건너뜀)\n\n"
+			L"백그라운드에서 한 편씩 만들고 진행은 아래 상태 줄에 표시됩니다.\n영상이 많으면 오래 걸릴 수 있습니다. 계속할까요?",
+			static_cast<int>(items.size()), has);
+	if (::MessageBoxW(owner, t, caption, MB_ICONQUESTION | MB_YESNO) != IDYES)
+		return;
+	QueuePreviews(items);
+}
+
+void CRuliManagerDlg::DeleteAllPreviews(CWnd* parent)
+{
+	const HWND owner = parent ? parent->GetSafeHwnd() : GetSafeHwnd();
+	const CString dir = PreviewVideo::GetPreviewDir();
+	// 미리보기 파일 (*.mp4) + 만들다 남은 임시 파일 (*.part)
+	std::vector<CString> files;
+	ULONGLONG bytes = 0;
+	for (LPCWSTR pat : { L"\\*.mp4", L"\\*.part" })
+	{
+		WIN32_FIND_DATAW fd = {};
+		HANDLE h = ::FindFirstFileW(dir + pat, &fd);
+		if (h == INVALID_HANDLE_VALUE)
+			continue;
+		do
+		{
+			if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+				continue;
+			files.push_back(dir + L"\\" + fd.cFileName);
+			bytes += (static_cast<ULONGLONG>(fd.nFileSizeHigh) << 32) | fd.nFileSizeLow;
+		} while (::FindNextFileW(h, &fd));
+		::FindClose(h);
+	}
+	if (files.empty() && !m_prevBusy && m_prevQueue.empty())
+	{
+		::MessageBoxW(owner, L"지울 미리보기 파일이 없습니다.", L"미리보기 모두 삭제", MB_ICONINFORMATION);
+		return;
+	}
+	CString t;
+	t.Format(L"미리보기 파일 %d개 (%.1f MB) 를 모두 삭제합니다.\n영상 파일은 지우지 않습니다.", static_cast<int>(files.size()), bytes / (1024.0 * 1024.0));
+	if (m_prevBusy || !m_prevQueue.empty())
+		t += L"\n\n미리보기를 만드는 중입니다. 만들기를 멈추고 남은 대기열도 비웁니다.";
+	t += L"\n\n계속할까요?";
+	if (::MessageBoxW(owner, t, L"미리보기 모두 삭제", MB_ICONWARNING | MB_YESNO | MB_DEFBUTTON2) != IDYES)
+		return;
+
+	CWaitCursor wait;
+	// 재생 · 만들기 멈춤 (파일 잠김 방지) - 만드는 중인 스레드는 ffmpeg 를 끝내고 돌아올 때까지 기다림
+	StopPreviewPlayer();
+	m_hoverItem = -1;
+	m_prevQueue.clear();
+	if (m_prevBusy)
+	{
+		m_prevCancel = true;
+		if (m_prevThread.joinable())
+			m_prevThread.join();
+		// 남은 결과 메시지는 버리고 상태 정리
+		MSG msg;
+		while (::PeekMessageW(&msg, GetSafeHwnd(), WM_APP_PREVIEW_DONE, WM_APP_PREVIEW_DONE, PM_REMOVE))
+			delete reinterpret_cast<PreviewVideo::Result*>(msg.lParam);
+		m_prevBusy = false;
+		m_prevBusyPath.Empty();
+		m_prevDone = m_prevTotal = m_prevOk = 0;
+		m_prevFirstError.Empty();
+		m_prevStopped = false;
+		SetGearSpin(false);
+	}
+	// 대기열이 비었어도 끝난 작업 스레드가 남아 있으면 정리
+	if (m_prevThread.joinable())
+		m_prevThread.join();
+
+	int deleted = 0, failed = 0;
+	for (const CString& f : files)
+		(::DeleteFileW(f) ? deleted : failed)++;
+	CString done;
+	if (failed == 0)
+		done.Format(L"미리보기 파일 %d개를 삭제했습니다.", deleted);
+	else
+		done.Format(L"미리보기 파일 %d개를 삭제했습니다. (%d개는 지우지 못함 - 사용 중일 수 있습니다)", deleted, failed);
+	SetDlgItemText(IDC_STATIC_STATUS, done);
+	::MessageBoxW(owner, done, L"미리보기 모두 삭제", failed ? MB_ICONWARNING : MB_ICONINFORMATION);
+}
+
+void CRuliManagerDlg::StopPreviews()
+{
+	// 미리보기 만들기 중단: 남은 대기열은 버리고, 지금 만드는 것은 ffmpeg 를 끝냄 (끝 알림 OnPreviewDone → StartNextPreview 에서 정리 · 톱니바퀴 멈춤)
+	if (!m_prevBusy || m_prevStopped)
+		return;
+	m_prevQueue.clear();
+	m_prevStopped = true;
+	m_prevCancel = true;
+	SetDlgItemText(IDC_STATIC_STATUS, L"미리보기 만들기를 멈추는 중...");
+}
+
+void CRuliManagerDlg::SetGearSpin(bool on)
+{
+	// 설정 버튼 톱니바퀴: 미리보기를 만드는 동안 돌아감 (0.05초마다 9도), 끝나면 제자리
+	if (on == m_gearSpinning)
+		return;
+	m_gearSpinning = on;
+	if (on)
+		SetTimer(kGearSpinTimer, 50, nullptr);
+	else
+	{
+		KillTimer(kGearSpinTimer);
+		m_gearAngle = 0.0;
+		if (m_btnSettings.GetSafeHwnd())
+		{
+			m_btnSettings.SetIconAngle(0.0);
+			m_btnSettings.SetTooltip(L"설정");
+		}
+	}
+}
+
+void CRuliManagerDlg::UpdatePreviewStatus()
+{
+	if (!m_prevBusy)
+		return;
+	CString t;
+	t.Format(L"미리보기 만드는 중 (%d / %d): %s", m_prevDone + 1, m_prevTotal, ::PathFindFileNameW(m_prevBusyPath));
+	SetDlgItemText(IDC_STATIC_STATUS, t);
+	SetGearSpin(true);
+	if (m_btnSettings.GetSafeHwnd())
+	{
+		CString tip;
+		tip.Format(L"설정 - 미리보기 만드는 중 (%d / %d)", m_prevDone + 1, m_prevTotal);
+		m_btnSettings.SetTooltip(tip);
+	}
+}
+
+void CRuliManagerDlg::StartNextPreview()
+{
+	if (m_prevThread.joinable())
+		m_prevThread.join();
+	if (m_prevQueue.empty())
+	{
+		// 모두 끝남: 결과 한 줄 (실패가 있으면 첫 실패 이유를 한 번 알림)
+		const bool any = (m_prevTotal > 0);
+		CString t;
+		if (m_prevStopped)
+		{
+			t.Format(L"미리보기 만들기를 중단했습니다. (%d편 만듦)", m_prevOk);
+			SetDlgItemText(IDC_STATIC_STATUS, t);
+		}
+		else if (any)
+		{
+			if (m_prevOk == m_prevTotal)
+				t.Format(L"미리보기 영상 %d편을 만들었습니다.", m_prevOk);
+			else
+				t.Format(L"미리보기 영상: %d편 만듦, %d편 실패", m_prevOk, m_prevTotal - m_prevOk);
+			SetDlgItemText(IDC_STATIC_STATUS, t);
+		}
+		const CString err = m_prevFirstError;
+		m_prevStopped = false;
+		SetGearSpin(false);   // 톱니바퀴 멈춤
+		m_prevBusy = false;
+		m_prevBusyPath.Empty();
+		m_prevDone = m_prevTotal = m_prevOk = 0;
+		m_prevFirstError.Empty();
+		if (!err.IsEmpty())
+			AfxMessageBox(err, MB_ICONWARNING);
+		return;
+	}
+	const PreviewJob job = m_prevQueue.front();
+	m_prevQueue.pop_front();
+	m_prevBusy = true;
+	m_prevCancel = false;
+	m_prevBusyPath = job.path;
+	if (m_previewPlayer.IsPlaying() && m_previewPlayer.File().CompareNoCase(job.out) == 0)
+		StopPreviewPlayer();   // 다시 만드는 영상의 미리보기가 재생 중이면 멈춤 (파일 잠김)
+	UpdatePreviewStatus();
+	const HWND hwnd = GetSafeHwnd();
+	const CString ffmpeg = m_ffmpegPath;
+	std::atomic<bool>* cancel = &m_prevCancel;   // 창이 닫힐 때 OnDestroy 가 스레드를 기다리므로 유효
+	m_prevThread = std::thread([hwnd, ffmpeg, job, cancel]()
+	{
+		const HRESULT co = ::CoInitializeEx(nullptr, COINIT_MULTITHREADED);   // 영상 길이 읽기 (속성 · Media Foundation)
+		const CMediaInfoLabel::Info info = CMediaInfoLabel::ReadInfoCached(job.path);
+		const double dur = info.duration100ns > 0 ? static_cast<double>(info.duration100ns) / 1e7 : 0.0;
+		PreviewVideo::Result* r = new PreviewVideo::Result(PreviewVideo::Make(ffmpeg, job.path, job.out, dur, *cancel));
+		if (SUCCEEDED(co))
+			::CoUninitialize();
+		if (!::PostMessageW(hwnd, WM_APP_PREVIEW_DONE, 0, reinterpret_cast<LPARAM>(r)))
+			delete r;
+	});
+}
+
+LRESULT CRuliManagerDlg::OnPreviewDone(WPARAM, LPARAM lParam)
+{
+	std::unique_ptr<PreviewVideo::Result> r(reinterpret_cast<PreviewVideo::Result*>(lParam));
+	if (m_prevThread.joinable())
+		m_prevThread.join();
+	if (r)
+	{
+		++m_prevDone;
+		if (r->ok)
+			++m_prevOk;
+		else if (!r->canceled && m_prevFirstError.IsEmpty())
+			m_prevFirstError = CString(::PathFindFileNameW(r->video)) + L"\n\n" + r->error;
+	}
+	StartNextPreview();   // 대기열의 다음 영상 (없으면 끝)
+	return 0;
+}
+
 void CRuliManagerDlg::OnBnClickedDrillViewGrid() { SetActorDrillView(0); }
 void CRuliManagerDlg::OnBnClickedDrillViewYear() { SetActorDrillView(1); }
 
@@ -14423,6 +14961,20 @@ void CRuliManagerDlg::SetListStarHover(int row, int val)
 
 BOOL CRuliManagerDlg::PreTranslateMessage(MSG* pMsg)
 {
+	// 설정 버튼 오른쪽 클릭: 미리보기를 만드는 중이면 [미리보기 만들기 중단]
+	if (pMsg->message == WM_RBUTTONUP && pMsg->hwnd == m_btnSettings.GetSafeHwnd() && m_prevBusy && !m_prevStopped)
+	{
+		CMenu menu;
+		menu.CreatePopupMenu();
+		CString t;
+		t.Format(L"미리보기 만들기 중단 (%d / %d)", m_prevDone + 1, m_prevTotal);
+		menu.AppendMenu(MF_STRING, 1, t);
+		CPoint pt;
+		::GetCursorPos(&pt);
+		if (DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD | TPM_NONOTIFY, pt.x, pt.y, this) == 1)
+			StopPreviews();
+		return TRUE;
+	}
 	// [리스트] 별점 칸 마우스 오버: 상세 별점 컨트롤처럼 마우스 위치까지 별 미리 보기 (오버 중인 줄만 - 누르면 그 줄을 고르고 저장)
 	if (pMsg->hwnd == m_list.GetSafeHwnd() && VideoListActive())
 	{

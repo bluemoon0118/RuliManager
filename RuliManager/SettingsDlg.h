@@ -32,7 +32,12 @@ public:
 	// [선택한 DB 삭제] 확인 후 호출 (메인 창이 실제로 지우고 화면 갱신)
 	std::function<void(int mask)> m_onDeleteDb;
 	// [텍스트 내보내기 / 가져오기] (what: CVideoLibrary::EXPORT_ACTORS / STUDIOS / TAGS) - 메인 창이 파일 고르기 · 처리 · 화면 갱신
-	std::function<void(int what)> m_onExportList;
+	std::function<void(int what)> m_onExportList;
+	std::function<void()> m_onMakePreviews;   // [DB 관리] 미리보기 일괄 만들기 (미리보기가 없는 영상만)
+	std::function<void()> m_onDeletePreviews; // [DB 관리] 미리보기 모두 삭제
+	std::function<void()> m_onRegenPreviews;  // [DB 관리] 미리보기 재생성 (이미 있는 것도 다시)
+	std::function<void()> m_onStopPreviews;   // [DB 관리] 미리보기 만들기 중단
+	std::function<bool()> m_isPreviewBusy;    // 미리보기를 만드는 중인지 ([만들기 중단] 활성 - 0.3초마다 확인)
 	std::function<void(int what)> m_onImportList;
 
 	// [표시] 영상 카드 해상도 · 재생 시간 (DoModal 전에 지금 값, IDOK 후 고른 값)
@@ -72,7 +77,13 @@ protected:
 	afx_msg void OnThemeChanged();  // 테마 콤보 → 미리보기 갱신
 	afx_msg void OnBnClickedDeleteDb();
 	afx_msg void OnBnClickedExportList();
-	afx_msg void OnBnClickedImportList();
+	afx_msg void OnBnClickedImportList();
+	afx_msg void OnBnClickedMakePreviews() { if (m_onMakePreviews) m_onMakePreviews(); UpdatePreviewButtons(); }
+	afx_msg void OnBnClickedDeletePreviews() { if (m_onDeletePreviews) m_onDeletePreviews(); }
+	afx_msg void OnBnClickedRegenPreviews() { if (m_onRegenPreviews) m_onRegenPreviews(); UpdatePreviewButtons(); }
+	afx_msg void OnBnClickedStopPreviews() { if (m_onStopPreviews) m_onStopPreviews(); UpdatePreviewButtons(); }
+	void UpdatePreviewButtons();
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	int  SelectedIoKind();
 	afx_msg void OnCheckChanged();
 	afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
