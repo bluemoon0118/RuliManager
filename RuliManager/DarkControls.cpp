@@ -267,13 +267,14 @@ void CDarkButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		// 설정 버튼: 글자 없이 가운데 톱니바퀴 (벡터)
 		VectorIcon::Gear(&dc, tr, disabled ? Dim(textColor) : textColor, 0.72, m_iconAngle);
 	}
-	else if (m_icon == ICON_VIEW_GRID || m_icon == ICON_VIEW_LIST || m_icon == ICON_VIEW_PACKAGE || m_icon == ICON_VIEW_YEAR)
+	else if (m_icon == ICON_VIEW_GRID || m_icon == ICON_VIEW_LIST || m_icon == ICON_VIEW_PACKAGE || m_icon == ICON_VIEW_YEAR || m_icon == ICON_VIEW_WALL)
 	{
 		// 보기 방식 버튼: 글자 없이 가운데 아이콘 (벡터)
 		const COLORREF ic = disabled ? Dim(textColor) : textColor;
 		if (m_icon == ICON_VIEW_GRID)      VectorIcon::ViewGrid(&dc, tr, ic, 0.66);
 		else if (m_icon == ICON_VIEW_LIST) VectorIcon::ViewList(&dc, tr, ic, 0.66);
-		else if (m_icon == ICON_VIEW_YEAR) VectorIcon::ViewYear(&dc, tr, ic, 0.66);
+		else if (m_icon == ICON_VIEW_YEAR) VectorIcon::ViewYear(&dc, tr, ic, 0.66);
+		else if (m_icon == ICON_VIEW_WALL) VectorIcon::ViewWall(&dc, tr, ic, 0.66);
 		else                               VectorIcon::ViewPackage(&dc, tr, ic, 0.66);
 	}
 	else if (m_icon == ICON_GENRE_OFF || m_icon == ICON_GENRE_ON)

@@ -48,7 +48,9 @@ public:
 	void SetBackColor(COLORREF bg); // 배경색 (어두운 색이면 글자/카드 색도 어둡게 맞춤)
 	int  HitTest(CPoint pt) const;
 	// 카드 크기를 고정 (0 이면 기본: 썸네일 + 글자 4줄). 남는 폭은 양쪽으로 나눠 가운데 정렬
-	void SetFixedTile(int cardW, int cardH);
+	void SetFixedTile(int cardW, int cardH);
+	void SetTilePad(int pad);
+	int  BasePad() const { return m_basePad; }   // 기본 카드 둘레 여백 (칸 = 카드 + 여백 × 2)   // 고정 카드 둘레 여백 (-1 = 기본 - 글꼴 높이 기준, 0 = 카드끼리 딱 붙임: 영상 [월 모드])
 	int  HotRow() const { return m_hot; }   // 마우스가 올라가 있는 카드 (-1: 없음)
 	int  HotPart() const { return m_hotPart; }   // 그 카드에서 마우스가 올라간 버튼 (GridHitPart 값)
 	int  HotZone() const { return m_hotZone; }   // 그 카드에서 마우스가 올라간 영역 (GridHoverZone 값)
@@ -85,7 +87,9 @@ protected:
 	COLORREF m_accent  = RGB(0, 102, 204);
 	COLORREF m_sub     = RGB(110, 110, 110);
 	int  ImageAreaH() const { return m_showImage ? m_thumbH + m_pad / 2 : 0; }
-	int  m_pad = 8;
+	int  m_pad = 8;
+	int  m_basePad = 8;      // 기본 여백 (글꼴 기준)
+	int  m_padOverride = -1; // SetTilePad (-1 = 기본)
 	int  m_lineH = 16;
 	int  m_cols = 1;
 	int  m_cellW = 176;

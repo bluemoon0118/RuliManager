@@ -474,7 +474,7 @@ bool CCardPopup::CreatePopup(CWnd* owner)
 		CRect(0, 0, 10, 10), owner, 0) != FALSE;
 }
 
-void CCardPopup::ShowNear(const CRect& anchor, CSize size)
+void CCardPopup::ShowNear(const CRect& anchor, CSize size, bool preferBelow)
 {
 	if (!GetSafeHwnd())
 		return;
@@ -486,7 +486,13 @@ void CCardPopup::ShowNear(const CRect& anchor, CSize size)
 	const int gap = 6;
 	int x = anchor.left + (anchor.Width() - size.cx) / 2;
 	int y = anchor.top - gap - size.cy;
-	if (y < work.top)
+	if (preferBelow)
+	{
+		y = anchor.bottom + gap;
+		if (y + size.cy > work.bottom)
+			y = anchor.top - gap - size.cy;   // 아래 공간이 없으면 위
+	}
+	else if (y < work.top)
 		y = anchor.bottom + gap;
 	const int cw = static_cast<int>(size.cx), ch = static_cast<int>(size.cy);   // LONG → int (std::min / max 형 맞춤)
 	x = (std::max)(static_cast<int>(work.left), (std::min)(x, static_cast<int>(work.right) - cw));
