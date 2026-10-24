@@ -134,6 +134,8 @@ BEGIN_MESSAGE_MAP(CImagePreview, CStatic)
 	ON_WM_ERASEBKGND()
 	ON_WM_SIZE()
 	ON_WM_LBUTTONDBLCLK()
+	ON_WM_MOUSEMOVE()
+	ON_MESSAGE(WM_MOUSELEAVE, &CImagePreview::OnMouseLeave)
 END_MESSAGE_MAP()
 
 namespace
@@ -281,6 +283,28 @@ void CImagePreview::OnLButtonDblClk(UINT nFlags, CPoint point)
 		m_onDblClick();
 	else
 		CStatic::OnLButtonDblClk(nFlags, point);
+}
+
+void CImagePreview::OnMouseMove(UINT nFlags, CPoint point)
+{
+	if (!m_hoverTracking && m_onHover)
+	{
+		TRACKMOUSEEVENT tme = { sizeof(tme), TME_LEAVE, m_hWnd, 0 };
+		m_hoverTracking = ::TrackMouseEvent(&tme) != FALSE;
+		m_onHover(true);
+	}
+	CStatic::OnMouseMove(nFlags, point);
+}
+
+LRESULT CImagePreview::OnMouseLeave(WPARAM, LPARAM)
+{
+	if (m_hoverTracking)
+	{
+		m_hoverTracking = false;
+		if (m_onHover)
+			m_onHover(false);
+	}
+	return 0;
 }
 
 void CImagePreview::OnPaint()

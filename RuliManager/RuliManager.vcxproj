@@ -105,7 +105,8 @@
     <ClInclude Include="ImagePreview.h" />
     <ClInclude Include="ImageViewerWnd.h" />
     <ClInclude Include="Theme.h" />
-    <ClInclude Include="ScreenshotExtractor.h" />
+    <ClInclude Include="ScreenshotExtractor.h" />
+    <ClInclude Include="PreviewVideo.h" />
     <ClInclude Include="YearView.h" />
     <ClInclude Include="TagLinkDlg.h" />
     <ClInclude Include="BulkNameDlg.h" />
@@ -161,7 +162,8 @@
     <ClCompile Include="SuggestEdit.cpp" />
     <ClCompile Include="TagChipCtrl.cpp" />
     <ClCompile Include="TextDraw.cpp" />
-    <ClCompile Include="VectorIcons.cpp" />
+    <ClCompile Include="VectorIcons.cpp" />
+    <ClCompile Include="PreviewVideo.cpp" />
     <ClCompile Include="ZoomSlider.cpp" />
     <ClCompile Include="StarRatingCtrl.cpp" />
     <ClCompile Include="SettingsDlg.cpp" />

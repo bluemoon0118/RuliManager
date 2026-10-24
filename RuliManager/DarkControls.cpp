@@ -195,9 +195,15 @@ void CDarkButton::OnEnable(BOOL bEnable)
 
 void CDarkButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 {
-	CDC dc;
-	dc.Attach(lpDIS->hDC);
+	// 메모리 DC 에 그린 뒤 한 번에 옮김 (톱니바퀴 회전처럼 자주 다시 그려도 깜빡이지 않게)
+	CDC screen;
+	screen.Attach(lpDIS->hDC);
 	CRect rc = lpDIS->rcItem;
+	CDC dc;
+	dc.CreateCompatibleDC(&screen);
+	CBitmap memBmp;
+	memBmp.CreateCompatibleBitmap(&screen, (std::max)(1, static_cast<int>(rc.right)), (std::max)(1, static_cast<int>(rc.bottom)));   // 0,0 부터 (좌표 그대로)
+	CBitmap* oldMemBmp = dc.SelectObject(&memBmp);
 
 	const bool disabled = (lpDIS->itemState & ODS_DISABLED) != 0;
 	const bool pressed  = (lpDIS->itemState & ODS_SELECTED) != 0;
@@ -259,7 +265,7 @@ void CDarkButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	if (m_icon == ICON_GEAR)
 	{
 		// 설정 버튼: 글자 없이 가운데 톱니바퀴 (벡터)
-		VectorIcon::Gear(&dc, tr, disabled ? Dim(textColor) : textColor, 0.72);
+		VectorIcon::Gear(&dc, tr, disabled ? Dim(textColor) : textColor, 0.72, m_iconAngle);
 	}
 	else if (m_icon == ICON_VIEW_GRID || m_icon == ICON_VIEW_LIST || m_icon == ICON_VIEW_PACKAGE || m_icon == ICON_VIEW_YEAR)
 	{
@@ -349,7 +355,9 @@ void CDarkButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	}
 	dc.SelectObject(oldFont);
 
-	dc.Detach();
+	screen.BitBlt(rc.left, rc.top, rc.Width(), rc.Height(), &dc, rc.left, rc.top, SRCCOPY);
+	dc.SelectObject(oldMemBmp);
+	screen.Detach();
 }
 
 // ===========================================================================

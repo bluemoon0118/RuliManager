@@ -382,6 +382,8 @@ void CVideoGrid::SetScroll(int pos)
 		if (std::abs(delta) >= rc.Height())
 			Invalidate(FALSE);
 		UpdateHot();   // 스크롤하면 커서 아래 카드가 바뀜
+		if (m_owner)
+			m_owner->GridScrolled();
 	}
 	SetScrollPos(SB_VERT, m_scroll, TRUE);
 }

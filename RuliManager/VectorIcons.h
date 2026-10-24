@@ -15,7 +15,7 @@ namespace VectorIcon
 	void User(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);        // 사람 (성별 미지정 배우 기본 이미지, Font Awesome user)
 	void Movie(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);       // 원 + 재생 (영상 기본 이미지, Font Awesome circle-play)
 	void PlayCircle(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);  // 원 + 재생 (영상 수)
-	void Gear(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);
+	void Gear(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0, double rotateDeg = 0.0);   // rotateDeg: 시계 방향 회전 (돌아가는 톱니바퀴)
 	void Copy(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);        // 겹친 두 장 (복사 - 품번 복사 버튼)
 	// 메뉴 아이콘 (오른쪽 클릭 메뉴 왼쪽 - DarkMenu)
 	void Trash(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);       // 휴지통 (삭제)

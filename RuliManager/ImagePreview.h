@@ -26,7 +26,8 @@ public:
 	// 이미지가 없을 때 직접 그리는 기본 이미지 (예: 사진 없는 배우의 실루엣) - 이전 이미지는 지움
 	void SetDefaultImage(std::function<void(CDC*, const CRect&)> draw);
 	void Clear();
-	void SetBackColor(COLORREF bg) { m_bk = bg; if (GetSafeHwnd()) Invalidate(FALSE); }
+	void SetBackColor(COLORREF bg) { m_bk = bg; if (GetSafeHwnd()) Invalidate(FALSE); }
+	COLORREF GetBackColor() const { return m_bk; }
 	// 이미지를 반투명으로 (연결 안 된 이동식 디스크 영상) - 이미지를 바꾸면(SetImageFile 등) 다시 불투명
 	void SetDimmed(bool dim) { const BYTE a = dim ? 100 : 255; if (a != m_alpha) { m_alpha = a; if (GetSafeHwnd()) Invalidate(FALSE); } }
 
@@ -41,11 +42,15 @@ protected:
 	std::function<void(CDC*, const CRect&)> m_drawDefault;   // 기본 이미지 (있으면 안내 문구 대신)
 public:
 	std::function<void()> m_onDblClick;   // 더블클릭 (SS_NOTIFY 스타일이 있어야 마우스를 받음)
+	std::function<void(bool)> m_onHover;   // 마우스가 들어옴(true) / 나감(false) (SS_NOTIFY 필요) - 영상 상세: 미리보기 영상 재생
 protected:
+	bool m_hoverTracking = false;
 
 	afx_msg void OnPaint();
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
+	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
+	afx_msg LRESULT OnMouseLeave(WPARAM, LPARAM);
 	DECLARE_MESSAGE_MAP()
 };
