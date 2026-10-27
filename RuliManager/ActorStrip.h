@@ -87,14 +87,33 @@ class CCardPopup : public CWnd
 public:
 	std::function<void(CDC*, const CRect&)> m_onDraw;
 	bool CreatePopup(CWnd* owner);
-	void ShowNear(const CRect& anchorScreen, CSize size, bool preferBelow = false);   // 기준 영역 위(공간이 없으면 아래)에 표시, preferBelow = 아래 먼저 (공간이 없으면 위)
+	void ShowNear(const CRect& anchorScreen, CSize size, bool preferBelow = false);
+	void ShowCentered(const CRect& anchorScreen, CSize size);   // 기준 영역 가운데에 겹쳐서 (모니터 작업 영역 안으로)   // 기준 영역 위(공간이 없으면 아래)에 표시, preferBelow = 아래 먼저 (공간이 없으면 위)
 	void Hide();
 	COLORREF m_back = TCOL(TC_BACK);
+	// 마우스: 기본은 통과 (아래 창이 받음), m_interactive = true 면 팝업이 받아 m_onMouse 로 (WM_MOUSEMOVE · LBUTTONDOWN · LBUTTONDBLCLK · RBUTTONUP, 클라이언트 좌표)
+	bool m_interactive = false;
+	std::function<void(UINT msg, CPoint client)> m_onMouse;
+	std::function<void(WPARAM, LPARAM)> m_onWheel;   // 휠 (예: 아래 격자로 넘겨 스크롤)
+	// 부드럽게 나타나기: 0 보다 크면 숨어 있다가 보일 때 이 시간(ms) 동안 투명 → 불투명 (끝나면 보통 창으로 - 안의 재생 창 등도 그대로 보이게)
+	int  m_fadeMs = 0;
+	bool IsFading() const { return m_fading; }
 
 protected:
+	bool      m_fading = false;
+	ULONGLONG m_fadeStart = 0;
+	static const UINT_PTR kFadeTimer = 1;
+	void PlaceAndShow(int x, int y, int cx, int cy);   // 자리 · 크기 맞춰 보임 (숨어 있었으면 m_fadeMs 로 나타남)
+	void EndFade();                                    // 투명 효과 끝 (불투명 · 보통 창)
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnPaint();
 	afx_msg BOOL OnEraseBkgnd(CDC*) { return TRUE; }
-	afx_msg LRESULT OnNcHitTest(CPoint) { return HTTRANSPARENT; }
+	afx_msg LRESULT OnNcHitTest(CPoint) { return m_interactive ? HTCLIENT : HTTRANSPARENT; }
+	afx_msg void OnMouseMove(UINT, CPoint pt) { if (m_onMouse) m_onMouse(WM_MOUSEMOVE, pt); }
+	afx_msg void OnLButtonDown(UINT, CPoint pt) { if (m_onMouse) m_onMouse(WM_LBUTTONDOWN, pt); }
+	afx_msg void OnLButtonDblClk(UINT, CPoint pt) { if (m_onMouse) m_onMouse(WM_LBUTTONDBLCLK, pt); }
+	afx_msg void OnRButtonUp(UINT, CPoint pt) { if (m_onMouse) m_onMouse(WM_RBUTTONUP, pt); }
+	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt) { if (m_onWheel) m_onWheel(MAKEWPARAM(nFlags, zDelta), MAKELPARAM(pt.x, pt.y)); return TRUE; }
 	afx_msg int OnMouseActivate(CWnd*, UINT, UINT) { return MA_NOACTIVATE; }
 	DECLARE_MESSAGE_MAP()
 };

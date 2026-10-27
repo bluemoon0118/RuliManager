@@ -3,6 +3,9 @@
 #include "NameListDlg.h"
 #include "BulkNameDlg.h"
 #include "TextInfoDlg.h"
+#include <functional>
+#include <set>
+#include <map>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -68,6 +71,11 @@ BEGIN_MESSAGE_MAP(CNameListDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_NL_KIND_STUDIO, &CNameListDlg::OnKindStudio)
 	ON_BN_CLICKED(IDC_NL_KIND_LABEL, &CNameListDlg::OnKindLabel)
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_NL_LIST, &CNameListDlg::OnLvnItemChanged)
+	ON_NOTIFY(NM_CUSTOMDRAW, IDC_NL_LIST, &CNameListDlg::OnListCustomDraw)
+	ON_NOTIFY(LVN_BEGINDRAG, IDC_NL_LIST, &CNameListDlg::OnLvnBeginDrag)
+	ON_WM_MOUSEMOVE()
+	ON_WM_LBUTTONUP()
+	ON_WM_CAPTURECHANGED()
 	ON_NOTIFY(LVN_COLUMNCLICK, IDC_NL_LIST, &CNameListDlg::OnLvnColumnClick)
 	ON_BN_CLICKED(IDC_NL_NEW, &CNameListDlg::OnBnClickedNew)
 	ON_BN_CLICKED(IDC_NL_DELETE, &CNameListDlg::OnBnClickedDelete)
@@ -115,6 +123,7 @@ BOOL CNameListDlg::OnInitDialog()
 			chips[i]->m_onDropDown = [ctrl]() { ctrl->m_edit.ShowAll(); };
 		}
 		m_labelChips.m_edit.SetCueBanner(L"레이블 입력 (↓ 목록)");
+	m_labelChips.m_onHeightChanged = [this]() { LayoutStudioChips(); };
 		SetupChipIcons(m_labelChips, true);   // 레이블 칩: 레이블 이미지
 
 		// 상위 제작사: 칩 하나 (자리 표시 칸 위치에), 등록된 제작사만 · 비우면 상위 없음
@@ -141,8 +150,8 @@ BOOL CNameListDlg::OnInitDialog()
 			for (int i : SortedNamedIndices(m_lib.studios, CString()))
 			{
 				const NamedInfo& st = m_lib.studios[i];
-				if (st.name.CompareNoCase(cur) == 0 || (!m_parentExclude.IsEmpty() && st.name.CompareNoCase(m_parentExclude) == 0))
-					continue;
+				if (st.name.CompareNoCase(cur) == 0 || (!m_parentExclude.IsEmpty() && m_lib.IsStudioDescendant(st.name, m_parentExclude)))
+					continue;   // 제작사의 상위: 자기 자신 · 자기 하위(여러 단계)는 안 됨 (순환)
 				const std::vector<CString> subs = CVideoLibrary::SplitLines(st.subName);
 				CString subShown;
 				for (const CString& s : subs) { if (!subShown.IsEmpty()) subShown += L" / "; subShown += s; }
@@ -160,10 +169,10 @@ BOOL CNameListDlg::OnInitDialog()
 			if (!tags.empty())
 			{
 				const int sn = m_lib.FindStudioLoose(tags[0]);
-				if (sn < 0 || (!m_parentExclude.IsEmpty() && m_lib.studios[sn].name.CompareNoCase(m_parentExclude) == 0))
+				if (sn < 0 || (!m_parentExclude.IsEmpty() && m_lib.IsStudioDescendant(m_lib.studios[sn].name, m_parentExclude)))
 				{
 					::MessageBeep(MB_ICONWARNING);
-					tags.clear();   // 없는 제작사는 상위로 지정할 수 없음 (먼저 제작사로 등록)
+					tags.clear();   // 없는 제작사 · 자기 자신 · 자기 하위 제작사는 상위로 지정할 수 없음
 				}
 				else
 					tags[0] = m_lib.studios[sn].name;
@@ -171,6 +180,69 @@ BOOL CNameListDlg::OnInitDialog()
 			m_parentChips.SetTags(tags);
 			OnFieldChanged();
 		};
+		// 하위 제작사: [상위] 줄 아래 칩 줄 (여러 개, 등록된 제작사만) - 자기 자신 · 자기 상위(여러 단계)는 안 됨 (순환)
+		{
+			CRect crc = m_parentRect;
+			crc.OffsetRect(0, m_chipsRect1.top - m_parentRect.top);
+			m_childChips.Create(this, IDC_NL_CHILD_CHIPS);   // 높이는 LayoutStudioChips (칩 수만큼)
+			m_childChips.m_onHeightChanged = [this]() { LayoutStudioChips(); };
+			m_childChips.SetColors(DarkColors::Edit, TCOL(TC_LIGHT), TCOL(TC_DARK), TCOL(TC_SUB), DarkColors::Text);
+			m_childChips.m_edit.SetColors(DarkColors::Edit, DarkColors::Text, DarkColors::Button, TCOL(TC_HINT));
+			m_childChips.m_edit.SetCueBanner(L"하위 제작사 (여러 개, ↓ 목록)");
+			m_childChips.MoveWindow(&crc);
+			m_childChips.SetWindowPos(&m_parentChips, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);   // 탭 순서: 상위 다음
+			m_childChips.m_onDropDown = [this]() { m_childChips.m_edit.ShowAll(); };
+			SetupChipIcons(m_childChips, false);   // 제작사 이미지
+			CRect lrc = m_parentLblRect;
+			lrc.OffsetRect(0, m_chipsRect1.top - m_parentRect.top);
+			m_childLbl.Create(L"하위", WS_CHILD | SS_LEFT, lrc, this, IDC_NL_CHILD_LBL);
+			m_childLbl.SetFont(GetFont());
+			m_childChips.m_edit.Setup([this](std::vector<SuggestItem>& out)
+			{
+				const NamedInfo* self = ItemOf(m_cur);
+				const CString me = (self && !IsLabelCode(m_cur)) ? self->name : CString();
+				std::set<CString> used;
+				for (const CString& t : m_childChips.Tags()) { CString k = t; k.MakeLower(); used.insert(k); }
+				for (int i : SortedNamedIndices(m_lib.studios, CString()))
+				{
+					const NamedInfo& st = m_lib.studios[i];
+					CString k = st.name;
+					k.MakeLower();
+					if (used.count(k) || (!me.IsEmpty() && m_lib.IsStudioDescendant(me, st.name)))
+						continue;   // 이미 넣은 것 · 자기 자신 · 자기 상위는 하위로 못 넣음
+					out.push_back({ st.name + L"\t" + (st.parent.IsEmpty() ? CString(L"최상위") : L"상위: " + st.parent), st.name });
+				}
+			}, false);
+			m_childChips.m_onChanged = [this]()
+			{
+				// 등록된 제작사만 (서브이름으로 입력하면 제작사 이름으로), 자기 자신 · 자기 상위는 빼고, 중복 정리
+				const NamedInfo* self = ItemOf(m_cur);
+				const CString me = (self && !IsLabelCode(m_cur)) ? self->name : CString();
+				std::vector<CString> tags, keep;
+				tags = m_childChips.Tags();
+				bool beep = false;
+				for (const CString& t : tags)
+				{
+					const int sn = m_lib.FindStudioLoose(t);
+					if (sn < 0 || (!me.IsEmpty() && m_lib.IsStudioDescendant(me, m_lib.studios[sn].name)))
+					{
+						beep = true;
+						continue;
+					}
+					bool dup = false;
+					for (const CString& k : keep)
+						if (k.CompareNoCase(m_lib.studios[sn].name) == 0)
+							dup = true;
+					if (!dup)
+						keep.push_back(m_lib.studios[sn].name);
+				}
+				if (beep)
+					::MessageBeep(MB_ICONWARNING);
+				if (keep != tags)
+					m_childChips.SetTags(keep);
+				OnFieldChanged();
+			};
+		}
 		// 레이블 후보: 다른 레이블 전부 (오른쪽에 지금 상위) - 고르면 저장할 때 이 제작사 아래로 옮김, 새 이름은 새 레이블
 		m_labelChips.m_edit.Setup([this](std::vector<SuggestItem>& out)
 		{
@@ -188,7 +260,7 @@ BOOL CNameListDlg::OnInitDialog()
 		}, false);
 	}
 
-	SetWindowText(m_kind == LIST_STUDIO ? CString(L"제작사 / 레이블 관리") : KindName() + L" 관리");
+	SetWindowText(m_kind == LIST_STUDIO ? CString(L"제작사 관리") : KindName() + L" 관리");
 	SetDlgItemText(IDC_NL_NEW, L"새 " + KindName());
 
 	CRect r(0, 0, 100, 0);
@@ -323,14 +395,29 @@ CString CNameListDlg::RowText(int code) const
 {
 	if (code < 0)
 		return CString();
+	// 트리 깊이만큼 들여쓰기 (깊이 1 = "└ ", 더 깊으면 앞에 빈칸)
+	auto indent = [this, code]()
+	{
+		const auto it = m_codeDepth.find(code);
+		const int d = it == m_codeDepth.end() ? 0 : it->second;
+		CString s;
+		for (int k = 1; k < d; ++k)
+			s += L"      ";
+		if (d > 0)
+			s += L"      └ ";
+		return s;
+	};
 	if (IsLabelCode(code))
 	{
 		const NamedInfo& lb = m_lib.labelInfos[code - kLabelBase];
 		if (m_lib.FindNamed(LIST_STUDIO, lb.parent) < 0)
 			return lb.name + L"  (레이블 · 상위 없음)";
-		return L"      └ " + lb.name;   // 상위 제작사 아래 들여쓰기
+		return indent() + lb.name;   // 상위 제작사 아래 들여쓰기
 	}
-	return m_lib.NamedList(m_kind)[code].name;
+	const NamedInfo& n = m_lib.NamedList(m_kind)[code];
+	if (m_kind == LIST_STUDIO)
+		return indent() + n.name;   // 하위 제작사: 상위 제작사 아래 들여쓰기
+	return n.name;
 }
 
 int CNameListDlg::CountOfCode(int code) const
@@ -366,23 +453,46 @@ void CNameListDlg::FillListCode(int selectCode)
 	};
 
 	m_rows.clear();
+	m_codeDepth.clear();
 	const std::vector<int> sorted = SortedNamedIndices(Items(), CString());
 	if (m_kind == LIST_STUDIO)
 	{
-		// 제작사 (이름 순) 바로 아래에 그 레이블 (└, 이름 순). 검색: 제작사가 맞으면 레이블 전부, 레이블만 맞으면 제작사 + 맞는 레이블
+		// 트리: 최상위 제작사 (이름 순) → 그 아래 하위 제작사 (여러 단계, 이름 순) → 그 제작사의 레이블 (이름 순)
+		// 검색: 제작사가 맞으면 그 아래 전부, 아래쪽만 맞으면 맞는 항목까지 가는 경로를 보여 줌
+		std::set<int> visited;
+		std::function<bool(int, int, bool, std::vector<std::pair<int, int>>&)> addStudio =
+			[&](int si, int depth, bool parentHit, std::vector<std::pair<int, int>>& out) -> bool
+		{
+			if (!visited.insert(si).second)
+				return false;   // 순환 연결 방지
+			const NamedInfo& st = Items()[si];
+			const bool hit = parentHit || matches(st);
+			std::vector<std::pair<int, int>> sub;   // (코드, 깊이)
+			for (int ci : m_lib.ChildStudiosOf(st.name))
+				addStudio(ci, depth + 1, hit, sub);
+			for (int li : m_lib.LabelsOf(st.name))
+				if (hit || matches(m_lib.labelInfos[li]))
+					sub.push_back({ kLabelBase + li, depth + 1 });
+			if (!hit && sub.empty())
+				return false;
+			out.push_back({ si, depth });
+			out.insert(out.end(), sub.begin(), sub.end());
+			return true;
+		};
+		std::vector<std::pair<int, int>> tree;
 		for (int si : sorted)
 		{
 			const NamedInfo& st = Items()[si];
-			const bool stHit = matches(st);
-			std::vector<int> lbs;
-			for (int li : m_lib.LabelsOf(st.name))
-				if (stHit || matches(m_lib.labelInfos[li]))
-					lbs.push_back(li);
-			if (!stHit && lbs.empty())
-				continue;
-			m_rows.push_back(si);
-			for (int li : lbs)
-				m_rows.push_back(kLabelBase + li);
+			if (st.parent.IsEmpty() || m_lib.FindNamed(LIST_STUDIO, st.parent) < 0)
+				addStudio(si, 0, false, tree);
+		}
+		for (int si : sorted)   // 순환으로 최상위에서 닿지 않은 제작사는 최상위로
+			if (visited.find(si) == visited.end())
+				addStudio(si, 0, false, tree);
+		for (const auto& t : tree)
+		{
+			m_rows.push_back(t.first);
+			m_codeDepth[t.first] = t.second;
 		}
 		// 상위 제작사가 없는 레이블은 맨 아래 (이름 순)
 		std::vector<int> orphans;
@@ -465,30 +575,36 @@ void CNameListDlg::UpdateKindControls()
 	if (m_kind != LIST_STUDIO)
 		return;
 	const BOOL enable = (m_cur >= 0);
-	m_radioStudio.EnableWindow(enable);
-	m_radioLabel.EnableWindow(enable);
-	const BOOL isLabel = enable && m_radioLabel.IsChecked();
-	m_parentChips.EnableWindow(isLabel);
-	// 제작사(또는 선택 없음)일 때는 [상위] 줄 자체를 숨김
-	m_parentChips.ShowWindow(isLabel ? SW_SHOW : SW_HIDE);
-	GetDlgItem(IDC_NL_PARENT_LBL)->ShowWindow(isLabel ? SW_SHOW : SW_HIDE);
-	if (!isLabel)
-		m_parentChips.m_edit.HidePopup();
-	GetDlgItem(IDC_NL_PARENT_LBL)->EnableWindow(isLabel);
-	// 제작사: [레이블] 칩 + 그 아래 [시리즈] 칩, 레이블: [시리즈] 칩 (첫 줄 자리)
-	// [레이블] 글자는 제작사일 때만 (시리즈 표는 글자 없이 전체 폭)
-	GetDlgItem(IDC_NL_CHIPS_LBL)->ShowWindow(isLabel ? SW_HIDE : SW_SHOW);
-	if (!isLabel)
+	// 레이블 개편: 제작사 하위 레이블 없음 → [제작사 | 레이블] 종류 버튼 · [레이블] 칩 숨김
+	m_radioStudio.ShowWindow(SW_HIDE);
+	m_radioLabel.ShowWindow(SW_HIDE);
+	m_radioStudio.EnableWindow(FALSE);
+	m_radioLabel.EnableWindow(FALSE);
+	const BOOL isLabel = FALSE;
+	// [상위] 줄: 레이블 = 그 레이블의 제작사, 제작사 = 상위 제작사 (여러 단계, 자기 하위는 안 됨) - 선택 없음이면 숨김
+	m_parentChips.EnableWindow(enable);
+	m_parentChips.ShowWindow(enable ? SW_SHOW : SW_HIDE);
+	GetDlgItem(IDC_NL_PARENT_LBL)->ShowWindow(enable ? SW_SHOW : SW_HIDE);
+	SetDlgItemText(IDC_NL_PARENT_LBL, isLabel ? L"제작사" : L"상위");
+	m_parentChips.m_edit.SetCueBanner(isLabel ? L"이 레이블의 제작사 (비우면 없음, ↓ 목록)" : L"상위 제작사 (비우면 최상위, ↓ 목록)");
+	m_parentChips.m_edit.HidePopup();
+	GetDlgItem(IDC_NL_PARENT_LBL)->EnableWindow(enable);
+	m_parentExclude = isLabel ? CString() : (m_cur >= 0 && ItemOf(m_cur) ? ItemOf(m_cur)->name : CString());   // 제작사: 자기 자신 · 하위는 상위로 못 고름
+	// 제작사: [상위] 줄 아래 [레이블] 칩 (원래 자리, [영상 수] 줄과 겹치지 않게 [상위] 줄 높이만큼 줄임), 레이블: 레이블 칩 숨김
+	GetDlgItem(IDC_NL_CHIPS_LBL)->ShowWindow(SW_HIDE);
+	// 제작사: [상위] / [하위] (하위 제작사 칩) / [레이블] 차례 - 레이블 칩은 두 줄만큼 아래로, [영상 수] 줄과 겹치지 않게 줄임
+	const bool studioRow = enable && !isLabel;
+	if (m_childChips.GetSafeHwnd())
 	{
-		// 제작사: [상위] 줄이 숨겨지므로 [레이블] 줄을 그 높이로 올림
-		CRect lbl = m_chipsLblRect, chips = m_chipsRect1;
-		lbl.OffsetRect(0, m_parentLblRect.top - lbl.top);
-		chips.OffsetRect(0, m_parentRect.top - chips.top);
-		GetDlgItem(IDC_NL_CHIPS_LBL)->MoveWindow(&lbl);
-		m_labelChips.MoveWindow(&chips);
+		m_childChips.ShowWindow(studioRow ? SW_SHOW : SW_HIDE);
+		m_childChips.EnableWindow(studioRow);
+		m_childLbl.ShowWindow(studioRow ? SW_SHOW : SW_HIDE);
+		if (!studioRow)
+			m_childChips.m_edit.HidePopup();
 	}
-	m_labelChips.ShowWindow(isLabel ? SW_HIDE : SW_SHOW);
-	m_labelChips.EnableWindow(enable);
+	LayoutStudioChips();
+	m_labelChips.ShowWindow(SW_HIDE);
+	m_labelChips.EnableWindow(FALSE);
 	m_labelChips.m_edit.HidePopup();
 }
 
@@ -528,8 +644,13 @@ void CNameListDlg::ShowItem(int code)
 			const bool label = IsLabelCode(m_cur);
 			m_radioStudio.SetChecked(!label);
 			m_radioLabel.SetChecked(label);
-			FillParentCombo(label ? CString() : n.name, label ? n.parent : CString());
+			FillParentCombo(label ? CString() : n.name, n.parent);   // 레이블: 그 제작사, 제작사: 상위 제작사
 			m_labelChips.SetTags(label ? std::vector<CString>() : m_lib.LabelNamesOf(n.name));
+			std::vector<CString> kids;
+			if (!label)
+				for (int ci : m_lib.ChildStudiosOf(n.name))
+					kids.push_back(m_lib.studios[ci].name);
+			m_childChips.SetTags(kids);
 		}
 	}
 	else
@@ -549,6 +670,7 @@ void CNameListDlg::ShowItem(int code)
 			m_parentExclude.Empty();
 			m_parentChips.SetTags({});
 			m_labelChips.SetTags({});
+			m_childChips.SetTags({});
 		}
 	}
 
@@ -687,6 +809,296 @@ void CNameListDlg::ApplyLabelChips(const CString& studioName)
 		AfxMessageBox(L"제작사 이름과 같아서 레이블로 추가하지 않았습니다: " + skipped, MB_ICONINFORMATION);
 }
 
+// ---------------------------------------------------------------------------
+// 제작사 목록 트리: 글자색 · 끌어서 놓기
+
+void CNameListDlg::OnListCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	NMLVCUSTOMDRAW* cd = reinterpret_cast<NMLVCUSTOMDRAW*>(pNMHDR);
+	*pResult = CDRF_DODEFAULT;
+	if (m_kind != LIST_STUDIO)
+		return;
+	if (cd->nmcd.dwDrawStage == CDDS_PREPAINT)
+	{
+		*pResult = CDRF_NOTIFYITEMDRAW;
+		return;
+	}
+	if (cd->nmcd.dwDrawStage != CDDS_ITEMPREPAINT)
+		return;
+	const int row = static_cast<int>(cd->nmcd.dwItemSpec);
+	if (row < 0 || row >= static_cast<int>(m_rows.size()))
+		return;
+	if (m_dragging && row == m_dropRow)
+	{
+		// 놓을 곳: 강조색 바탕 + 흰 글자 (선택 표시는 끔)
+		cd->nmcd.uItemState &= ~(CDIS_SELECTED | CDIS_FOCUS);
+		cd->clrTextBk = DarkColors::Button;
+		cd->clrText = RGB(255, 255, 255);
+		*pResult = CDRF_NEWFONT;
+		return;
+	}
+	if (m_list.GetItemState(row, LVIS_SELECTED) & LVIS_SELECTED)
+		return;   // 선택 행은 기본 색
+	const COLORREF text = DarkColors::Text;
+	const bool darkBack = (GetRValue(text) + GetGValue(text) + GetBValue(text)) > 384;   // 밝은 글자 = 어두운 바탕
+	if (IsLabelCode(m_rows[row]))
+		cd->clrText = darkBack ? RGB(0xC4, 0xB0, 0xF0) : RGB(0x6A, 0x3F, 0xC0);   // 레이블: 보라
+	else
+		cd->clrText = text;                                                       // 제작사: 기본 글자색
+	*pResult = CDRF_NEWFONT;
+}
+
+// dragCode 를 row 행에 놓을 수 있는지 - targetStudio: 새 상위 제작사 (빈칸 = 최상위 / 상위 없음)
+//  row -1 = 빈 곳, 레이블 위에 놓으면 그 레이블의 상위 제작사 아래로
+bool CNameListDlg::CanDrop(int dragCode, int row, CString* targetStudio) const
+{
+	if (dragCode < 0)
+		return false;
+	CString target;
+	if (row >= 0)
+	{
+		if (row >= static_cast<int>(m_rows.size()))
+			return false;
+		const int code = m_rows[row];
+		if (IsLabelCode(code))
+		{
+			const CString& p = m_lib.labelInfos[code - kLabelBase].parent;
+			if (m_lib.FindNamed(LIST_STUDIO, p) < 0)
+				return false;   // 상위 없는 레이블 위
+			target = m_lib.studios[m_lib.FindNamed(LIST_STUDIO, p)].name;
+		}
+		else
+			target = m_lib.studios[code].name;
+	}
+	CString cur;
+	if (IsLabelCode(dragCode))
+	{
+		const NamedInfo& lb = m_lib.labelInfos[dragCode - kLabelBase];
+		const int pi = m_lib.FindNamed(LIST_STUDIO, lb.parent);
+		cur = pi >= 0 ? m_lib.studios[pi].name : CString();
+	}
+	else
+	{
+		const NamedInfo& st = m_lib.studios[dragCode];
+		if (!target.IsEmpty() && m_lib.IsStudioDescendant(target, st.name))
+			return false;   // 자기 자신 · 자기 하위 아래로는 못 감
+		const int pi = st.parent.IsEmpty() ? -1 : m_lib.FindNamed(LIST_STUDIO, st.parent);
+		cur = pi >= 0 ? m_lib.studios[pi].name : CString();
+	}
+	if (cur.CompareNoCase(target) == 0)
+		return false;   // 그대로
+	if (targetStudio)
+		*targetStudio = target;
+	return true;
+}
+
+void CNameListDlg::SetDropRow(int row)
+{
+	if (row == m_dropRow)
+		return;
+	const int old = m_dropRow;
+	m_dropRow = row;
+	if (old >= 0)
+		m_list.RedrawItems(old, old);
+	if (row >= 0)
+		m_list.RedrawItems(row, row);
+	m_list.UpdateWindow();
+}
+
+void CNameListDlg::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	NMLISTVIEW* p = reinterpret_cast<NMLISTVIEW*>(pNMHDR);
+	*pResult = 0;
+	if (m_kind != LIST_STUDIO || p->iItem < 0 || p->iItem >= static_cast<int>(m_rows.size()))
+		return;
+	m_dragCode = m_rows[p->iItem];
+	m_dragging = true;
+	m_dropRow = -2;
+	SetCapture();
+	::SetCursor(::LoadCursor(nullptr, IDC_NO));
+}
+
+void CNameListDlg::OnMouseMove(UINT nFlags, CPoint point)
+{
+	if (!m_dragging)
+	{
+		CDialogEx::OnMouseMove(nFlags, point);
+		return;
+	}
+	CPoint pt = point;
+	ClientToScreen(&pt);
+	m_list.ScreenToClient(&pt);
+	CRect rc;
+	m_list.GetClientRect(&rc);
+	int row = -2;   // 목록 밖
+	if (rc.PtInRect(pt))
+	{
+		// 위 · 아래 끝 근처면 스크롤
+		CRect head(0, 0, 0, 0);
+		if (CHeaderCtrl* h = m_list.GetHeaderCtrl())
+			if (h->IsWindowVisible())
+				h->GetWindowRect(&head);
+		const int top = rc.top + head.Height();
+		const int edge = ::GetSystemMetrics(SM_CYMENU);
+		if (pt.y < top + edge)
+			m_list.Scroll(CSize(0, -edge));
+		else if (pt.y > rc.bottom - edge)
+			m_list.Scroll(CSize(0, edge));
+		LVHITTESTINFO hit = {};
+		hit.pt = CPoint(rc.left + 4, pt.y);   // 줄 어디에 있어도 그 행
+		row = m_list.SubItemHitTest(&hit);
+		if (row < 0)
+			row = pt.y >= top ? -1 : -2;      // 빈 곳 = 최상위
+	}
+	const bool ok = row != -2 && CanDrop(m_dragCode, row, nullptr);
+	SetDropRow(ok && row >= 0 ? row : -2);
+	::SetCursor(::LoadCursor(nullptr, ok ? IDC_ARROW : IDC_NO));
+}
+
+void CNameListDlg::OnLButtonUp(UINT nFlags, CPoint point)
+{
+	if (m_dragging)
+	{
+		CPoint pt = point;
+		ClientToScreen(&pt);
+		m_list.ScreenToClient(&pt);
+		CRect rc;
+		m_list.GetClientRect(&rc);
+		int row = -2;
+		if (rc.PtInRect(pt))
+		{
+			LVHITTESTINFO hit = {};
+			hit.pt = CPoint(rc.left + 4, pt.y);
+			row = m_list.SubItemHitTest(&hit);
+			if (row < 0)
+				row = -1;
+		}
+		m_dropRow = row;
+		EndDrag(true);
+		return;
+	}
+	CDialogEx::OnLButtonUp(nFlags, point);
+}
+
+void CNameListDlg::OnCaptureChanged(CWnd* pWnd)
+{
+	if (m_dragging && pWnd != this)
+		EndDrag(false);   // 다른 창이 마우스를 가져감 (Esc · Alt+Tab 등) → 취소
+	CDialogEx::OnCaptureChanged(pWnd);
+}
+
+void CNameListDlg::EndDrag(bool drop)
+{
+	if (!m_dragging)
+		return;
+	const int code = m_dragCode;
+	const int row = m_dropRow;
+	m_dragging = false;
+	m_dragCode = -1;
+	m_dropRow = -2;
+	if (GetCapture() == this)
+		ReleaseCapture();
+	m_list.Invalidate(FALSE);
+	if (!drop || row == -2)
+		return;
+	CString target;
+	if (!CanDrop(code, row, &target))
+		return;
+
+	// 끌어 온 항목의 이름 (지금 항목 저장으로 코드가 바뀔 수 있음)
+	const bool isLabel = IsLabelCode(code);
+	const CString name = isLabel ? m_lib.labelInfos[code - kLabelBase].name : m_lib.studios[code].name;
+	if (!Commit())
+		return;
+	const int code2 = CodeOf(name, isLabel);
+	if (code2 < 0)
+		return;
+	// 저장 뒤 목록이 바뀌었을 수 있으니 대상 다시 확인
+	const int ti = target.IsEmpty() ? -1 : m_lib.FindNamed(LIST_STUDIO, target);
+	if (!target.IsEmpty() && ti < 0)
+		return;
+
+	if (isLabel)
+	{
+		const int li = code2 - kLabelBase;
+		const int videos = m_lib.CountLabelVideos(name);
+		if (videos > 0)
+		{
+			CString msg;
+			msg.Format(L"레이블 '%s' 을(를) %s 옮깁니다.\n이 레이블 영상 %d개의 제작사도 함께 바뀝니다. 계속할까요?",
+				(LPCWSTR)name,
+				target.IsEmpty() ? L"상위 없음으로" : (LPCWSTR)(L"'" + target + L"' 아래로"),
+				videos);
+			if (AfxMessageBox(msg, MB_YESNO | MB_ICONQUESTION) != IDYES)
+				return;
+		}
+		m_lib.SetLabelParent(li, target);
+	}
+	else
+	{
+		if (!target.IsEmpty() && m_lib.IsStudioDescendant(target, name))
+			return;
+		m_lib.studios[code2].parent = target;   // 하위 제작사 · 레이블은 그대로 따라감 (상위 연결만 바뀜)
+	}
+	m_changed = true;
+	m_counts = m_lib.CountNamed(m_kind);
+	FillListCode(code2);   // 옮긴 항목을 선택 (그 아래 항목도 함께 옮겨져 보임)
+}
+
+void CNameListDlg::LayoutStudioChips()
+{
+	// 제작사: [하위] 칩 칸 (칩 수만큼 높이) + 그 아래 [레이블] 칩 칸 (남는 공간) - 원래 칩 영역(m_chipsRect1) 안에서
+	//  둘이 합쳐 넘치면 필요한 높이 비율로 나눔 (한 줄은 늘 보이게)
+	if (m_inChipLayout || m_kind != LIST_STUDIO || !m_childChips.GetSafeHwnd() || !m_labelChips.GetSafeHwnd())
+		return;
+	if (m_radioLabel.IsChecked())
+		return;
+	m_inChipLayout = true;
+	const int rowH = m_parentRect.Height();
+	const int gap = (std::max)(2, static_cast<int>(m_chipsRect1.top - m_parentRect.bottom));   // 줄 사이 간격
+	const int top = m_chipsRect1.top;
+	const int bottom = m_chipsRect1.bottom;
+	const int w = m_chipsRect1.Width();
+	(void)w;
+	(void)gap;
+	const int childH = (std::max)(rowH, bottom - top);   // 레이블 개편: [하위] 칩 칸이 칩 영역 전체 ([레이블] 칩 없음)
+	const CRect child(m_chipsRect1.left, top, m_chipsRect1.right, top + childH);
+	CRect cur;
+	m_childChips.GetWindowRect(&cur);
+	ScreenToClient(&cur);
+	if (cur != child)
+		m_childChips.MoveWindow(&child);
+	// "하위" 글자: 칸 첫 줄 가운데
+	CRect lrc = m_parentLblRect;
+	lrc.OffsetRect(0, top - m_parentRect.top);
+	if (m_childLbl.GetSafeHwnd())
+		m_childLbl.MoveWindow(&lrc);
+	Invalidate(FALSE);
+	m_inChipLayout = false;
+}
+
+void CNameListDlg::ApplyChildChips(const CString& studioName)
+{
+	// 칩에 있는 제작사 → 상위를 이 제작사로, 칩에서 뺀 (예전) 하위 제작사 → 최상위로
+	const std::vector<CString> want = m_childChips.Tags();
+	auto wanted = [&want](const CString& n)
+	{
+		for (const CString& w : want)
+			if (w.CompareNoCase(n) == 0) return true;
+		return false;
+	};
+	for (int ci : m_lib.ChildStudiosOf(studioName))
+		if (!wanted(m_lib.studios[ci].name))
+			m_lib.studios[ci].parent.Empty();
+	for (const CString& w : want)
+	{
+		const int sn = m_lib.FindNamed(LIST_STUDIO, w);
+		if (sn < 0 || m_lib.IsStudioDescendant(studioName, m_lib.studios[sn].name))
+			continue;   // 없는 제작사 · 자기 자신 · 자기 상위 (순환)
+		m_lib.studios[sn].parent = studioName;
+	}
+}
+
 void CNameListDlg::OnKindStudio()
 {
 	if (m_loading || m_cur < 0 || m_radioStudio.IsChecked())
@@ -750,15 +1162,25 @@ bool CNameListDlg::Commit()
 	}
 
 	CString parent;
+	if (m_kind == LIST_STUDIO && !m_parentChips.Tags().empty())   // 비어 있으면 상위 없음 (레이블: 제작사 없는 레이블, 제작사: 최상위)
+		parent = m_parentChips.Tags()[0];
 	if (wantLabel)
 	{
-		if (!m_parentChips.Tags().empty())   // 비어 있으면 상위 제작사 없는 레이블
-			parent = m_parentChips.Tags()[0];
 		if (!wasLabel && !m_lib.LabelsOf(n.name).empty())
 		{
 			AfxMessageBox(L"하위 레이블이 있는 제작사는 레이블로 바꿀 수 없습니다.\n먼저 그 레이블들을 다른 제작사로 옮기거나 삭제하세요.", MB_ICONWARNING);
 			return false;
 		}
+		if (!wasLabel && !m_lib.ChildStudiosOf(n.name).empty())
+		{
+			AfxMessageBox(L"하위 제작사가 있는 제작사는 레이블로 바꿀 수 없습니다.\n먼저 하위 제작사의 [상위] 를 바꾸거나 비우세요.", MB_ICONWARNING);
+			return false;
+		}
+	}
+	else if (m_kind == LIST_STUDIO && !parent.IsEmpty() && !wasLabel && m_lib.IsStudioDescendant(parent, n.name))
+	{
+		AfxMessageBox(L"자기 자신이나 자기 하위 제작사는 상위로 지정할 수 없습니다.", MB_ICONWARNING);
+		return false;
 	}
 
 	// 이름 변경 → 영상에도 반영
@@ -830,12 +1252,34 @@ bool CNameListDlg::Commit()
 			m_lib.SetLabelParent(m_cur - kLabelBase, parent);
 			m_structChanged = true;   // 목록 위치(상위 제작사 아래)가 바뀜
 		}
+		// 제작사: 상위 제작사 (여러 단계 - 순환은 위에서 막음)
+		if (!wantLabel)
+		{
+			if (NamedInfo* stp = ItemOf(newCode))
+			{
+				CString p = parent;
+				if (!p.IsEmpty() && m_lib.IsStudioDescendant(p, stp->name))
+					p.Empty();   // 레이블에서 바꾼 경우 등 - 순환이면 최상위로
+				if (stp->parent != p)
+				{
+					stp->parent = p;
+					m_structChanged = true;   // 목록 글자(상위 표시)가 바뀜
+				}
+			}
+		}
 		// 제작사: 레이블 칩 → 하위 레이블 지정 (목록 구조가 바뀜)
 		if (!wantLabel)
 		{
 			const NamedInfo* st = ItemOf(newCode);
 			if (st)
 			{
+				// 하위 제작사 칩 → 각 제작사의 상위 (목록 구조가 바뀜)
+				{
+					std::vector<int> beforeKids = m_lib.ChildStudiosOf(st->name);
+					ApplyChildChips(st->name);
+					if (beforeKids != m_lib.ChildStudiosOf(st->name))
+						m_structChanged = true;
+				}
 				const std::vector<CString> before = m_lib.LabelNamesOf(st->name);
 				ApplyLabelChips(st->name);
 				if (before != m_lib.LabelNamesOf(st->name))
@@ -1060,7 +1504,7 @@ void CNameListDlg::OnBnClickedImageBrowse()
 		return;
 
 	CFileDialog dlg(TRUE, nullptr, nullptr, OFN_FILEMUSTEXIST | OFN_HIDEREADONLY,
-		L"이미지 파일 (*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif;*.tif;*.tiff)|*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif;*.tif;*.tiff|모든 파일 (*.*)|*.*||",
+		L"이미지 파일 (*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif;*.tif;*.tiff;*.svg)|*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif;*.tif;*.tiff;*.svg|모든 파일 (*.*)|*.*||",
 		this);
 	if (dlg.DoModal() != IDOK)
 		return;

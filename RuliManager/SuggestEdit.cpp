@@ -101,6 +101,7 @@ BEGIN_MESSAGE_MAP(CSuggestEdit, CEdit)
 	ON_WM_KILLFOCUS()
 	ON_WM_MOUSEWHEEL()
 	ON_WM_DESTROY()
+	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 void CSuggestEdit::Setup(Provider provider, bool multi)
@@ -126,6 +127,8 @@ void CSuggestEdit::HidePopup()
 {
 	if (IsPopupVisible())
 		m_popup.ShowWindow(SW_HIDE);
+	if (GetSafeHwnd())
+		KillTimer(kWatchTimer);
 }
 
 CString CSuggestEdit::CurrentToken(int& start, int& end) const
@@ -274,6 +277,47 @@ void CSuggestEdit::UpdatePopup(bool showAll)
 		y = rc.top - h;   // 아래에 자리가 없으면 위로
 	m_popup.SetWindowPos(&CWnd::wndTop, rc.left, y, rc.Width(), h, SWP_NOACTIVATE | SWP_SHOWWINDOW);
 	m_popup.Invalidate();
+	SetTimer(kWatchTimer, 100, nullptr);   // 바깥(포커스를 받지 않는 곳)을 눌러도 닫히게
+}
+
+void CSuggestEdit::OnTimer(UINT_PTR nIDEvent)
+{
+	if (nIDEvent != kWatchTimer)
+	{
+		CEdit::OnTimer(nIDEvent);
+		return;
+	}
+	if (!IsPopupVisible())
+	{
+		KillTimer(kWatchTimer);
+		return;
+	}
+	// 포커스가 없거나 이 창(대화상자)이 뒤로 가면 닫음
+	//  (GetTopLevelParent 는 주인 창까지 올라가서 - 대화상자 안이면 메인 창 - 늘 "뒤에 있음" 으로 보고 바로 닫던 것 → 자기 최상위 창으로)
+	const HWND top = ::GetAncestor(m_hWnd, GA_ROOT);
+	if (GetFocus() != this || (top && ::GetForegroundWindow() != top))
+	{
+		HidePopup();
+		KillTimer(kWatchTimer);
+		return;
+	}
+	// 목록 · 입력 칸 · 칩 칸(⌄ 버튼 포함 - 그쪽에서 처리) 밖을 누르면 닫음 (대화상자 빈 곳 · 글자 등 포커스를 받지 않는 곳)
+	if ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) || (::GetAsyncKeyState(VK_RBUTTON) & 0x8000))
+	{
+		CPoint pt;
+		::GetCursorPos(&pt);
+		CRect pr, er, cr;
+		m_popup.GetWindowRect(&pr);
+		GetWindowRect(&er);
+		CWnd* parent = GetParent();
+		if (parent && parent->GetSafeHwnd() != top)
+			parent->GetWindowRect(&cr);   // 칩 칸 안 (⌄ 버튼 등) - 칩 칸이 아닌 그냥 입력 칸이면 대화상자 전체가 되므로 뺌
+		if (!pr.PtInRect(pt) && !er.PtInRect(pt) && !cr.PtInRect(pt))
+		{
+			HidePopup();
+			KillTimer(kWatchTimer);
+		}
+	}
 }
 
 void CSuggestEdit::MoveSelection(int delta)

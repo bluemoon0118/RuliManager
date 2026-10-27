@@ -267,7 +267,7 @@ void CDarkButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		// 설정 버튼: 글자 없이 가운데 톱니바퀴 (벡터)
 		VectorIcon::Gear(&dc, tr, disabled ? Dim(textColor) : textColor, 0.72, m_iconAngle);
 	}
-	else if (m_icon == ICON_VIEW_GRID || m_icon == ICON_VIEW_LIST || m_icon == ICON_VIEW_PACKAGE || m_icon == ICON_VIEW_YEAR || m_icon == ICON_VIEW_WALL)
+	else if (m_icon == ICON_VIEW_GRID || m_icon == ICON_VIEW_LIST || m_icon == ICON_VIEW_PACKAGE || m_icon == ICON_VIEW_YEAR || m_icon == ICON_VIEW_WALL || m_icon == ICON_VIEW_TREEMAP || m_icon == ICON_VIEW_LABEL)
 	{
 		// 보기 방식 버튼: 글자 없이 가운데 아이콘 (벡터)
 		const COLORREF ic = disabled ? Dim(textColor) : textColor;
@@ -275,6 +275,8 @@ void CDarkButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		else if (m_icon == ICON_VIEW_LIST) VectorIcon::ViewList(&dc, tr, ic, 0.66);
 		else if (m_icon == ICON_VIEW_YEAR) VectorIcon::ViewYear(&dc, tr, ic, 0.66);
 		else if (m_icon == ICON_VIEW_WALL) VectorIcon::ViewWall(&dc, tr, ic, 0.66);
+		else if (m_icon == ICON_VIEW_TREEMAP) VectorIcon::ViewTreemap(&dc, tr, ic, 0.66);
+		else if (m_icon == ICON_VIEW_LABEL) VectorIcon::ViewLabel(&dc, tr, ic, 0.66);
 		else                               VectorIcon::ViewPackage(&dc, tr, ic, 0.66);
 	}
 	else if (m_icon == ICON_GENRE_OFF || m_icon == ICON_GENRE_ON)
@@ -1700,10 +1702,45 @@ namespace
 	}
 }
 
+namespace
+{
+	// 메뉴가 마우스 왼쪽 클릭으로 닫힌 자리 · 시각 (DarkMenu::ClosedByClickOn)
+	ULONGLONG g_menuClickCloseTick = 0;
+	POINT     g_menuClickClosePt = {};
+
+	void NoteMenuClosed()
+	{
+		// 메뉴 밖을 눌러서 닫으면 TrackPopupMenu 가 돌아올 때 왼쪽 버튼이 아직 눌려 있음
+		if (::GetAsyncKeyState(VK_LBUTTON) & 0x8000)
+		{
+			::GetCursorPos(&g_menuClickClosePt);
+			g_menuClickCloseTick = ::GetTickCount64();
+		}
+		else
+			g_menuClickCloseTick = 0;
+	}
+}
+
+bool DarkMenu::ClosedByClickOn(HWND wnd)
+{
+	if (g_menuClickCloseTick == 0 || !wnd || !::IsWindow(wnd))
+		return false;
+	const bool recent = (::GetTickCount64() - g_menuClickCloseTick) < 800;   // 그 클릭의 BN_CLICKED (버튼을 뗄 때) 까지
+	RECT rc = {};
+	::GetWindowRect(wnd, &rc);
+	const bool on = ::PtInRect(&rc, g_menuClickClosePt) != FALSE;
+	g_menuClickCloseTick = 0;   // 한 번만
+	return recent && on;
+}
+
 BOOL DarkMenu::Track(CMenu& menu, UINT flags, int x, int y, CWnd* owner)
 {
 	if (!owner || !owner->GetSafeHwnd() || !menu.GetSafeHmenu() || g_darkMenu)
-		return menu.TrackPopupMenu(flags, x, y, owner);   // 주인 창이 없거나 이미 다른 메뉴가 떠 있으면 기본 메뉴
+	{
+		const BOOL r = menu.TrackPopupMenu(flags, x, y, owner);   // 주인 창이 없거나 이미 다른 메뉴가 떠 있으면 기본 메뉴
+		NoteMenuClosed();
+		return r;
+	}
 
 	DarkMenuState st;
 	{
@@ -1726,6 +1763,7 @@ BOOL DarkMenu::Track(CMenu& menu, UINT flags, int x, int y, CWnd* owner)
 	st.oldProc = reinterpret_cast<WNDPROC>(::SetWindowLongPtrW(st.owner, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(DarkMenuOwnerProc)));
 	// TPM_NONOTIFY 는 빼고 (그리기 메시지를 받기 위해) - TPM_RETURNCMD 면 WM_COMMAND 는 원래대로 보내지 않음
 	const BOOL result = menu.TrackPopupMenu(flags & ~TPM_NONOTIFY, x, y, owner);
+	NoteMenuClosed();
 	if (st.oldProc)
 		::SetWindowLongPtrW(st.owner, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(st.oldProc));
 	g_darkMenu = nullptr;

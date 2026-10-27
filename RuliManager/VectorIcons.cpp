@@ -569,6 +569,34 @@ namespace VectorIcon
 		});
 	}
 
+	void ViewTreemap(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			// 왼쪽 큰 칸 | 오른쪽 위 중간 칸 | 오른쪽 아래 작은 칸 둘 (칸 사이 얇은 틈)
+			const float g = 1.2f;
+			AddRoundRect(p, 2.0f, 4.0f, 10.0f, 16.0f, 0.8f);
+			AddRoundRect(p, 12.0f + g, 4.0f, 22.0f - 12.0f - g, 9.0f, 0.8f);
+			AddRoundRect(p, 12.0f + g, 13.0f + g, 4.6f, 20.0f - 13.0f - g, 0.8f);
+			AddRoundRect(p, 12.0f + g + 4.6f + g, 13.0f + g, 22.0f - (12.0f + g + 4.6f + g), 20.0f - 13.0f - g, 0.8f);
+		});
+	}
+
+	void ViewLabel(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			AddRoundRect(p, 2.0f, 2.5f, 20.0f, 3.4f, 1.0f);           // 묶음 머리줄
+			for (int i = 0; i < 2; ++i)
+			{
+				const float y = 8.0f + i * 7.6f;
+				AddRoundRect(p, 2.0f, y + 1.6f, 2.6f, 2.6f, 0.6f);    // 체크 칸
+				AddRoundRect(p, 6.4f, y, 4.4f, 6.0f, 0.8f);           // 세로 커버
+				AddRoundRect(p, 12.6f, y + 1.9f, 9.4f, 2.2f, 1.0f);   // 줄
+			}
+		});
+	}
+
 	void ViewPackage(CDC* dc, const CRect& area, COLORREF col, double fill)
 	{
 		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)

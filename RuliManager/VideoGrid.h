@@ -28,11 +28,15 @@ public:
 	virtual void GridPrefetch(int /*first*/, int /*last*/) {}
 	// 세로 스크롤 위치가 바뀜 (카드 위에 띄운 미리보기 팝업을 따라 옮기기용)
 	virtual void GridScrolled() {}
+	// 묶음 머리줄 그리기 (GridLine::header 인 줄 위의 띠, SetGroupHeaderHeight 높이) - firstCard: 그 줄의 첫 카드
+	virtual void GridDrawGroupHeader(CDC* /*dc*/, int /*firstCard*/, const CRect& /*rc*/) {}
 };
 
 // 줄 배치(리스트 보기)의 한 줄: start 번 카드부터 다음 줄 start 전까지 - 한 화면 줄에 모두 (넘치면 좌우 스크롤)
 //  firstCol: 첫 카드의 칸 (예: 앞 페이지 제작사의 레이블이 이어지면 1 → 제작사 칸 비움), wrapCol: 사용 안 함 (예전 줄 바꿈용)
-struct GridLine { int start = 0; int firstCol = 0; int wrapCol = 0; };
+//  header: 이 줄 위에 묶음 머리줄 띠 (SetGroupHeaderHeight 높이, 주인이 GridDrawGroupHeader 로 그림)
+//  headerH: 이 줄 머리줄 높이 (0 = SetGroupHeaderHeight 값)
+struct GridLine { int start = 0; int firstCol = 0; int wrapCol = 0; bool header = false; int headerH = 0; };
 
 // 썸네일 + 파일명 + 발매일 + 메모를 카드 형태로 바둑판 배열하는 컨트롤
 class CVideoGrid : public CWnd
@@ -70,6 +74,10 @@ public:
 	// 줄 배치 (리스트 보기): 비우면 보통 바둑판, 주면 줄마다 새 화면 줄에서 시작 (Refresh 전에 호출)
 	void SetLines(const std::vector<GridLine>& lines);
 	bool LineMode() const { return !m_lines.empty(); }
+	// 묶음 머리줄 높이 (줄 배치에서 header 인 줄 위) - 0 = 없음
+	void SetGroupHeaderHeight(int h);
+	// 고정 카드 폭을 격자 폭에 맞춤 (한 줄에 카드 하나 - 표 형태 보기), 높이는 SetFixedTile 값
+	void SetFillWidth(bool fill);
 
 protected:
 	bool m_scrollHidden = false;
@@ -106,6 +114,17 @@ protected:
 	int  m_lineRows = 0;             // 줄 배치의 화면 줄 수
 	int  m_lineCols = 0;             // 줄 배치의 가장 긴 줄 칸 수 (화면보다 길면 좌우 스크롤)
 	int  m_scrollX = 0;              // 줄 배치 가로 스크롤 위치
+	// 묶음 머리줄 (줄 배치 + header): 화면 줄마다 높이가 달라짐
+	int  m_groupH = 0;
+	bool m_fillWidth = false;
+	std::vector<int>  m_bandTop;     // 화면 줄 r 의 띠(머리줄 포함) 위쪽 (내용 좌표, 머리 영역 제외) - 크기 = 줄 수 + 1 (마지막 = 전체 높이)
+	std::vector<int>  m_rowHdr;      // 화면 줄 r 위 머리줄 높이 (0 = 없음)
+	std::vector<int>  m_rowHdrCard;  // 그 머리줄의 첫 카드
+	bool Variable() const;           // 화면 줄 높이가 달라지는 배치인지
+	int  RowTop(int r) const;        // 화면 줄 r 카드 위쪽 (내용 좌표)
+	int  BandTop(int r) const;       // 화면 줄 r 띠 위쪽 (머리줄 포함)
+	int  ContentH(int rows) const;   // 카드 전체 높이
+	int  BandAt(int y) const;        // 내용 좌표 y 의 화면 줄 (-1 = 위쪽 밖)
 	int  Cols(int count) const { return LineReady(count) ? m_lineCols : m_cols; }
 	void SetScrollX(int pos);
 	void UpdateHorzBar();

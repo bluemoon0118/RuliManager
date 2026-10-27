@@ -24,6 +24,7 @@
 #include "ScreenshotExtractor.h"
 #include "YearView.h"
 #include "PreviewVideo.h"
+#include "TreemapView.h"
 
 // 컬렉션 · 제작사 영상 화면 위쪽 정보 (배우 출연작 화면의 배우 정보 자리): 제목(크게) · 정보 줄 · 메모 + (제작사) 하위 레이블 이미지 칸
 //  - 더블클릭 = 편집 (m_onDblClick), 레이블 칸 더블클릭 = 그 레이블 영상 (m_onSubDblClick)
@@ -141,10 +142,15 @@ protected:
 		if (m_mode == MODE_COLLECTION) return 4;                         // 컬렉션 영상
 		return -1;
 	}
-	bool VideoPortraitActive() const   // 세로 카드 (이미지만) = [패키지]
+	bool VideoPortraitActive() const   // 세로 카드 (이미지만) = [패키지] - [레이블] 보기도 커버 마우스 오버 팝업 · 미리보기는 [패키지] 와 같이 동작
 	{
 		const int s = VideoViewSlot();
-		return s >= 0 && m_videoView[s] == 2;
+		return s >= 0 && (m_videoView[s] == 2 || m_videoView[s] == 4);
+	}
+	bool VideoLabelActive() const       // [레이블]: 제작사 · 레이블 영상 화면에서 레이블 + 품번 묶음마다 머리줄, 줄마다 체크 · 품번 · 세로 커버 · 제목 · 출연 배우 · 발매일
+	{
+		const int s = VideoViewSlot();
+		return s == 2 && m_videoView[s] == 4;
 	}
 	bool VideoWallActive() const        // [월 모드]: 16:9 이미지만 빈틈없이 붙임 + 미리보기 자동 재생
 	{
@@ -163,16 +169,44 @@ protected:
 	// [월 모드] CPU 줄이기: 프로그램이 뒤에 있거나(최소화 포함) 스크롤하는 동안 모든 칸 일시정지
 	bool      m_wallPlaying = true;
 	ULONGLONG m_wallScrollTick = 0;     // 마지막 스크롤 시각 (멈춘 뒤 0.3초 지나면 재생)
-	size_t    m_wallOverlaySig = 0;     // 글자 창 내용 (보이는 칸 · 자리 · 글자) - 바뀔 때만 다시 그림
+	size_t    m_wallOverlaySig = 0;     // 글자 창 내용 (보이는 칸 · 자리 · 글자) - 바뀔 때만 다시 그림
+	size_t    m_wallHotSig = 0;         // 마우스가 올라간 칸 · 파트 · 고른 파트 (분할 영상 파트 칸 표시) - 바뀌면 다시 그림
 	bool WallShouldPlay();
 	void ApplyWallPlayState(bool play);
 	void DrawWallOverlay(CDC* dc, const CRect& rc);
+	void DrawWallPartZones(CDC* dc, int g, const CRect& card, int hotPart = -2);   // hotPart: -2 = 격자의 마우스 상태 (올라가 있을 때만), 그 밖 = 그 파트를 올라간 칸으로 (-1 = 없음) 항상 그림   // 분할 영상 파트 칸 (구분선 + 번호, 올라간 칸 흰 테두리, 고른 파트 파란 줄) - 색 키 글자 창용
+	// [격자] · [패키지] 분할 영상 미리보기 재생 중: 재생 창 위에 파트 칸 ([월 모드] 와 같은 그림, 겹친 투명 글자 창)
+	CWallOverlay m_gridPartOverlay;
+	int    m_gridPartG = -1;          // 파트 칸을 그릴 카드
+	CRect  m_gridPartCard;            // 그 카드 이미지 영역 (글자 창 좌표)
+	size_t m_gridPartSig = 0;         // 내용 (카드 · 자리 · 올라간 파트 · 고른 파트) - 바뀌면 다시 그림
+	void UpdateGridPartOverlay();
+	CPoint    m_gridPartMouse;            // 마지막 마우스 위치 (화면 좌표) - 멈춰 있으면 파트 칸을 숨김
+	ULONGLONG m_gridPartMoveTick = 0;     // 마우스가 마지막으로 움직인 시각
+	static const ULONGLONG kGridPartIdleMs = 1500;   // 이만큼 멈춰 있으면 파트 칸 숨김 (다시 움직이면 보임)
 	afx_msg void OnBnClickedVideoModeWall();
 	void SetVideoPortrait(bool portrait);
 	afx_msg void OnBnClickedVideoViewH();
 	afx_msg void OnBnClickedVideoViewV();
 	// 영상 탭 보기 방식: [격자] (카드 - [가로|세로]) / [리스트] (스프레드시트 - 숨겨 두던 목록 컨트롤을 보임) - 레지스트리 Settings\VideoList
-	CDarkButton m_videoModeBtns[4];   // [격자] [리스트] [패키지] [월 모드]
+	CDarkButton m_videoModeBtns[5];   // [격자] [리스트] [패키지] [월 모드] [레이블] (레이블은 제작사 · 레이블 영상 화면만)
+	// [레이블] 보기 (VideoLabelActive)
+	struct LabelGroup { CString label; CString code; CString seriesLabel; CString desc; CString image; int count = 0; };   // image: 레이블 대표 이미지   // 묶음 머리줄: 레이블 이름 · 품번 접두어 · 품번(시리즈)의 라벨 · 설명 · 영상(카드) 수
+	std::map<int, LabelGroup> m_labelGroups;   // 묶음 첫 격자 칸 → 묶음
+	int  m_lrowCoverW = 54, m_lrowCoverH = 72;   // 줄의 세로 커버 크기
+	int  m_lrowH = 84;                           // 줄 높이 (카드)
+	int  m_lgroupH = 40;                         // 묶음 머리줄 높이 (이미지 없을 때)
+	int  m_limgH = 48;                           // 머리줄 레이블 이미지 높이 (이미지가 있는 묶음은 머리줄이 이만큼 + 여백 더 높음)
+	int  m_lcodeW = 120;                         // 품번 칸 폭 (품번 글꼴로 10글자)
+	struct LabelCols { CRect check, code, cover, title, actors, release; };
+	LabelCols LabelColumns(const CRect& card);            // 줄 안 칸 자리 (머리줄 열 이름도 같은 x)
+	void LabelGroupKey(int itemIdx, CString& label, CString& code) const;   // 영상의 묶음 (레이블 이름 · 품번 접두어)
+	void GroupViewByLabel();                                     // m_view 를 레이블 → 품번 묶음 순으로 (묶음 안은 지금 정렬 그대로)
+	void UpdateLabelLines();                                     // 격자 줄 배치 + 묶음 머리줄 (레이블 보기가 아니면 지움)
+	void DrawLabelRow(CDC* dc, int g, const CRect& card, bool selected, bool focused);
+	void GridDrawGroupHeader(CDC* dc, int firstCard, const CRect& rc) override;
+	bool PkgAnchorRect(int g, CRect& rc);                  // [패키지] 팝업 기준 자리 (패키지 = 카드, 레이블 = 커버 칸, 격자 좌표)
+	afx_msg void OnBnClickedVideoModeLabel();
 	CDarkHeader m_listHeader;          // [리스트] 열 머리글 (어두운 색 + 정렬 삼각형)
 	// 영상 화면별 보기: 0 = [격자] (가로 카드), 1 = [리스트] (스프레드시트), 2 = [패키지] (세로 카드, 이미지만), 3 = [월 모드] (16:9 이미지만 빈틈없이 + 미리보기 자동 재생)
 	//  [0] 영상 탭, [1] 배우 출연작, [2] 제작사 · 레이블 영상, [3] 태그 영상, [4] 컬렉션 영상 - 레지스트리 Settings\VideoViewMode / …Actor / …Studio / …Tag / …Collection
@@ -204,6 +238,19 @@ protected:
 	int  m_actorGender = 0;            // 0 = 선택없음(전체), 1 = 여성만, 2 = 남성만 (배우 정보의 성별 값이 "여성" / "남성" 인 배우)
 	void SetActorGender(int g);
 	afx_msg void OnGenderButton(UINT nID);
+	// 배우 탭 보기 방식: [격자] (배우 카드) / [트리맵] (차트 - 기준 콤보: 용량 / 영상수, 칸 안에 배우 이름 + 퍼센트)
+	CDarkButton  m_actorViewBtns[2];
+	int          m_actorView = 0;      // 0 = 격자, 1 = 트리맵 (레지스트리 ActorViewMode)
+	int          m_treemapBasis = 0;   // 0 = 용량 (출연작 파일 크기 합), 1 = 영상수 (레지스트리 TreemapBasis)
+	CTreemapView m_treemap;            // 배우 격자의 자식 (도구줄 아래 전체)
+	CDarkCombo   m_comboTmBasis;       // 트리맵 기준 콤보 (트리맵 보기에서만)
+	std::map<CString, ULONGLONG> m_actorBytes;   // 배우 이름(소문자) → 출연작 파일 크기 합
+	bool ActorTreemapActive() const { return IsActorGridMode() && m_actorView == 1; }
+	void SetActorView(int v);
+	void RebuildTreemap();             // m_actorRows (트리맵 보기에서는 페이지 나누기 없이 전체) 로 차트 다시 채움
+	void LayoutTreemap();              // 배우 격자 머리 영역(도구줄) 아래 전체로
+	afx_msg void OnActorViewButton(UINT nID);
+	afx_msg void OnCbnSelchangeTreemapBasis();
 	// 장르(태그) 칩: [장르숨김][전체] (목록 도구줄) - [전체] 면 도구줄 아래에 태그 칩 줄, 칩 하나를 골라 그 태그 영상만
 	//  화면별(영상 탭 / 배우 출연작 / 제작사 · 레이블 영상)로 따로: 레지스트리 Settings\GenreBar · GenreBarActor · GenreBarStudio
 	CDarkButton   m_genreBtns[2];
@@ -219,7 +266,7 @@ protected:
 		if (m_mode == MODE_STUDIO && !m_drill.IsEmpty()) return 2;
 		return -1;
 	}
-	bool GenreBarActive() const { const int s = GenreSlot(); return s >= 0 && m_genreShow[s] && !YearViewActive(); }   // 연도별 보기에서는 쓰지 않음
+	bool GenreBarActive() const { const int s = GenreSlot(); return s >= 0 && m_genreShow[s] && !YearViewActive() && !VideoLabelActive(); }   // 연도별 · [레이블] 보기에서는 쓰지 않음
 	void SyncGenreKey();                  // 대상이 바뀌었으면 그 화면의 고른 태그를 풂
 	void SetGenreShow(bool show);
 	void UpdateGenreBar(const std::vector<int>& before);
@@ -297,6 +344,7 @@ protected:
 	CLinkBar    m_namedLinks;        // 제작사 탭 상세: 제작사 / 레이블 링크 (사이트 아이콘, 정보 줄 아래 - 링크가 있을 때만)
 	CActorStrip m_labelStrip;        // 제작사 탭 상세: 선택한 제작사의 하위 레이블 카드 (여러 줄)
 	std::vector<int> m_stripLabels;  // 카드: 0 이상 = labelInfos 인덱스 (하위 레이블), 음수 = -(studios 인덱스 + 1) (레이블의 상위 제작사)
+	CString m_stripOwner;            // 제작사 탭: 카드 줄을 띄운 제작사 (그 제작사의 하위 제작사 카드인지 가르기용)
 	bool m_stripForActor = false;    // true = 배우 상세: 그 배우 출연작의 제작사 / 레이블 카드 (m_stripCounts = 출연 편수)
 	std::vector<int> m_stripCounts;
 	void UpdateActorStudioStrip(int actorIdx);   // 배우 상세 하단: 출연작의 제작사 / 레이블 카드 (하위 레이블이 있는 제작사는 제외)
@@ -310,8 +358,10 @@ protected:
 	void RelayoutIfLabelRowChanged(bool focusRow = false);
 	// 영상 상세: 제작사 / 레이블 카드 (제작사 탭 상세의 카드 모양, [변경...] 버튼 · × 로 비우기 · 더블클릭 = 그 영상 보기)
 	CActorStrip m_studioCard;
+	CActorStrip m_labelCard;      // 영상 상세: 레이블 카드 (제작사 카드 아래 따로 한 줄)
 	int  m_studioCardW = 0, m_studioCardH = 0;
-	void DrawVideoStudioCard(CDC* dc, const CRect& rc, bool hot);
+	void DrawVideoStudioCard(CDC* dc, const CRect& rc, bool hot, bool labelCard = false);   // labelCard: 레이블 줄 카드
+	void ClearStudioCard(bool labelCard);   // × : 제작사 카드 = 제작사(와 그 제작사의 레이블) 비우기, 레이블 카드 = 레이블만
 	CRect StudioCardXRect(const CRect& card);   // DX() 가 const 가 아니므로 const 멤버로 두지 않음
 	void OpenStudioCardTarget(int which = 0);   // which: 0 = 레이블이 있으면 레이블, 1 = 제작사, 2 = 레이블   // focusRow: 바뀐 줄 입력 칸으로 포커스
 	CEdit   m_editNamedMemo;         // 제작사 탭 상세: 선택한 제작사 / 레이블 메모 (바로 편집, 포커스를 잃거나 다른 항목을 고르면 저장)
@@ -338,12 +388,31 @@ protected:
 	void DrawStripCardFor(CDC* dc, int actorIdx, const CRect& rc, bool hot, bool stripHeartHot = true);   // 배우 번호로 (출연 배우 카드 모양)
 	// 영상 카드 아래 배우 수에 마우스 → 카드 아래에 출연 배우 카드(작게, 좌우로) 팝업
 	CCardPopup       m_castPopup;
+	// [패키지] 카드 마우스 오버: [격자] 영상 카드 팝업 (패키지 카드 가운데에 겹쳐서)
+	CCardPopup m_pkgPopup;
+	int        m_pkgHoverG = -1;          // 마우스가 올라간 패키지 카드 (격자 칸)
+	CRect      m_pkgHoverCard;            // 그 카드 (화면 좌표 - 움직이면 닫고 다시)
+	ULONGLONG  m_pkgHoverTick = 0;        // 올라간 시각 (0.25초 뒤 팝업)
+	ULONGLONG  m_pkgRepaintTick = 0;      // 팝업 다시 그린 시각 (커버를 읽는 중일 수 있어 0.25초마다)
+	bool       m_popupCardDraw = false;   // 팝업에 카드를 그리는 중 (마우스 오버 표시 · 페이드 없음)
+	void CheckPackageHover();
+	// [패키지] 팝업 카드: 커버에 마우스 → 미리보기 (재생 창은 팝업의 자식, m_previewPlayers 를 같이 씀), 분할 영상은 파트 칸 (팝업에서 고름)
+	bool         m_pkgPreviewOn = false;   // 팝업 카드에서 미리보기 재생 중 (재생 창의 부모 = 팝업)
+	int          m_pkgPartHot = -1;        // 팝업 커버 위 마우스가 올라간 파트 (-1: 파트 칸 숨김)
+	CWallOverlay m_pkgPartOverlay;         // 팝업 커버 위 파트 칸 (미리보기 위에도 보이게 겹친 투명 창 - 팝업에 딸림)
+	size_t       m_pkgPartSig = 0;
+	CPoint       m_pkgMouse;               // 마지막 마우스 위치 - kGridPartIdleMs 동안 멈추면 파트 칸 숨김
+	ULONGLONG    m_pkgMoveTick = 0;
+	void CheckPkgPreview();
+	void OnPkgPopupMouse(UINT msg, CPoint pt);   // 팝업 카드 마우스 (클라이언트 좌표)
+	int  PkgPartAt(CPoint pt) const;             // 팝업 카드 커버 위 파트 번호 (분할 영상이 아니거나 커버 밖이면 -1)
 	std::vector<int> m_castActors;      // 팝업에 그릴 배우 번호 (DB 에 있는 배우만)
 	int              m_castMore = 0;    // 화면 폭을 넘어 못 그린 배우 수 ("+N")
 	int              m_castItem = -1;   // 마우스가 올라간 배우 수의 영상 항목
 	ULONGLONG        m_castTick = 0;
-	bool VideoCardCountZone(int g, const CRect& card, int which, CRect& zone);   // 영상 카드(가로) 아래 개수 줄의 자리 (which 0 = 태그 수, 1 = 배우 수 - 격자 좌표, 0 개면 false)
+	bool VideoCardCountZone(int g, const CRect& card, int which, CRect& zone, bool popupCard = false);   // popupCard: [패키지] 팝업의 [격자] 카드 (보기 방식과 관계없이 계산)   // 영상 카드(가로) 아래 개수 줄의 자리 (which 0 = 태그 수, 1 = 배우 수 - 격자 좌표, 0 개면 false)
 	int              m_castKind = 0;    // 팝업 종류: 1 = 출연 배우 카드, 2 = 태그 칩
+	bool             m_castInPkg = false;   // 개수 자리가 [패키지] 팝업 카드의 것 (배경 다시 그림은 팝업)
 	CRect            m_castCardRect;    // 개수 자리 배경을 칠한 카드 (격자 좌표 - 바뀌면 다시 그림)
 	CString          m_castTags;        // 태그 팝업에 그릴 태그 (쉼표 목록)
 	void CheckCastHover();
@@ -352,7 +421,7 @@ protected:
 	CRect  m_countHotBand;             // 그 카드의 아래 줄 (격자 좌표)
 	CPoint m_countHotPt;
 	bool CountHoverAllowed() const;    // 프로그램이 앞에 있고 메뉴가 없을 때
-	void HotCountBack(CDC* dc, CVideoGrid& grid, int left, int width, int y);   // 집계 한 묶음 자리에 마우스가 있으면 배경
+	void HotCountBack(CDC* dc, CVideoGrid& grid, int left, int width, int y, int lineH = -1, int pad = -1);   // lineH · pad: 줄 높이 · 여백 (-1 = 기본 카드 값)   // 집계 한 묶음 자리에 마우스가 있으면 배경
 	void CheckCountHover();
 	int  CastCardH();                                           // 출연 배우 팝업 카드 높이 (사진 + 이름 한 줄)
 	void DrawCastCard(CDC* dc, int actorIdx, const CRect& rc);   // 출연 배우 팝업 카드 (사진 + 이름만)
@@ -390,7 +459,7 @@ protected:
 	ULONGLONG m_totalVideoBytes = 0;   // 필터된 영상 전체 크기
 	int& CurPageRef();             // 지금 보이는 목록의 페이지 번호
 	int  CurTotal() const;         // 지금 보이는 목록의 전체 개수
-	int  EffPageSize() const { return StudioListView() ? 0 : m_pageSize; }   // 제작사 탭 [리스트]: 페이지 나누지 않음 (전체)
+	int  EffPageSize() const { return (StudioListView() || VideoLabelActive()) ? 0 : m_pageSize; }   // 제작사 탭 [리스트] · 영상 [레이블] 보기: 페이지 나누지 않음 (전체)
 	int  PageCount(int total, int size = -1) const { if (size < 0) size = EffPageSize(); return (size <= 0 || total <= 0) ? 1 : (total + size - 1) / size; }
 	void SlicePage(int& page, int total, int& first, int& last, int size = -1) const;   // 페이지 범위 [first, last) (size < 0: 지금 탭 값)
 	void ResetCurPage() { CurPageRef() = 0; }
@@ -583,7 +652,14 @@ protected:
 
 	// 스튜디오 / 태그 카드 (로고 · 카메라 아이콘 / 꼬리표 아이콘, 이름, ▶ 영상 수 · 배우 수(스튜디오만))
 	int   m_scardW = 255, m_scardH = 230;
+	int   m_scardLogoH = 143;
+	// 제작사 탭 카드: 확대 단계마다 글자 · 여백도 카드 폭에 비례 (로고 16:9 · 카드 비율 · 글자 비율이 단계와 상관없이 같게)
+	CFont m_scardNameFont, m_scardTextFont;
+	int   m_scardPad = 4, m_scardLineB = 16, m_scardLine = 14;   // 카드 위쪽 로고 칸 높이 (제작사 카드는 카드 비율을 맞추느라 16:9 가 아닐 수 있음)
 	std::map<CString, int> m_studioActorCounts;   // 스튜디오(소문자) → 출연 배우 수
+	std::map<CString, int> m_studioLevel;         // 제작사(소문자) → 레벨 (가장 아래 제작사 = 0, 상위는 1 + 하위 중 가장 큰 레벨) - 카드 배경색
+	void ComputeStudioLevels();
+	COLORREF StudioLevelBack(const CString& studioName) const;   // 레벨별 카드 배경 (0 = 기본 카드색)
 	std::map<CString, int> m_labelActorCounts;    // 레이블(소문자) → 출연 배우 수
 	void DrawStudioCard(CDC* dc, int row, const CRect& card, bool selected, bool focused);
 	std::vector<int> m_actorRows;          // 배우 격자 행 → m_lib.actors 인덱스
@@ -807,6 +883,7 @@ protected:
 	afx_msg void OnManageActors();
 	afx_msg void OnManageStudios();
 	afx_msg void OnManageTags();
+	afx_msg void OnManageFiles();    // [목록 관리 ▾] → 파일 관리 (등록 폴더 트리 · 배우\[발매일]품번\품번.mp4 규칙 검사 · 복구)
 	afx_msg void OnManageSeries();   // [목록 관리 ▾] → 품번 관리 (제작사 / 레이블의 시리즈 표)
 	afx_msg void OnBnClickedPickStudio();
 	afx_msg void OnBnClickedPickTags();
@@ -903,8 +980,14 @@ protected:
 	afx_msg void OnVideoMakePreview();
 	afx_msg void OnVideoMakePreviewChecked();
 	afx_msg LRESULT OnPreviewDone(WPARAM wParam, LPARAM lParam);
-	// 미리보기 재생: 영상 격자 카드 이미지에 마우스를 올리면 바로 카드 위에 팝업 창을 띄워 소리 없이 반복
-	CPreviewPlayer m_previewPlayer;
+	// 미리보기 재생: 영상 격자 카드 이미지에 마우스를 올리면 바로 카드 이미지 자리에 소리 없이 반복 재생 (격자의 자식 창 - [월 모드] 처럼 화면에 직접, 별도 팝업 창 없음)
+	//  분할 영상 파트를 바꿀 때는 다음 파트를 뒤에서 열어 두고(m_pNextPlayer, 숨김) 준비되면 바꿔 끼움 → 꺼졌다 켜지지 않음
+	CPreviewPlayer  m_previewPlayers[2];
+	CPreviewPlayer* m_pPrevPlayer = &m_previewPlayers[0];   // 지금 보이는 재생 창
+	CPreviewPlayer* m_pNextPlayer = &m_previewPlayers[1];   // 바꿀 파트 (여는 중)
+	int  m_nextHoverItem = -1;                              // m_pNextPlayer 로 여는 파트 항목 (-1: 없음)
+	void StartNextPart(int item);                           // 다음 파트를 지금 재생 창 뒤에서 열기 (미리보기가 없으면 false 처럼 지금 창을 닫음)
+	void SwapNextPart();                                    // 다음 파트가 준비됐으면 바꿔 끼움
 	static const UINT_PTR kPreviewHoverTimer = 0x5056;   // 마우스 위치 살피기 (0.06초마다)
 	int       m_hoverItem = -1;          // 마우스가 올라가 있는 영상 카드의 항목 (-1: 없음)
 	ULONGLONG m_hoverTick = 0;           // 그 카드에 올라간 시각

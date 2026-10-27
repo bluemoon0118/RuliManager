@@ -12,6 +12,9 @@
 namespace DarkMenu
 {
 	BOOL Track(CMenu& menu, UINT flags, int x, int y, CWnd* owner);
+	// 방금 메뉴가 그 창(예: 메뉴를 연 버튼) 위 클릭으로 닫혔으면 true (한 번만) - 버튼을 다시 눌러 닫았는데
+	//  그 클릭이 버튼에도 전달되어 메뉴가 또 열리던 것 막기용: 버튼 처리 맨 앞에서 true 면 그냥 돌아감
+	bool ClosedByClickOn(HWND wnd);
 }
 
 // 직접 그린 스크롤바가 대상 창에 스크롤 위치를 지정할 때 보내는 메시지 (wParam = 위치, lParam = 1 이면 가로 스크롤바)
@@ -112,7 +115,7 @@ public:
 
 	// 글자 왼쪽 아이콘
 	enum Icon { ICON_NONE = 0, ICON_PLAY, ICON_PERSON, ICON_CAMERA, ICON_TAG, ICON_GEAR, ICON_COLLECTION, ICON_COPY, ICON_GENDER_ALL, ICON_FEMALE, ICON_MALE,
-		ICON_VIEW_GRID, ICON_VIEW_LIST, ICON_VIEW_PACKAGE, ICON_VIEW_YEAR, ICON_VIEW_WALL, ICON_GENRE_OFF, ICON_GENRE_ON, ICON_SYMBOL_ALL, ICON_SYMBOL_F, ICON_SYMBOL_M, ICON_SORT_ASC, ICON_SORT_DESC };   // SORT_ASC / DESC: 글자 없이 가운데 정렬 방향 (화살표 + 막대)   // SYMBOL_ALL / F / M: 글자 없이 가운데 성별 기호 (♀♂ 나란히 / ♀ 분홍 / ♂ 파랑 - 배우 성별 거르기)   // VIEW_*: 글자 없이 가운데 보기 방식 아이콘 ([격자|리스트|패키지])   // GENDER_ALL / FEMALE / MALE: ⚥ / ♀ / ♂ (배우 성별 거르기 - 꺼진 상태면 분홍 / 파랑)   // COPY: 글자 없이 가운데 겹친 두 장 (품번 복사)   // COLLECTION: 겹친 화면 (컬렉션 탭)   // GEAR: 글자 없이 가운데 톱니바퀴   // PLAY: 원 안의 재생(▶), PERSON: 사람, CAMERA: 비디오 카메라, TAG: 꼬리표
+		ICON_VIEW_GRID, ICON_VIEW_LIST, ICON_VIEW_PACKAGE, ICON_VIEW_YEAR, ICON_VIEW_WALL, ICON_GENRE_OFF, ICON_GENRE_ON, ICON_SYMBOL_ALL, ICON_SYMBOL_F, ICON_SYMBOL_M, ICON_SORT_ASC, ICON_SORT_DESC, ICON_VIEW_TREEMAP, ICON_VIEW_LABEL };   // VIEW_LABEL: 머리줄 + 세로 썸네일 줄 (제작사 영상 [레이블] 보기)   // VIEW_TREEMAP: 크기가 다른 사각형 묶음 (배우 [트리맵])   // SORT_ASC / DESC: 글자 없이 가운데 정렬 방향 (화살표 + 막대)   // SYMBOL_ALL / F / M: 글자 없이 가운데 성별 기호 (♀♂ 나란히 / ♀ 분홍 / ♂ 파랑 - 배우 성별 거르기)   // VIEW_*: 글자 없이 가운데 보기 방식 아이콘 ([격자|리스트|패키지])   // GENDER_ALL / FEMALE / MALE: ⚥ / ♀ / ♂ (배우 성별 거르기 - 꺼진 상태면 분홍 / 파랑)   // COPY: 글자 없이 가운데 겹친 두 장 (품번 복사)   // COLLECTION: 겹친 화면 (컬렉션 탭)   // GEAR: 글자 없이 가운데 톱니바퀴   // PLAY: 원 안의 재생(▶), PERSON: 사람, CAMERA: 비디오 카메라, TAG: 꼬리표
 	void SetIcon(int icon) { m_icon = icon; if (GetSafeHwnd()) Invalidate(FALSE); }
 	void SetIconAngle(double deg) { if (deg != m_iconAngle) { m_iconAngle = deg; if (GetSafeHwnd()) Invalidate(FALSE); } }   // 톱니바퀴 회전
 

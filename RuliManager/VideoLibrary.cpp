@@ -323,6 +323,23 @@ namespace
 		}
 		return path;
 	}
+
+	// 시리즈 칸의 레이블 대표 이미지: 저장할 때 상대 경로, 읽을 때 전체 경로
+	CString SeriesToStored(const CString& series)
+	{
+		std::vector<SeriesInfo> list = CVideoLibrary::ParseSeries(series);
+		bool any = false;
+		for (SeriesInfo& s : list)
+			if (!s.image.IsEmpty()) { s.image = ToStoredPath(s.image); any = true; }
+		return any ? CVideoLibrary::JoinSeries(list) : series;
+	}
+	CString SeriesFromStored(const CString& series)
+	{
+		std::vector<SeriesInfo> list = CVideoLibrary::ParseSeries(series);
+		for (SeriesInfo& s : list)
+			if (!s.image.IsEmpty()) s.image = FromStoredPath(s.image);
+		return CVideoLibrary::JoinSeries(list);
+	}
 }
 
 CString CVideoLibrary::GetImageRoot()
@@ -505,6 +522,11 @@ int CVideoLibrary::CleanupImageStore() const
 		if (!n.image.IsEmpty()) used.insert(MakeKey(n.image));
 	for (const NamedInfo& n : collectionInfos)   // 컬렉션 커버
 		if (!n.image.IsEmpty()) used.insert(MakeKey(n.image));
+	for (const NamedInfo& n : studios)           // 품번 DB 의 레이블 대표 이미지
+		for (const SeriesInfo& s : ParseSeries(n.series))
+			if (!s.image.IsEmpty()) used.insert(MakeKey(s.image));
+	for (const SeriesInfo& s : ParseSeries(looseSeries))   // 제작사 없는 품번 항목
+		if (!s.image.IsEmpty()) used.insert(MakeKey(s.image));
 
 	// 보관소 하위 폴더의 파일 중 연결되지 않은 것 모으기
 	std::vector<CString> unused;
@@ -1436,8 +1458,10 @@ namespace
 		if (fields.size() >= 7 && kind == LIST_STUDIO)   // 예전 형식: 레이블 이름 목록 (줄바꿈 구분) → L 줄 항목으로 옮김
 			for (const CString& l : CVideoLibrary::SplitLines(Unescape(fields[6])))
 				if (legacy) legacy->push_back({ n.name, l });
-		if (fields.size() >= 8 && kind == LIST_STUDIO)   // 시리즈 (제작사, 줄바꿈 구분)
-			n.series = CVideoLibrary::JoinSeries(CVideoLibrary::ParseSeries(Unescape(fields[7])));
+		if (fields.size() >= 12 && kind == LIST_STUDIO)   // 상위 제작사 (12번째 칸)
+			n.parent = Unescape(fields[11]).Trim();
+		if (fields.size() >= 8 && kind == LIST_STUDIO)   // 시리즈 (제작사, 줄바꿈 구분) - 레이블 대표 이미지는 전체 경로로
+			n.series = SeriesFromStored(Unescape(fields[7]));
 		if (fields.size() >= 9 && kind == LIST_STUDIO)   // 링크 URL (줄바꿈 구분)
 			n.urls = CVideoLibrary::JoinUrls(CVideoLibrary::SplitUrls(Unescape(fields[8])));
 		if (fields.size() >= 10 && kind == LIST_TAG)   // 태그: 영어 이름 · 일본어 이름
@@ -1567,9 +1591,10 @@ namespace
 		CString text = (kind == LIST_STUDIO ? L"S\t" : L"T\t");
 		text += Escape(n.name) + L"\t" + (kind == LIST_STUDIO ? Escape(n.memo) : CString()) + L"\t" + (kind == LIST_STUDIO ? Escape(ToStoredPath(n.image)) : CString()) +
 			L"\t" + (n.favorite ? L"1" : L"") + L"\t" + Escape(n.subName) +   // 서브이름 / 태그의 다른 이름
-			L"\t\t" + (kind == LIST_STUDIO ? Escape(n.series) : CString()) +
+			L"\t\t" + (kind == LIST_STUDIO ? Escape(SeriesToStored(n.series)) : CString()) +
 			L"\t" + (kind == LIST_STUDIO ? Escape(n.urls) : CString()) +
-			L"\t" + (kind == LIST_TAG ? Escape(n.nameEn) : CString()) + L"\t" + (kind == LIST_TAG ? Escape(n.nameJa) : CString()) + L"\n";   // 6번째 칸: 서브이름, 7번째 칸: (예전 레이블 목록 - 비움), 8번째 칸: 시리즈, 9번째 칸: 링크, 10 · 11번째 칸: 태그 영어 · 일본어 이름
+			L"\t" + (kind == LIST_TAG ? Escape(n.nameEn) : CString()) + L"\t" + (kind == LIST_TAG ? Escape(n.nameJa) : CString()) +
+			L"\t" + (kind == LIST_STUDIO ? Escape(n.parent) : CString()) + L"\n";   // 6번째 칸: 서브이름, 7번째 칸: (예전 레이블 목록 - 비움), 8번째 칸: 시리즈, 9번째 칸: 링크, 10 · 11번째 칸: 태그 영어 · 일본어 이름, 12번째 칸: 제작사의 상위 제작사
 		return text;
 	}
 
@@ -1591,6 +1616,7 @@ bool CVideoLibrary::Load()
 	tagInfos.clear();
 	labelInfos.clear();
 	collectionInfos.clear();
+	looseSeries.Empty();
 	std::vector<std::pair<CString, CString>> legacyLabels;   // 예전 형식: S 줄 7번째 칸의 레이블 목록 (제작사, 레이블)
 
 	CString text, pendingText;
@@ -1687,6 +1713,10 @@ bool CVideoLibrary::Load()
 			ParseNamedFields(kind, fields, n, &legacyLabels);
 			if (!n.name.IsEmpty() && FindNamed(kind, n.name) < 0)
 				NamedList(kind).push_back(n);
+		}
+		else if (fields[0] == L"Q" && fields.size() >= 2)   // 제작사 없는 품번 DB 항목
+		{
+			looseSeries = SeriesFromStored(Unescape(fields[1]));
 		}
 		else if (fields[0] == L"C" && fields.size() >= 2)   // 컬렉션
 		{
@@ -2059,6 +2089,8 @@ bool CVideoLibrary::Save() const
 	for (int kind = LIST_STUDIO; kind <= LIST_TAG; ++kind)
 		for (const NamedInfo& n : NamedList(kind))
 			text += NamedDbLine(kind, n);
+	if (!looseSeries.IsEmpty())
+		text += L"Q\t" + Escape(SeriesToStored(looseSeries)) + L"\n";   // 제작사 없는 품번 DB 항목
 	for (const NamedInfo& n : labelInfos)
 		text += LabelDbLine(n);
 	for (const NamedInfo& n : collectionInfos)   // 컬렉션: C<탭>이름(제목)<탭>메모<탭>즐겨찾기<탭>커버 이미지
@@ -2087,7 +2119,7 @@ bool CVideoLibrary::Save() const
 			static_cast<LPCWSTR>(Escape(creditedField(v.actorAliases))),   // 번호:과거이름
 			v.oCount,
 			static_cast<LPCWSTR>(Escape(v.code)),
-			static_cast<LPCWSTR>(Escape(v.label)),
+			L"",   // 15번째 칸 레이블: 저장하지 않음 (레이블 = 품번 DB 의 레이블, 읽을 때 값이 있으면 MigrateLabelsToSeries 로 옮김)
 			static_cast<LPCWSTR>(Escape(v.series)),
 			static_cast<LPCWSTR>(Escape(v.seriesTitle)),
 			v.censor,
@@ -3008,7 +3040,7 @@ bool CVideoLibrary::NormalizeAllVideoActors()
 CString CVideoLibrary::FindActorFolderImage(const CString& videoPath, const CString& actorName)
 {
 	// 영상의 상위 폴더 중 이름이 배우 이름과 같은 폴더(폴더\배우\영상\영상.mp4 의 "배우")를 찾음
-	static const wchar_t* const kExts[] = { L".jpg", L".jpeg", L".png", L".webp", L".bmp", L".gif", L".tif", L".tiff" };
+	static const wchar_t* const kExts[] = { L".jpg", L".jpeg", L".png", L".webp", L".bmp", L".gif", L".tif", L".tiff", L".svg" };
 	CString dir = videoPath;
 	for (int depth = 0; depth < 8; ++depth)
 	{
@@ -3620,49 +3652,78 @@ bool CVideoLibrary::SyncNamedFromVideos()
 				collectionInfos.push_back(n);
 				added = true;
 			}
-	// 영상의 새 레이블 (파일 · 정보 txt 로딩, 웹페이지 붙여넣기, 직접 입력) → 레이블 목록에 **공용 레이블(상위 제작사 없음)** 로 추가
-	//  - 어느 제작사의 레이블인지 판단하기 어려우므로 상위는 비워 둠 (레이블 관리 창에서 상위 제작사 지정)
-	//  - 예전에는 그 영상의 제작사를 상위로 넣었음 (잘못된 제작사 아래 레이블이 생기던 원인)
+	// 영상의 새 레이블 값 (텍스트 입력 · 정보 txt · 웹페이지 붙여넣기 · 다른 DB 가져오기) → 품번 DB 에 없는 품번만 새 항목으로 추가
+	//  - 그 품번(접두어)이 품번 DB 에 이미 있으면 레이블명은 바꾸지 않고, 읽은 이름이 레이블명 · 다른 이름과 다르면 "다른 이름" 에 추가
+	//  - 새 항목: 품번 = 영상 품번의 접두어, 레이블 = 읽은 레이블, 제작사 = 영상의 제작사 (등록 안 된 제작사 · 없으면 제작사 없는 항목)
+	//  - 영상의 레이블 값은 저장하지 않으므로 마지막 RefreshDerivedLabels 에서 품번 DB 값으로 다시 맞춰짐
 	for (const VideoItem& v : items)
 	{
 		CString lb = v.label;
 		lb.Trim();
-		if (lb.IsEmpty())
+		if (lb.IsEmpty() || v.code.IsEmpty())
 			continue;
-		if (FindStudioLoose(lb) >= 0)
-			continue;   // 제작사 이름과 같으면 레이블로 만들지 않음
-		if (FindLabel(lb) < 0)   // 레이블 이름은 전체에서 하나 (이미 있으면 그대로)
+		int owner = -1, index = -1, part = -1;
+		if (SeriesSlotForCode(v.code, owner, index, part))
 		{
-			NamedInfo info;
-			info.name = lb;   // 상위 제작사 없음 = 공용 레이블
-			labelInfos.push_back(info);
+			// 이미 있는 품번: 레이블명이 다르면 그 항목의 "다른 이름" 에 추가 (레이블명 자체는 바꾸지 않음)
+			CString& series = (owner >= 0 && owner < static_cast<int>(studios.size())) ? studios[owner].series : looseSeries;
+			std::vector<SeriesInfo> list = ParseSeries(series);
+			if (index < 0 || index >= static_cast<int>(list.size()))
+				continue;
+			SeriesInfo& s = list[index];
+			CString cur = s.label;
+			if (cur.Trim().CompareNoCase(lb) == 0)
+				continue;
+			bool known = false;
+			{
+				int p = 0;
+				while (p <= s.altNames.GetLength() && !known)
+				{
+					int nl = s.altNames.Find(L'\n', p);
+					if (nl < 0) nl = s.altNames.GetLength();
+					CString a = s.altNames.Mid(p, nl - p);
+					p = nl + 1;
+					if (a.Trim().CompareNoCase(lb) == 0)
+						known = true;
+				}
+			}
+			if (known)
+				continue;
+			if (!s.altNames.IsEmpty())
+				s.altNames += L"\n";
+			s.altNames += lb;
+			series = JoinSeries(list);
 			added = true;
-		}
-	}
-	// 영상의 시리즈 → 어느 레이블 · 제작사에도 없으면 그 영상 레이블의 시리즈로 (레이블이 없으면 제작사의 시리즈로)
-	for (const VideoItem& v : items)
-	{
-		if (v.series.IsEmpty() || FindLabelOfSeries(v.series) >= 0 || FindStudioOfSeries(v.series) >= 0)
 			continue;
-		NamedInfo* owner = nullptr;
-		const int li = v.label.IsEmpty() ? -1 : FindLabel(v.label);
-		if (li >= 0)
-			owner = &labelInfos[li];
-		else
-		{
-			const int sn = v.studio.IsEmpty() ? -1 : FindNamed(LIST_STUDIO, v.studio);
-			if (sn >= 0)
-				owner = &studios[sn];
 		}
-		if (!owner)
+		const CString prefix = CodePrefixOf(v.code);
+		if (prefix.IsEmpty())
 			continue;
-		std::vector<SeriesInfo> list = ParseSeries(owner->series);
 		SeriesInfo si;
-		si.name = v.series;
+		si.name = prefix;
+		si.label = lb;
+		const int sn = v.studio.IsEmpty() ? -1 : FindNamed(LIST_STUDIO, v.studio);
+		CString& target = (sn >= 0) ? studios[sn].series : looseSeries;
+		std::vector<SeriesInfo> list = ParseSeries(target);
 		list.push_back(si);
-		owner->series = JoinSeries(list);
+		target = JoinSeries(list);
 		added = true;
 	}
+	// 영상의 시리즈가 품번 DB(제작사 · 레이블의 시리즈 목록)에 없으면: 품번 DB 에 자동으로 넣지 않음
+	//  (예전: 그 영상 레이블의 시리즈로 자동 등록 → 파일 자동 읽기 · 정보 txt 의 시리즈 이름이 레이블의 품번 시리즈로 쌓이던 문제)
+	//  → 영상 상세 아래 [시리즈] 이름 칸이 비어 있으면 그쪽으로 옮김 (품번 시리즈는 품번 DB 에서 직접 등록)
+	for (VideoItem& v : items)
+	{
+		if (v.series.IsEmpty() || SeriesRegistered(v.series))
+			continue;
+		if (v.seriesTitle.IsEmpty())
+			v.seriesTitle = v.series;
+		else if (v.seriesTitle.CompareNoCase(v.series) != 0)
+			continue;   // 이름 칸에 다른 값이 있음 → 시리즈 값은 그대로 둠 (등록만 하지 않음)
+		v.series.Empty();
+		added = true;
+	}
+	RefreshDerivedLabels();   // 영상 레이블 = 품번 DB 의 레이블 (저장하지 않는 값이라 added 와 무관)
 	return added;
 }
 
@@ -3842,10 +3903,15 @@ int CVideoLibrary::CountLabelVideos(const CString& labelName) const
 
 void CVideoLibrary::RenameNamedInVideos(int kind, const CString& oldName, const CString& newName)
 {
-	if (kind == LIST_STUDIO)   // 레이블의 상위 제작사 이름도
+	if (kind == LIST_STUDIO)   // 레이블 · 하위 제작사의 상위 제작사 이름도
+	{
 		for (NamedInfo& lb : labelInfos)
 			if (lb.parent.CompareNoCase(oldName) == 0)
 				lb.parent = newName;
+		for (NamedInfo& st : studios)
+			if (st.parent.CompareNoCase(oldName) == 0)
+				st.parent = newName;
+	}
 	for (VideoItem& v : items)
 	{
 		if (kind == LIST_STUDIO)
@@ -3909,7 +3975,8 @@ std::vector<SeriesInfo> CVideoLibrary::ParseSeries(const CString& text)
 			const int sep = line.Find(kSeriesSep, fpos);
 			CString f = (sep < 0) ? line.Mid(fpos) : line.Mid(fpos, sep - fpos);
 			f.Trim();
-			if (fi == 0) s.name = f; else if (fi == 1) s.code = f; else if (fi == 2) s.label = f; else if (fi == 3) s.desc = f;
+			if (fi == 0) s.name = f; else if (fi == 1) s.code = f; else if (fi == 2) s.label = f; else if (fi == 3) s.desc = f; else if (fi == 4) s.image = f;
+			else if (fi == 5) { f.Replace(L'\x241E', L'\n'); s.altNames = f; }   // 레이블 다른 이름 (␞ → 줄바꿈)
 			++fi;
 			if (sep < 0) break;
 			fpos = sep + 1;
@@ -3942,9 +4009,41 @@ CString CVideoLibrary::JoinSeries(const std::vector<SeriesInfo>& list)
 			continue;
 		auto clean = [](CString f) { f.Replace(L'\n', L' '); f.Replace(L'\r', L' '); f.Remove(kSeriesSep); f.Trim(); return f; };
 		CString line = clean(name);
-		const CString label = clean(s.label), desc = clean(s.desc);
-		if (!label.IsEmpty() || !desc.IsEmpty())
+		const CString label = clean(s.label), desc = clean(s.desc), image = clean(s.image);
+		CString alt;   // 레이블 다른 이름: 줄마다 하나 → ␞ 로 이어서 (빈 줄 · 중복 제거)
+		{
+			CString t = s.altNames;
+			t.Replace(L"\r\n", L"\n");
+			t.Replace(L'\r', L'\n');
+			t.Replace(L'\x241E', L'\n');
+			int p = 0;
+			std::vector<CString> seen;
+			while (p <= t.GetLength())
+			{
+				int nl = t.Find(L'\n', p);
+				if (nl < 0) nl = t.GetLength();
+				CString a = t.Mid(p, nl - p);
+				p = nl + 1;
+				a.Remove(kSeriesSep);
+				a.Trim();
+				if (a.IsEmpty())
+					continue;
+				bool dup = false;
+				for (const CString& o : seen)
+					if (o.CompareNoCase(a) == 0) { dup = true; break; }
+				if (dup)
+					continue;
+				seen.push_back(a);
+				if (!alt.IsEmpty()) alt += L'\x241E';
+				alt += a;
+			}
+		}
+		if (!label.IsEmpty() || !desc.IsEmpty() || !image.IsEmpty() || !alt.IsEmpty())
 			line += CString(kSeriesSep) + kSeriesSep + label + kSeriesSep + desc;   // 둘째 칸(예전 품번)은 비움
+		if (!image.IsEmpty() || !alt.IsEmpty())
+			line += CString(kSeriesSep) + image;   // 다섯째 칸: 레이블 대표 이미지
+		if (!alt.IsEmpty())
+			line += CString(kSeriesSep) + alt;     // 여섯째 칸: 레이블 다른 이름
 		if (!out.IsEmpty()) out += L"\n";
 		out += line;
 	}
@@ -3957,6 +4056,227 @@ std::vector<CString> CVideoLibrary::SeriesNames(const CString& text)
 	for (const SeriesInfo& s : ParseSeries(text))
 		out.push_back(s.name);
 	return out;
+}
+
+CString CVideoLibrary::CodePrefixOf(const CString& code)
+{
+	CString c = code;
+	c.Trim();
+	c.MakeUpper();
+	CString prefix;
+	const int dash = c.Find(L'-');
+	if (dash > 0)
+		prefix = c.Left(dash);
+	else
+		for (int i = 0; i < c.GetLength() && iswalpha(c[i]); ++i) prefix += c[i];
+	prefix.Trim();
+	return prefix;
+}
+
+CString CVideoLibrary::LabelForCode(const CString& code) const
+{
+	SeriesInfo s;
+	if (code.IsEmpty() || !SeriesInfoForCode(code, s))
+		return CString();
+	CString l = s.label;
+	l.Trim();
+	return l;
+}
+
+CString CVideoLibrary::LabelImage(const CString& label) const
+{
+	CString lb = label;
+	lb.Trim();
+	lb.MakeLower();
+	if (lb.IsEmpty())
+		return CString();
+	auto it = m_labelImages.find(lb);
+	return it != m_labelImages.end() ? it->second : CString();
+}
+
+void CVideoLibrary::RefreshDerivedLabels()
+{
+	m_labelImages.clear();
+	std::vector<const CString*> all;
+	for (const NamedInfo& n : studios)
+		all.push_back(&n.series);
+	all.push_back(&looseSeries);
+	for (const CString* sp : all)
+		for (const SeriesInfo& s : ParseSeries(*sp))
+		{
+			if (s.image.IsEmpty())
+				continue;
+			std::vector<CString> names{ s.label };   // 레이블 이름 + 다른 이름
+			{
+				int p = 0;
+				while (p <= s.altNames.GetLength())
+				{
+					int nl = s.altNames.Find(L'\n', p);
+					if (nl < 0) nl = s.altNames.GetLength();
+					names.push_back(s.altNames.Mid(p, nl - p));
+					p = nl + 1;
+				}
+			}
+			for (CString l : names)
+			{
+				l.Trim();
+				l.MakeLower();
+				if (!l.IsEmpty() && m_labelImages.find(l) == m_labelImages.end())
+					m_labelImages[l] = s.image;
+			}
+		}
+	for (VideoItem& v : items)
+		v.label = LabelForCode(v.code);
+}
+
+int CVideoLibrary::FillSeriesLabel(const CString& code, const CString& label)
+{
+	// SeriesInfoForCode 와 같은 규칙으로 품번의 시리즈를 찾아 레이블이 비어 있으면 채움
+	CString c = code;
+	c.Trim();
+	c.MakeUpper();
+	const CString prefix = CodePrefixOf(code);
+	CString lb = label;
+	lb.Trim();
+	if (c.IsEmpty() || prefix.IsEmpty() || lb.IsEmpty())
+		return 0;
+	auto tryOwner = [&](CString& ownerSeries) -> int
+	{
+		std::vector<SeriesInfo> list = ParseSeries(ownerSeries);
+		for (SeriesInfo& s : list)
+			for (CString p : SplitList(s.name))
+			{
+				p.Trim();
+				p.MakeUpper();
+				p.TrimRight(L'-');
+				if (p.IsEmpty())
+					continue;
+				if (p == prefix || (p.Find(L'-') > 0 && c.Left(p.GetLength()) == p))
+				{
+					CString cur = s.label;
+					cur.Trim();
+					if (!cur.IsEmpty())
+						return 2;
+					s.label = lb;
+					ownerSeries = JoinSeries(list);
+					return 1;
+				}
+			}
+		return 0;
+	};
+	for (NamedInfo& n : labelInfos)
+		if (const int r = tryOwner(n.series)) return r;
+	for (NamedInfo& n : studios)
+		if (const int r = tryOwner(n.series)) return r;
+	return tryOwner(looseSeries);   // 제작사 없는 항목
+}
+
+bool CVideoLibrary::MigrateLabelsToSeries(CString* report)
+{
+	// 레이블 개편: 제작사 하위 레이블(labelInfos)을 없애고, 영상에 적힌 레이블을 품번 DB(제작사의 시리즈 목록)의 레이블 칸으로
+	//  - 레이블이 가지고 있던 시리즈 목록은 폐기
+	//  - 품번 접두어마다 그 접두어 영상들에서 가장 많이 쓰인 레이블 → 품번 DB 에 그 접두어가 있으면 레이블이 비었을 때만 채움 (있으면 그대로)
+	//    없으면 새 시리즈(품번 = 접두어, 레이블)를 그 접두어 영상들에서 가장 많이 쓰인 제작사에 (없으면 레이블의 상위 제작사, 그것도 없으면 건너뜀)
+	//  - 영상의 레이블 값은 비우고 품번 DB 에서 다시 찾음 (RefreshDerivedLabels)
+	bool need = !labelInfos.empty();
+	for (const VideoItem& v : items)
+	{
+		CString l = v.label;
+		if (!l.Trim().IsEmpty()) { need = true; break; }
+	}
+	if (!need)
+		return false;
+
+	std::map<CString, CString> labelParent;   // 레이블(소문자) → 상위 제작사
+	for (const NamedInfo& lb : labelInfos)
+	{
+		CString k = lb.name;
+		k.MakeLower();
+		labelParent[k] = lb.parent;
+	}
+	struct Acc { std::map<CString, int> labels; std::map<CString, int> studioCount; CString code; };
+	std::map<CString, Acc> acc;   // 품번 접두어 → 레이블 · 제작사 사용 수
+	int noCode = 0;
+	for (const VideoItem& v : items)
+	{
+		CString l = v.label;
+		l.Trim();
+		if (l.IsEmpty())
+			continue;
+		const int li = FindLabel(l);
+		if (li >= 0)
+			l = labelInfos[li].name;   // 등록 표기
+		const CString p = CodePrefixOf(v.code);
+		if (p.IsEmpty())
+		{
+			++noCode;
+			continue;
+		}
+		Acc& a = acc[p];
+		++a.labels[l];
+		if (a.code.IsEmpty())
+			a.code = v.code;
+		const int sn = v.studio.IsEmpty() ? -1 : FindNamed(LIST_STUDIO, v.studio);
+		if (sn >= 0)
+			++a.studioCount[studios[sn].name];
+	}
+	const int oldLabels = static_cast<int>(labelInfos.size());
+	labelInfos.clear();   // 레이블 폐기 (레이블의 시리즈 목록 포함)
+
+	int filled = 0, kept = 0, created = 0, skipped = 0;
+	for (auto& kv : acc)
+	{
+		const CString& prefix = kv.first;
+		Acc& a = kv.second;
+		auto best = [](const std::map<CString, int>& m) -> CString
+		{
+			CString b;
+			int bc = -1;
+			for (const auto& e : m)
+				if (e.second > bc || (e.second == bc && ::StrCmpLogicalW(e.first, b) < 0)) { b = e.first; bc = e.second; }
+			return b;
+		};
+		const CString label = best(a.labels);
+		const int r = FillSeriesLabel(a.code, label);
+		if (r == 1) { ++filled; continue; }
+		if (r == 2) { ++kept; continue; }
+		CString ownerName = best(a.studioCount);
+		if (ownerName.IsEmpty())
+		{
+			CString k = label;
+			k.MakeLower();
+			auto pit = labelParent.find(k);
+			if (pit != labelParent.end() && FindNamed(LIST_STUDIO, pit->second) >= 0)
+				ownerName = pit->second;
+		}
+		const int on = ownerName.IsEmpty() ? -1 : FindNamed(LIST_STUDIO, ownerName);
+		if (on < 0)
+		{
+			// 제작사를 정할 수 없음 → 제작사 없는 품번 항목으로
+			std::vector<SeriesInfo> loose = ParseSeries(looseSeries);
+			SeriesInfo si;
+			si.name = prefix;
+			si.label = label;
+			loose.push_back(si);
+			looseSeries = JoinSeries(loose);
+			++skipped;
+			continue;
+		}
+		std::vector<SeriesInfo> list = ParseSeries(studios[on].series);
+		SeriesInfo si;
+		si.name = prefix;
+		si.label = label;
+		list.push_back(si);
+		studios[on].series = JoinSeries(list);
+		++created;
+	}
+	for (VideoItem& v : items)
+		v.label.Empty();
+	RefreshDerivedLabels();
+	if (report)
+		report->Format(L"레이블 개편: 레이블 %d개 폐기 · 품번 DB 레이블 채움 %d · 새 품번 %d · 이미 있어 그대로 %d · 제작사 없는 품번으로 %d · 품번 없는 영상 %d",
+			oldLabels, filled, created, kept, skipped, noCode);
+	return true;
 }
 
 CString CVideoLibrary::SeriesForCode(const CString& code) const
@@ -4003,6 +4323,58 @@ bool CVideoLibrary::SeriesInfoForCode(const CString& code, SeriesInfo& out) cons
 		if (match(ParseSeries(lb.series))) return true;
 	for (const NamedInfo& st : studios)
 		if (match(ParseSeries(st.series))) return true;
+	if (match(ParseSeries(looseSeries))) return true;   // 제작사 없는 항목
+	return false;
+}
+
+bool CVideoLibrary::SeriesSlotForCode(const CString& code, int& owner, int& index, int& part) const
+{
+	CString c = code;
+	c.Trim();
+	c.MakeUpper();
+	const CString prefix = CodePrefixOf(code);
+	if (c.IsEmpty() || prefix.IsEmpty())
+		return false;
+	auto match = [&](const CString& series, int o) -> bool
+	{
+		const std::vector<SeriesInfo> list = ParseSeries(series);
+		for (size_t i = 0; i < list.size(); ++i)
+		{
+			int pi = 0;
+			for (CString p : SplitList(list[i].name))
+			{
+				p.Trim();
+				p.MakeUpper();
+				p.TrimRight(L'-');
+				if (!p.IsEmpty() && (p == prefix || (p.Find(L'-') > 0 && c.Left(p.GetLength()) == p)))
+				{
+					owner = o;
+					index = static_cast<int>(i);
+					part = pi;
+					return true;
+				}
+				++pi;
+			}
+		}
+		return false;
+	};
+	for (size_t s = 0; s < studios.size(); ++s)
+		if (match(studios[s].series, static_cast<int>(s)))
+			return true;
+	return match(looseSeries, static_cast<int>(studios.size()));
+}
+
+bool CVideoLibrary::SeriesRegistered(const CString& series) const
+{
+	CString nm = series;
+	nm.Trim();
+	if (nm.IsEmpty())
+		return false;
+	if (FindLabelOfSeries(nm) >= 0 || FindStudioOfSeries(nm) >= 0)
+		return true;
+	for (const CString& s : SeriesNames(looseSeries))
+		if (s.CompareNoCase(nm) == 0)
+			return true;
 	return false;
 }
 
@@ -4081,6 +4453,52 @@ void CVideoLibrary::SetLabelParent(int labelIdx, const CString& parent)
 			v.studio = parent;   // 레이블은 상위 제작사를 따라감
 }
 
+std::vector<int> CVideoLibrary::ChildStudiosOf(const CString& studioName) const
+{
+	std::vector<int> out;
+	if (studioName.IsEmpty())
+		return out;
+	for (size_t i = 0; i < studios.size(); ++i)
+		if (studios[i].parent.CompareNoCase(studioName) == 0 && studios[i].name.CompareNoCase(studioName) != 0)
+			out.push_back(static_cast<int>(i));
+	std::sort(out.begin(), out.end(), [this](int a, int b) { return ::StrCmpLogicalW(studios[a].name, studios[b].name) < 0; });
+	return out;
+}
+
+std::vector<CString> CVideoLibrary::StudioParentChain(const CString& studioName) const
+{
+	std::vector<CString> chain;
+	CString cur = studioName;
+	for (int guard = 0; guard < 64; ++guard)
+	{
+		const int i = FindNamed(LIST_STUDIO, cur);
+		if (i < 0 || studios[i].parent.IsEmpty())
+			break;
+		const CString p = studios[i].parent;
+		if (p.CompareNoCase(studioName) == 0)
+			break;   // 순환
+		bool seen = false;
+		for (const CString& c : chain)
+			if (c.CompareNoCase(p) == 0)
+				seen = true;
+		if (seen)
+			break;
+		chain.push_back(p);
+		cur = p;
+	}
+	return chain;
+}
+
+bool CVideoLibrary::IsStudioDescendant(const CString& name, const CString& ancestor) const
+{
+	if (name.CompareNoCase(ancestor) == 0)
+		return true;
+	for (const CString& p : StudioParentChain(name))
+		if (p.CompareNoCase(ancestor) == 0)
+			return true;
+	return false;
+}
+
 int CVideoLibrary::StudioToLabel(int studioIdx, const CString& parent)
 {
 	if (studioIdx < 0 || studioIdx >= static_cast<int>(studios.size()))
@@ -4123,8 +4541,13 @@ int CVideoLibrary::RemoveNamedFromVideos(int kind, const CString& name)
 {
 	int affected = 0;
 	if (kind == LIST_STUDIO)   // 제작사를 지우면 그 레이블도 지움
+	{
 		labelInfos.erase(std::remove_if(labelInfos.begin(), labelInfos.end(),
 			[&](const NamedInfo& lb) { return lb.parent.CompareNoCase(name) == 0; }), labelInfos.end());
+		for (NamedInfo& st : studios)   // 하위 제작사는 남기고 상위 연결만 끊음 (최상위로)
+			if (st.parent.CompareNoCase(name) == 0)
+				st.parent.Empty();
+	}
 	for (VideoItem& v : items)
 	{
 		if (kind == LIST_STUDIO)
@@ -5247,6 +5670,35 @@ int CVideoLibrary::NameLangCount(const CString& name)
 	return static_cast<int>(langs.size());
 }
 
+void CVideoLibrary::SplitNameByLang(const CString& name, CString& ko, CString& en, CString& ja)
+{
+	// 괄호 · 쉼표 · 슬래시로 자른 조각마다 언어를 보고, 언어마다 처음 나온 이름 (배우 탭 트리맵 칸: 한글 / 영어 / 일본어 줄)
+	ko.Empty();
+	en.Empty();
+	ja.Empty();
+	CString t = name;
+	const wchar_t seps[] = { L'(', L')', L'\xFF08', L'\xFF09', L'\xFF0C', L'\x3001', L'/', L';', L'\xFF1B' };
+	for (wchar_t c : seps)
+		t.Replace(c, L',');
+	int start = 0;
+	for (;;)
+	{
+		CString p = t.Tokenize(L",", start);
+		if (start < 0)
+			break;
+		p.Trim();
+		if (p.IsEmpty())
+			continue;
+		switch (DetectNameLang(p))
+		{
+		case LANG_KO: if (ko.IsEmpty()) ko = p; break;
+		case LANG_EN: if (en.IsEmpty()) en = p; break;
+		case LANG_JA: if (ja.IsEmpty()) ja = p; break;
+		default: break;
+		}
+	}
+}
+
 CString CVideoLibrary::ComposeFullName(const CString& existing, const CString& web)
 {
 	// 언어별 조각 나누기: 괄호 · 쉼표 · 슬래시로 자름 ("아오이 츠카사(Tsukasa Aoi, 葵つかさ)", "Tsukasa Aoi / 葵つかさ")
@@ -5439,7 +5891,7 @@ bool CVideoLibrary::ApplyVideoText(VideoItem& v, CString text, std::vector<CStri
 			CString s = val;
 			s.TrimLeft(L'#');
 			s.Trim();
-			if (!s.IsEmpty() && (FindLabelOfSeries(s) >= 0 || FindStudioOfSeries(s) >= 0))
+			if (!s.IsEmpty() && SeriesRegistered(s))
 				setIfEmpty(v.series, s);
 			else if (!s.IsEmpty() && v.seriesTitle.IsEmpty())
 			{
@@ -5454,8 +5906,8 @@ bool CVideoLibrary::ApplyVideoText(VideoItem& v, CString text, std::vector<CStri
 			s.Trim();
 			if (!seriesAsTitle.IsEmpty() && v.seriesTitle == seriesAsTitle)
 			{
-				// 같은 글에 "시리즈"(품번 시리즈) 와 "시리즈 이름" 이 둘 다 있음 (정보 txt 형식) → 각각 제 칸으로
-				setIfEmpty(v.series, seriesAsTitle);
+				// 같은 글에 "시리즈" 와 "시리즈 이름" 이 둘 다 있음 (정보 txt 형식) → 이름 칸은 "시리즈 이름"
+				//  "시리즈" 값은 품번 DB 에 없는 것 (있으면 위에서 품번 시리즈로 들어감) → 품번 시리즈로 넣지 않음 (자동 등록 방지)
 				v.seriesTitle = s;
 				seriesAsTitle.Empty();
 				changed = true;
@@ -6265,14 +6717,7 @@ bool CVideoLibrary::ImportListFile(int what, const CString& path, int& added, in
 		}
 		else if (what == EXPORT_STUDIOS && fields[0] == L"L")
 		{
-			NamedInfo src;
-			ParseLabelFields(fields, src);
-			src.name.Trim();
-			if (src.name.IsEmpty())
-				continue;
-			const int idx = exactNamed(labelInfos, src.name);
-			if (idx < 0) { labelInfos.push_back(src); ++added; }
-			else if (putNamed(labelInfos[idx], src)) ++updated;
+			continue;   // 레이블 목록은 없음 (레이블 개편 - 레이블은 품번 DB 의 레이블 칸, 가져온 시리즈에 들어 있음)
 		}
 	}
 	if (what == EXPORT_ACTORS)
