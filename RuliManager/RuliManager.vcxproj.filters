@@ -23,6 +23,8 @@
     <ClInclude Include="framework.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="ImagePreview.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="PreviewVideo.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="TreemapView.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="FileManageDlg.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="ImageViewerWnd.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="Theme.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="ScreenshotExtractor.h"><Filter>헤더 파일</Filter></ClInclude>
@@ -69,6 +71,8 @@
     <ClCompile Include="AliasCombo.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="ImagePreview.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="PreviewVideo.cpp"><Filter>소스 파일</Filter></ClCompile>
+    <ClCompile Include="TreemapView.cpp"><Filter>소스 파일</Filter></ClCompile>
+    <ClCompile Include="FileManageDlg.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="ImageViewerWnd.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="Theme.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="ScreenshotExtractor.cpp"><Filter>소스 파일</Filter></ClCompile>

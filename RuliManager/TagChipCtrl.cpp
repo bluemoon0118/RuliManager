@@ -469,6 +469,12 @@ void CTagChipCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	}
 	if (m_dropRect.PtInRect(point))
 	{
+		// ⌄ 버튼: 목록이 떠 있으면 닫기 (다시 누르면 닫히는 콤보처럼), 아니면 열기
+		if (m_edit.GetSafeHwnd() && m_edit.IsPopupVisible())
+		{
+			m_edit.HidePopup();
+			return;
+		}
 		if (m_onDropDown)
 			m_onDropDown();
 		return;

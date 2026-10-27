@@ -465,11 +465,17 @@ BEGIN_MESSAGE_MAP(CCardPopup, CWnd)
 	ON_WM_ERASEBKGND()
 	ON_WM_NCHITTEST()
 	ON_WM_MOUSEACTIVATE()
+	ON_WM_MOUSEMOVE()
+	ON_WM_LBUTTONDOWN()
+	ON_WM_LBUTTONDBLCLK()
+	ON_WM_RBUTTONUP()
+	ON_WM_MOUSEWHEEL()
+	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 bool CCardPopup::CreatePopup(CWnd* owner)
 {
-	const CString cls = AfxRegisterWndClass(CS_DROPSHADOW, ::LoadCursor(nullptr, IDC_ARROW), nullptr);
+	const CString cls = AfxRegisterWndClass(CS_DROPSHADOW | CS_DBLCLKS, ::LoadCursor(nullptr, IDC_ARROW), nullptr);   // 더블클릭 (m_interactive 팝업)
 	return CreateEx(WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE, cls, L"", WS_POPUP,
 		CRect(0, 0, 10, 10), owner, 0) != FALSE;
 }
@@ -497,14 +503,86 @@ void CCardPopup::ShowNear(const CRect& anchor, CSize size, bool preferBelow)
 	const int cw = static_cast<int>(size.cx), ch = static_cast<int>(size.cy);   // LONG → int (std::min / max 형 맞춤)
 	x = (std::max)(static_cast<int>(work.left), (std::min)(x, static_cast<int>(work.right) - cw));
 	y = (std::max)(static_cast<int>(work.top), (std::min)(y, static_cast<int>(work.bottom) - ch));
-	SetWindowPos(&CWnd::wndTopMost, x, y, size.cx, size.cy, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+	PlaceAndShow(x, y, cw, ch);
+}
+
+void CCardPopup::ShowCentered(const CRect& anchor, CSize size)
+{
+	if (!GetSafeHwnd())
+		return;
+	MONITORINFO mi = { sizeof(mi) };
+	CRect work(0, 0, ::GetSystemMetrics(SM_CXSCREEN), ::GetSystemMetrics(SM_CYSCREEN));
+	if (::GetMonitorInfoW(::MonitorFromRect(&anchor, MONITOR_DEFAULTTONEAREST), &mi))
+		work = mi.rcWork;
+	const int cw = static_cast<int>(size.cx), ch = static_cast<int>(size.cy);
+	int x = anchor.CenterPoint().x - cw / 2;
+	int y = anchor.CenterPoint().y - ch / 2;
+	x = (std::max)(static_cast<int>(work.left), (std::min)(x, static_cast<int>(work.right) - cw));
+	y = (std::max)(static_cast<int>(work.top), (std::min)(y, static_cast<int>(work.bottom) - ch));
+	PlaceAndShow(x, y, cw, ch);
+}
+
+void CCardPopup::PlaceAndShow(int x, int y, int cx, int cy)
+{
+	const bool wasHidden = !IsWindowVisible();
+	if (wasHidden && m_fadeMs > 0)
+	{
+		// 투명하게 보인 뒤 타이머로 조금씩 불투명하게 (계층 창 - 끝나면 계층을 풀어 보통 창으로)
+		if (!(GetExStyle() & WS_EX_LAYERED))
+			ModifyStyleEx(0, WS_EX_LAYERED);
+		::SetLayeredWindowAttributes(GetSafeHwnd(), 0, 0, LWA_ALPHA);
+		m_fading = true;
+		m_fadeStart = ::GetTickCount64();
+		SetTimer(kFadeTimer, 15, nullptr);
+	}
+	SetWindowPos(&CWnd::wndTopMost, x, y, cx, cy, SWP_NOACTIVATE | SWP_SHOWWINDOW);
 	Invalidate(FALSE);
+	if (m_fading)
+		UpdateWindow();   // 첫 그림을 먼저 (투명한 동안 빈 창이 비치지 않게)
+}
+
+void CCardPopup::EndFade()
+{
+	KillTimer(kFadeTimer);
+	if (!m_fading)
+		return;
+	m_fading = false;
+	if (GetExStyle() & WS_EX_LAYERED)
+	{
+		ModifyStyleEx(WS_EX_LAYERED, 0);
+		RedrawWindow(nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN);
+	}
+}
+
+void CCardPopup::OnTimer(UINT_PTR nIDEvent)
+{
+	if (nIDEvent != kFadeTimer)
+	{
+		CWnd::OnTimer(nIDEvent);
+		return;
+	}
+	if (!m_fading || !IsWindowVisible())
+	{
+		EndFade();
+		return;
+	}
+	const double t = (std::min)(1.0, static_cast<double>(::GetTickCount64() - m_fadeStart) / (std::max)(1, m_fadeMs));
+	if (t >= 1.0)
+	{
+		::SetLayeredWindowAttributes(GetSafeHwnd(), 0, 255, LWA_ALPHA);
+		EndFade();
+		return;
+	}
+	const double e = 1.0 - (1.0 - t) * (1.0 - t) * (1.0 - t);   // 처음엔 빠르게, 끝에서 천천히 (ease-out)
+	::SetLayeredWindowAttributes(GetSafeHwnd(), 0, static_cast<BYTE>(e * 255.0 + 0.5), LWA_ALPHA);
 }
 
 void CCardPopup::Hide()
 {
 	if (GetSafeHwnd() && IsWindowVisible())
 		ShowWindow(SW_HIDE);
+	if (GetSafeHwnd())
+		EndFade();
 }
 
 void CCardPopup::OnPaint()

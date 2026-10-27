@@ -3,9 +3,14 @@
 
 #include <wincodec.h>
 #include <shlwapi.h>
+#include <d2d1_3.h>     // SVG (Direct2D - Windows 10 1703 이상)
 #include "DbCrypt.h"
 #include <atomic>
+#include <cmath>
+#include <string>
+#include <vector>
 #pragma comment(lib, "windowscodecs.lib")
+#pragma comment(lib, "d2d1.lib")
 
 namespace
 {
@@ -35,6 +40,146 @@ namespace
 		if (!ReadAll(path, raw) || !DbCrypt::IsEncrypted(raw.data(), raw.size()))
 			return false;
 		return DbCrypt::Decrypt(raw.data(), raw.size(), plain) && !plain.empty();
+	}
+
+	// 내용이 SVG(XML) 인지: 앞부분(BOM · 공백 · <?xml · 주석 · DOCTYPE 뒤)에 "<svg" 가 있으면
+	bool IsSvgData(const std::vector<BYTE>& data)
+	{
+		if (data.size() < 5)
+			return false;
+		const size_t n = (std::min)(data.size(), static_cast<size_t>(4096));
+		std::string head(reinterpret_cast<const char*>(data.data()), n);
+		size_t i = 0;
+		if (head.compare(0, 3, "\xEF\xBB\xBF") == 0)
+			i = 3;   // UTF-8 BOM
+		while (i < head.size() && (head[i] == ' ' || head[i] == '\t' || head[i] == '\r' || head[i] == '\n'))
+			++i;
+		if (i >= head.size() || head[i] != '<')
+			return false;
+		for (char& c : head)
+			c = static_cast<char>(::tolower(static_cast<unsigned char>(c)));
+		return head.find("<svg", i) != std::string::npos;
+	}
+
+	// SVG → 32비트 BGRA(알파 미리 곱함) 비트맵 (Direct2D 의 SVG 그리기 - 외부 라이브러리 없음)
+	//  - 크기: SVG 의 viewBox (없으면 width · height) 비율로 긴 변 kSvgPx 픽셀 (벡터라 카드 · 상세 화면에서 줄여 그려도 선명)
+	//  - Windows 10 1703 이전(ID2D1DeviceContext5 없음)이면 false
+	//  - <text> · CSS <style> · 필터는 Direct2D 가 그리지 않음 (로고 대부분은 글자도 패스라 문제 없음)
+	bool LoadWithSvg(CImage& image, const std::vector<BYTE>& data)
+	{
+		static const float kSvgPx = 1024.0f;
+		if (data.empty() || data.size() > 64u * 1024 * 1024)
+			return false;
+		CComPtr<IWICImagingFactory> wic;
+		if (FAILED(::CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&wic))))
+			return false;
+		CComPtr<ID2D1Factory1> d2d;
+		D2D1_FACTORY_OPTIONS opt = {};
+		if (FAILED(::D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory1), &opt, reinterpret_cast<void**>(&d2d))))
+			return false;
+		auto makeTarget = [&](UINT w, UINT h, CComPtr<IWICBitmap>& bmp, CComPtr<ID2D1DeviceContext5>& dc) -> bool
+		{
+			bmp.Release();
+			dc.Release();
+			if (FAILED(wic->CreateBitmap(w, h, GUID_WICPixelFormat32bppPBGRA, WICBitmapCacheOnLoad, &bmp)))
+				return false;
+			const D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_SOFTWARE,
+				D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+			CComPtr<ID2D1RenderTarget> rt;
+			if (FAILED(d2d->CreateWicBitmapRenderTarget(bmp, props, &rt)))
+				return false;
+			return SUCCEEDED(rt->QueryInterface(__uuidof(ID2D1DeviceContext5), reinterpret_cast<void**>(&dc)));   // SVG 지원 (Win10 1703+)
+		};
+		auto makeStream = [&]() -> CComPtr<IStream>
+		{
+			CComPtr<IStream> s;
+			s.Attach(::SHCreateMemStream(data.data(), static_cast<UINT>(data.size())));
+			return s;
+		};
+
+		// 1) 크기 알아내기 (1×1 에 읽어서 viewBox / width · height)
+		CComPtr<IWICBitmap> bmp;
+		CComPtr<ID2D1DeviceContext5> dc;
+		if (!makeTarget(1, 1, bmp, dc))
+			return false;
+		D2D1_SVG_VIEWBOX vb = {};
+		bool hasVb = false;
+		float lw = 0, lh = 0;
+		{
+			CComPtr<IStream> s = makeStream();
+			CComPtr<ID2D1SvgDocument> doc;
+			if (!s || FAILED(dc->CreateSvgDocument(s, D2D1::SizeF(1.0f, 1.0f), &doc)) || !doc)
+				return false;   // SVG 가 아니거나 읽지 못함
+			CComPtr<ID2D1SvgElement> root;
+			doc->GetRoot(&root);
+			if (root)
+			{
+				if (root->IsAttributeSpecified(L"viewBox")
+					&& SUCCEEDED(root->GetAttributeValue(L"viewBox", D2D1_SVG_ATTRIBUTE_POD_TYPE_VIEWBOX, &vb, sizeof(vb)))
+					&& vb.width > 0 && vb.height > 0)
+					hasVb = true;
+				D2D1_SVG_LENGTH len = {};
+				if (root->IsAttributeSpecified(L"width") && SUCCEEDED(root->GetAttributeValue(L"width", D2D1_SVG_ATTRIBUTE_POD_TYPE_LENGTH, &len, sizeof(len)))
+					&& len.units == D2D1_SVG_LENGTH_UNITS_NUMBER)
+					lw = len.value;
+				if (root->IsAttributeSpecified(L"height") && SUCCEEDED(root->GetAttributeValue(L"height", D2D1_SVG_ATTRIBUTE_POD_TYPE_LENGTH, &len, sizeof(len)))
+					&& len.units == D2D1_SVG_LENGTH_UNITS_NUMBER)
+					lh = len.value;
+			}
+		}
+		if (!hasVb && lw > 0 && lh > 0)
+		{
+			vb = { 0, 0, lw, lh };   // viewBox 가 없으면 width · height 를 viewBox 로 (아래에서 크기에 맞춰 늘림)
+			hasVb = true;
+		}
+		const float aspect = hasVb ? vb.width / vb.height : 1.0f;
+		UINT w = 0, h = 0;
+		if (aspect >= 1.0f)
+		{
+			w = static_cast<UINT>(kSvgPx);
+			h = static_cast<UINT>((std::max)(1.0f, std::floor(kSvgPx / aspect + 0.5f)));
+		}
+		else
+		{
+			h = static_cast<UINT>(kSvgPx);
+			w = static_cast<UINT>((std::max)(1.0f, std::floor(kSvgPx * aspect + 0.5f)));
+		}
+
+		// 2) 그 크기로 그림 (viewBox → 전체 크기, 남는 곳은 투명)
+		if (!makeTarget(w, h, bmp, dc))
+			return false;
+		CComPtr<IStream> s = makeStream();
+		CComPtr<ID2D1SvgDocument> doc;
+		if (!s || FAILED(dc->CreateSvgDocument(s, D2D1::SizeF(static_cast<float>(w), static_cast<float>(h)), &doc)) || !doc)
+			return false;
+		CComPtr<ID2D1SvgElement> root;
+		doc->GetRoot(&root);
+		if (root)
+		{
+			if (hasVb)
+				root->SetAttributeValue(L"viewBox", D2D1_SVG_ATTRIBUTE_POD_TYPE_VIEWBOX, &vb, sizeof(vb));
+			const D2D1_SVG_LENGTH full = { 100.0f, D2D1_SVG_LENGTH_UNITS_PERCENTAGE };   // 그리는 크기 전체
+			root->SetAttributeValue(L"width", D2D1_SVG_ATTRIBUTE_POD_TYPE_LENGTH, &full, sizeof(full));
+			root->SetAttributeValue(L"height", D2D1_SVG_ATTRIBUTE_POD_TYPE_LENGTH, &full, sizeof(full));
+		}
+		dc->BeginDraw();
+		dc->Clear(D2D1::ColorF(0, 0, 0, 0));
+		dc->DrawSvgDocument(doc);
+		if (FAILED(dc->EndDraw()))
+			return false;
+		dc.Release();   // 그리기 끝 (비트맵 잠금 해제)
+
+		if (!image.IsNull())
+			image.Destroy();
+		if (!image.Create(static_cast<int>(w), -static_cast<int>(h), 32, CImage::createAlphaChannel))
+			return false;
+		const int pitch = image.GetPitch();
+		if (FAILED(bmp->CopyPixels(nullptr, static_cast<UINT>(pitch), static_cast<UINT>(pitch) * h, static_cast<BYTE*>(image.GetBits()))))
+		{
+			image.Destroy();
+			return false;
+		}
+		return true;
 	}
 
 	bool LoadWithWic(CImage& image, const CString& path, IStream* stream)
@@ -91,6 +236,12 @@ bool LoadImageFile(CImage& image, const CString& path)
 	std::vector<BYTE> plain;
 	if (ReadEncryptedImage(path, plain))
 	{
+		if (IsSvgData(plain))
+		{
+			const bool svgOk = LoadWithSvg(image, plain);   // 암호화된 SVG
+			::SecureZeroMemory(plain.data(), plain.size());
+			return svgOk;
+		}
 		bool ok = false;
 		if (IStream* s = ::SHCreateMemStream(plain.data(), static_cast<UINT>(plain.size())))
 		{
@@ -107,6 +258,16 @@ bool LoadImageFile(CImage& image, const CString& path)
 		}
 		::SecureZeroMemory(plain.data(), plain.size());
 		return ok;
+	}
+
+	{
+		// SVG: 확장자가 .svg 이거나 내용이 SVG 면 Direct2D 로 그림 (WIC · GDI+ 는 SVG 를 못 읽음)
+		const CString ext = ::PathFindExtensionW(path);
+		if (ext.CompareNoCase(L".svg") == 0)
+		{
+			std::vector<BYTE> data;
+			return ReadAll(path, data) && LoadWithSvg(image, data);
+		}
 	}
 
 	if (LoadWithWic(image, path, nullptr))

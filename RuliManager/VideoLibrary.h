@@ -17,7 +17,7 @@ struct VideoItem
 	CString   actorAliases;  // 이 작품에서 배우가 쓴 별칭 (쉼표 구분)
 	CString   studio;        // 스튜디오 (1개)
 	CString   label;         // 레이블 (스튜디오 하위, 1개 - 스튜디오의 레이블 목록에 자동 등록)
-	CString   series;        // 시리즈 (레이블 하위, 1개 - 레이블의 시리즈 목록에 자동 등록) = 품번 접두어 시리즈
+	CString   series;        // 시리즈 (레이블 하위, 1개) = 품번 접두어 시리즈 - 품번 DB(제작사 · 레이블의 시리즈 목록)에 있는 것만 (없는 값은 자동 등록하지 않고 seriesTitle 로)
 	CString   seriesTitle;   // 시리즈 이름 (품번 시리즈와 별개의 자유 글자 - 영상 상세 [시리즈] 칸)
 	CString   release;       // 발매일 "YYYY-MM-DD" (없으면 빈 문자열)
 	CString   tags;          // 쉼표로 구분된 태그
@@ -59,7 +59,7 @@ struct NamedInfo
 	CString memo;    // 메모
 	CString image;   // 이미지(로고 등) 파일 경로
 	CString subName; // 서브이름 (제작사 · 레이블 · 태그(다른 이름), 여러 개 줄바꿈 \n 구분 - 쉼표는 이름의 일부, 보조 표기 예: S1 NO.1 STYLE → 에스원 / S1) - 이 이름으로 적혀 있어도 같은 스튜디오
-	CString parent;  // 레이블만: 상위 제작사 이름 (labelInfos 항목)
+	CString parent;  // 상위 제작사 이름 - 레이블: 그 레이블의 제작사 (labelInfos 항목), 제작사: 상위 제작사 (여러 단계 가능 · 순환 불가, 비우면 최상위)
 	CString series;  // 제작사 · 레이블: 시리즈 (여러 개, 한 줄에 하나 "이름␟품번␟라벨␟설명" - ParseSeries / JoinSeries, 시리즈 하나는 제작사나 레이블 하나에만)
 	CString urls;    // 제작사 · 레이블: 링크 URL (여러 개, 줄바꿈 \n 구분 - SplitUrls / JoinUrls)
 	CString nameEn;  // 태그: 영어 이름 (카드에 "한글 (영어, 일본어)", 텍스트 · 붙여넣기에서 이 이름도 그 태그로)
@@ -74,8 +74,10 @@ struct SeriesInfo
 {
 	CString name;    // 시리즈 = 품번 접두어 (예: SONE, 쉼표로 여러 개도 가능) - 영상 품번이 이 접두어면 이 시리즈로 자동 지정
 	CString code;    // (예전 형식의 품번 칸 - 읽을 때 name 으로 옮김, 쓰지 않음)
-	CString label;   // 라벨 (별도 표기)
+	CString label;   // 레이블 (레이블 개편 - 예전 "라벨")
 	CString desc;    // 설명
+	CString altNames; // 레이블 다른 이름 (여러 개, 줄바꿈 \n 구분 - DB 시리즈 칸 여섯째 칸에는 ␞ 로 이어서)
+	CString image;   // 레이블 대표 이미지 (이미지 보관소 studios 폴더의 복사본, 메모리에는 전체 경로 - DB 에는 보관소 기준 상대 경로)
 };
 
 // 동영상 라이브러리 (목록 + 등록 폴더 + 배우 + 스튜디오 + 태그 + 저장/불러오기)
@@ -159,6 +161,7 @@ public:
 	int  FindStudioLoose(const CString& name) const;   // 스튜디오 이름 · 서브이름으로 찾기 (그대로 → 공백 · 대소문자 · 기호 무시 순, 없으면 -1)
 	static bool SameNameByLang(const CString& a, const CString& b);
 	static int  NameLangCount(const CString& name);   // 이름의 구성요소(언어) 수: "한글(English, 日本語)" = 3
+	static void    SplitNameByLang(const CString& name, CString& ko, CString& en, CString& ja);   // "한글(English, 日本語)" → 언어별 첫 이름 (없으면 빈칸, 언어를 가를 수 없는 조각은 무시)
 	static CString ComposeFullName(const CString& existing, const CString& web);   // 기존 이름 + 웹 이름 → "한글(English, 日本語)" (언어마다 기존 표기 우선, 없는 언어만 웹에서)
 	// 성별 목록 (저장 값, 순서 = 배우 관리 창 콤보 순서, 0번 = 미지정 "")
 	static int     GenderCount();
@@ -196,7 +199,10 @@ public:
 	int  DeleteCollection(const CString& name);                  // 컬렉션 삭제 (영상에서도 빠짐, 영상 파일은 그대로) - 빠진 영상 수
 	bool InCollection(const VideoItem& v, const CString& name) const;
 	int  FindLabel(const CString& name) const;                   // 레이블 이름 · 서브이름으로 찾기 (대소문자 무시, 없으면 -1)
-	std::vector<int> LabelsOf(const CString& studioName) const;   // 이 제작사의 레이블 (labelInfos 인덱스, 이름 순)
+	std::vector<int> LabelsOf(const CString& studioName) const;
+	std::vector<int> ChildStudiosOf(const CString& studioName) const;   // 바로 아래 하위 제작사 (studios 인덱스, 이름 순)
+	bool IsStudioDescendant(const CString& name, const CString& ancestor) const;   // name 이 ancestor 의 하위(여러 단계)이거나 같으면 true - 순환 연결 막기용
+	std::vector<CString> StudioParentChain(const CString& studioName) const;      // 상위 제작사들 (가까운 것부터, 순환이면 거기서 멈춤)   // 이 제작사의 레이블 (labelInfos 인덱스, 이름 순)
 	std::vector<CString> LabelNamesOf(const CString& studioName) const;
 	int  CountLabelVideos(const CString& labelName) const;       // 이 레이블이 지정된 영상 수
 	// 시리즈 (레이블 하위, 레이블의 series 목록)
@@ -205,7 +211,20 @@ public:
 	static CString JoinSeries(const std::vector<SeriesInfo>& list);
 	static std::vector<CString> SeriesNames(const CString& text);     // series 칸의 시리즈 이름만
 	CString SeriesForCode(const CString& code) const;                  // 영상 품번의 접두어가 등록된 시리즈 (없으면 빈 문자열)
-	bool    SeriesInfoForCode(const CString& code, SeriesInfo& out) const;   // 위와 같은 규칙으로 찾은 시리즈 정보 (라벨 · 설명 포함)
+	bool    SeriesInfoForCode(const CString& code, SeriesInfo& out) const;   // 위와 같은 규칙으로 찾은 시리즈 정보 (레이블 · 설명 포함)
+	// 레이블 개편 (v0.8): 제작사 하위 레이블(labelInfos) 폐기 → 레이블 = 품번 DB(시리즈)의 "레이블" 칸
+	//  영상의 label 은 저장하지 않고 품번으로 품번 DB 에서 찾은 값 (RefreshDerivedLabels)
+	static CString CodePrefixOf(const CString& code);            // 품번 접두어 ('-' 앞, 없으면 앞쪽 영문 - 대문자)
+	CString LabelForCode(const CString& code) const;             // 품번 DB 에서 찾은 레이블 (없으면 빈칸)
+	CString LabelImage(const CString& label) const;              // 그 레이블 이름을 가진 품번 DB 항목의 대표 이미지 (처음 찾은 것, 없으면 빈칸 - RefreshDerivedLabels 때 만든 표)
+	std::map<CString, CString> m_labelImages;                   // 레이블(소문자) → 대표 이미지 (RefreshDerivedLabels)
+	CString looseSeries;                                         // 제작사 없는 품번 DB 항목 (시리즈 칸 형식 - DB "Q" 줄)
+	bool    SeriesRegistered(const CString& series) const;       // 품번 DB(제작사 · 제작사 없음)에 있는 시리즈 이름인지
+	// 품번이 속한 품번 DB 자리: owner = studios 인덱스 (studios.size() = 제작사 없는 항목), index = 그 목록의 순번 (레이블 순번), part = 항목 안 접두어 순서 - 없으면 false
+	bool    SeriesSlotForCode(const CString& code, int& owner, int& index, int& part) const;
+	void    RefreshDerivedLabels();                              // 모든 영상의 label = LabelForCode(code)
+	int     FillSeriesLabel(const CString& code, const CString& label);   // 품번의 시리즈 레이블이 비어 있으면 채움 - 0 = 시리즈 없음, 1 = 채움, 2 = 이미 있음
+	bool    MigrateLabelsToSeries(CString* report = nullptr);    // 예전 레이블 → 품번 DB 레이블 (레이블 목록이나 영상 레이블 값이 있을 때만, 바꿨으면 true)
 	int  FindStudioOfSeries(const CString& series, CString* seriesName = nullptr) const;  // 이 시리즈를 가진 제작사 (studios 인덱스, 없으면 -1)
 	std::vector<CString> AllSeries() const;                      // 모든 레이블의 시리즈 + 영상에만 있는 시리즈 (이름 순, 중복 제거)
 	void RenameLabelInVideos(const CString& oldName, const CString& newName);

@@ -18,6 +18,7 @@
 #define IDD_TEXT_INFO                   139
 #define IDD_SERIES                      140
 #define IDD_TAG_LINK                    141
+#define IDD_FILE_MANAGE                 145
 #define IDC_BTN_ADDFOLDER               1000
 #define IDC_BTN_REMOVEFOLDER            1001
 #define IDC_BTN_REFRESH                 1002
@@ -285,6 +286,36 @@
 #define IDC_SET_PREVIEW_STOP            1326
 #define IDC_VIDEO_MODE_WALL             1327
 #define IDC_DETAIL_BAR                  1328
+#define IDC_ACTOR_VIEW_GRID             1329
+#define IDC_ACTOR_VIEW_TREEMAP          1330
+#define IDC_COMBO_TREEMAP_BASIS         1331
+#define IDC_TREEMAP                     1332
+#define IDC_FM_RESCAN                   1333
+#define IDC_FM_ONLYBAD                  1334
+#define IDC_FM_SUMMARY                  1335
+#define IDC_FM_TREE                     1336
+#define IDC_FM_DETAIL                   1337
+#define IDC_FM_FIXONE                   1338
+#define IDC_FM_FIXCHECKED               1339
+#define IDC_FM_FIXALL                   1340
+#define IDC_FM_RULE                     1341
+#define IDC_LABEL_CARD                  1342
+#define IDC_NL_CHILD_CHIPS              1343
+#define IDC_NL_CHILD_LBL                1344
+#define IDC_VIDEO_MODE_LABEL            1345
+#define IDC_SR_STUDIO                   1346
+#define IDC_SR_CODE                     1347
+#define IDC_SR_LABEL                    1348
+#define IDC_SR_DESC                     1349
+#define IDC_SR_IMAGE                    1350
+#define IDC_SR_IMG_BROWSE               1351
+#define IDC_SR_IMG_CLEAR                1352
+#define IDC_SR_NEW                      1353
+#define IDC_SR_DELETE                   1354
+#define IDC_SR_SAVE                     1355
+#define IDC_SR_IMAGE_PATH               1356
+#define IDC_SR_HEADER                   1357
+#define IDC_SR_ALT                      1358
 #define ID_ACTOR_SHOWVIDEOS             32800
 #define ID_ACTOR_EDIT                   32801
 #define ID_MANAGE_ACTORS                32810
@@ -312,6 +343,7 @@
 #define ID_VIDEO_MAKEPREVIEW            33045
 #define ID_VIDEO_MAKEPREVIEWCHECKED     33046
 #define ID_MANAGE_SERIES                32822
+#define ID_MANAGE_FILES                 33047
 #define ID_CAT_MERGE                    32823
 #define ID_VIDEO_SCREENSHOT             32824
 #define ID_ACTOR_PASTEINFO              32825
@@ -325,9 +357,9 @@
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        145
-#define _APS_NEXT_COMMAND_VALUE         33047
-#define _APS_NEXT_CONTROL_VALUE         1329
+#define _APS_NEXT_RESOURCE_VALUE        146
+#define _APS_NEXT_COMMAND_VALUE         33048
+#define _APS_NEXT_CONTROL_VALUE         1359
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

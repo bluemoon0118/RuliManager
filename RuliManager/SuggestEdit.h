@@ -66,5 +66,7 @@ protected:
 	afx_msg void OnKillFocus(CWnd* pNewWnd);
 	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
 	afx_msg void OnDestroy();
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	static const UINT_PTR kWatchTimer = 0x5347;   // 목록이 떠 있는 동안 바깥 클릭 · 다른 창 전환 살피기 (닫기)
 	DECLARE_MESSAGE_MAP()
 };

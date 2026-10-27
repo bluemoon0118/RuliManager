@@ -44,6 +44,11 @@ protected:
 	CTagChipCtrl   m_parentChips;      // 레이블의 상위 제작사 (칩 하나, 비우면 상위 없음 - 등록된 제작사만)
 	CString        m_parentExclude;    // 상위로 고를 수 없는 이름 (지금 항목이 제작사일 때 자기 자신)
 	CTagChipCtrl   m_labelChips;       // 제작사: 하위 레이블 (여러 개, 태그처럼 칩) - 빼면 그 레이블은 상위 없음으로
+	CTagChipCtrl   m_childChips;       // 제작사: 하위 제작사 (여러 개, [상위] 줄 아래) - 넣으면 그 제작사의 상위를 이 제작사로, 빼면 최상위로
+	CStatic        m_childLbl;         // "하위" 글자
+	void ApplyChildChips(const CString& studioName);
+	void LayoutStudioChips();   // 제작사: [하위] 칸은 칩 수만큼 커지고 [레이블] 칸은 남는 공간 (둘 다 넘치면 필요한 높이 비율로 나눔)
+	bool m_inChipLayout = false;   // 하위 제작사 칩 → 각 제작사의 상위 지정 / 해제
 	// (시리즈 = 품번 표는 별도 창 CSeriesDlg [품번 관리] 로 옮김)
 	CRect          m_chipsLblRect, m_parentRect, m_parentLblRect;   // 제작사일 때 [레이블] 줄을 [상위] 줄 높이로 올림
 	CRect          m_chipsRect1;   // [레이블] 칩 자리
@@ -60,6 +65,14 @@ protected:
 	int        CountOfCode(int code) const;
 
 	std::vector<int>       m_rows;    // 목록 행 → 항목 코드
+	std::map<int, int>     m_codeDepth;   // 제작사 목록: 항목 코드 → 트리 깊이 (들여쓰기)
+	// 제작사 목록 끌어서 옮기기: 제작사 → 다른 제작사 아래(하위째로) / 빈 곳 = 최상위, 레이블 → 그 제작사 아래 / 빈 곳 = 상위 없음
+	bool m_dragging = false;
+	int  m_dragCode = -1;
+	int  m_dropRow = -2;          // 강조한 행 (-1 = 빈 곳 = 최상위, -2 = 없음)
+	bool CanDrop(int dragCode, int row, CString* targetStudio) const;   // 그 행(-1 = 빈 곳)에 놓을 수 있는지 + 놓으면 새 상위 제작사 이름
+	void SetDropRow(int row);
+	void EndDrag(bool drop);
 	std::map<CString, int> m_counts;  // 이름(소문자) → 영상 수
 	int     m_cur = -1;               // 지금 항목 코드 (-1 = 없음)
 	CString m_imagePath;
@@ -88,6 +101,11 @@ protected:
 	afx_msg void OnKindStudio();
 	afx_msg void OnKindLabel();
 	afx_msg void OnLvnItemChanged(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnListCustomDraw(NMHDR* pNMHDR, LRESULT* pResult);   // 제작사 목록: 제작사 / 레이블 글자색, 끌어 놓을 곳 강조
+	afx_msg void OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult);     // 제작사 목록: 끌어서 상위 바꾸기 시작
+	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
+	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
+	afx_msg void OnCaptureChanged(CWnd* pWnd);
 	afx_msg void OnLvnColumnClick(NMHDR* pNMHDR, LRESULT* pResult);   // 태그 관리: 이름 / 영상 수 열 머리글 클릭 → 그 열로 정렬, 같은 열을 다시 누르면 오름차순 ↔ 내림차순
 	afx_msg void OnBnClickedNew();
 	afx_msg void OnBnClickedDelete();
