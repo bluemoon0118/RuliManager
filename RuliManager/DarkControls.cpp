@@ -707,6 +707,42 @@ namespace
 {
 	const UINT_PTR kSyncTimer = 1;
 	const UINT_PTR kRepeatTimer = 2;
+	const UINT_PTR kAnimTimer = 3;          // 펼침/접힘 애니메이션
+	const ULONGLONG kCollapseDelay = 800;   // 마우스가 떠난 뒤 접기까지 기다리는 시간 (ms)
+
+	void EnsureGdipScroll()
+	{
+		static ULONG_PTR token = 0;
+		if (!token)
+		{
+			Gdiplus::GdiplusStartupInput input;
+			Gdiplus::GdiplusStartup(&token, &input, nullptr);
+		}
+	}
+	COLORREF MixSB(COLORREF a, COLORREF b, float t)   // a → b 로 t 만큼
+	{
+		auto ch = [t](int x, int y) { return static_cast<int>(x + (y - x) * t + 0.5f); };
+		return RGB(ch(GetRValue(a), GetRValue(b)), ch(GetGValue(a), GetGValue(b)), ch(GetBValue(a), GetBValue(b)));
+	}
+	Gdiplus::Color GpSB(COLORREF c, BYTE a = 255)
+	{
+		return Gdiplus::Color(a, GetRValue(c), GetGValue(c), GetBValue(c));
+	}
+	void AddPillSB(Gdiplus::GraphicsPath& p, const Gdiplus::RectF& r, float rad)
+	{
+		rad = (std::min)(rad, (std::min)(r.Width, r.Height) / 2.0f);
+		if (rad <= 0.1f)
+		{
+			p.AddRectangle(r);
+			return;
+		}
+		const float d = rad * 2.0f;
+		p.AddArc(r.X, r.Y, d, d, 180.0f, 90.0f);
+		p.AddArc(r.GetRight() - d, r.Y, d, d, 270.0f, 90.0f);
+		p.AddArc(r.GetRight() - d, r.GetBottom() - d, d, d, 0.0f, 90.0f);
+		p.AddArc(r.X, r.GetBottom() - d, d, d, 90.0f, 90.0f);
+		p.CloseFigure();
+	}
 }
 
 BOOL CDarkScrollBar::Create(CWnd* parent, CWnd* target, bool vertical, TargetType type)
@@ -732,6 +768,14 @@ void CDarkScrollBar::SetColors(COLORREF track, COLORREF thumb, COLORREF thumbHot
 	m_track = track;
 	m_thumb = thumb;
 	m_thumbHot = thumbHot;
+	if (GetSafeHwnd())
+		Invalidate(FALSE);
+}
+
+void CDarkScrollBar::SetBackColor(COLORREF back)
+{
+	m_back = back;
+	m_backSet = true;
 	if (GetSafeHwnd())
 		Invalidate(FALSE);
 }
@@ -927,57 +971,112 @@ void CDarkScrollBar::OnPaint()
 	buf.CreateCompatibleBitmap(&paintDC, (std::max)(1, rc.Width()), (std::max)(1, rc.Height()));
 	CBitmap* oldBuf = dc.SelectObject(&buf);
 
-	dc.FillSolidRect(&rc, m_track);
+	// Windows 11 스크롤바:
+	//  · 평소: 트랙/화살표 없이 대상 창 바탕 위에 가는 선 썸만 (바깥쪽 가장자리 쪽)
+	//  · 마우스를 올리면: 은은한 트랙이 나타나고, 썸이 둥근 막대로 굵어지며 양 끝에 ▲▼ 화살표 표시
+	const COLORREF back = m_backSet ? m_back : TCOL(m_type == TARGET_EDIT ? TC_EDIT : TC_BACK);
+	dc.FillSolidRect(&rc, back);
 
-	CRect thumb;
-	if (GetThumbRect(thumb))
+	EnsureGdipScroll();
 	{
-		thumb.DeflateRect(m_vert ? 3 : 2, m_vert ? 2 : 3);
-		const COLORREF c = (m_dragging || m_hot) ? m_thumbHot : m_thumb;
-		CBrush brush(c);
-		CPen pen(PS_SOLID, 1, c);
-		CBrush* oldBrush = dc.SelectObject(&brush);
-		CPen* oldPen = dc.SelectObject(&pen);
-		const int radius = m_vert ? thumb.Width() : thumb.Height();
-		dc.RoundRect(&thumb, CPoint(radius, radius));
-		dc.SelectObject(oldBrush);
-		dc.SelectObject(oldPen);
-	}
-	// 양 끝 화살표 버튼 (▲ ▼ / ◀ ▶): 마우스를 올리거나 누르면 밝게
-	for (int which = 1; which <= 2; ++which)
-	{
-		const CRect ar = ArrowRect(which);
-		if (ar.IsRectEmpty())
-			continue;
-		const bool pressed = (which == 1 && m_repeatCode == SB_LINEUP) || (which == 2 && m_repeatCode == SB_LINEDOWN);
-		const COLORREF c = !m_enabled ? m_track : ((pressed || m_hotArrow == which) ? m_thumbHot : m_thumb);
-		const int s = (std::max)(3, (std::min)(ar.Width(), ar.Height()) / 4);   // 삼각형 반 너비
-		const CPoint mid = ar.CenterPoint();
-		POINT pts[3];
-		if (m_vert)
+		Gdiplus::Graphics g(dc.GetSafeHdc());
+		g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+		g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+
+		const float e = (std::max)(0.0f, (std::min)(1.0f, m_expand));
+		const float thick = static_cast<float>(m_vert ? m_barRect.Width() : m_barRect.Height());
+		const COLORREF thumbNormal = MixSB(m_thumb, back, 0.25f);   // 기본 썸/화살표 색 (살짝 가라앉은 회색)
+
+		// 트랙 (펼친 정도에 따라 서서히 나타남)
+		if (e > 0.01f && !m_barRect.IsRectEmpty())
 		{
-			const int dir = (which == 1) ? -1 : 1;   // 위 / 아래
-			pts[0] = { mid.x - s, mid.y - dir * s / 2 };
-			pts[1] = { mid.x + s, mid.y - dir * s / 2 };
-			pts[2] = { mid.x, mid.y + dir * (s - s / 2) + dir };
+			const COLORREF tc = MixSB(back, m_track, 0.30f);
+			Gdiplus::SolidBrush br(GpSB(tc, static_cast<BYTE>(255.0f * e)));
+			Gdiplus::RectF r(static_cast<float>(m_barRect.left), static_cast<float>(m_barRect.top),
+				static_cast<float>(m_barRect.Width()), static_cast<float>(m_barRect.Height()));
+			Gdiplus::GraphicsPath path;
+			AddPillSB(path, r, (std::min)(4.0f, thick / 2.0f));
+			g.FillPath(&br, &path);
 		}
-		else
+
+		// 썸: 가는 선(2px) → 둥근 막대(두께의 약 40%)
+		CRect thumb;
+		if (GetThumbRect(thumb))
 		{
-			const int dir = (which == 1) ? -1 : 1;   // 왼쪽 / 오른쪽
-			pts[0] = { mid.x - dir * s / 2, mid.y - s };
-			pts[1] = { mid.x - dir * s / 2, mid.y + s };
-			pts[2] = { mid.x + dir * (s - s / 2) + dir, mid.y };
+			const float thinW = (std::max)(2.0f, thick * 0.12f);
+			const float fatW = (std::max)(6.0f, thick * 0.40f);
+			const float w = thinW + (fatW - thinW) * e;
+			// 가는 선은 바깥쪽(오른쪽/아래) 가장자리 가까이, 펼치면 가운데로
+			const float mid = m_vert ? (m_barRect.left + m_barRect.right) / 2.0f : (m_barRect.top + m_barRect.bottom) / 2.0f;
+			const float edge = (m_vert ? m_barRect.right : m_barRect.bottom) - 2.5f - thinW / 2.0f;
+			const float c = edge + (mid - edge) * e;
+			const float inset = 2.0f;   // 길이 방향 여백
+			Gdiplus::RectF r;
+			if (m_vert)
+				r = Gdiplus::RectF(c - w / 2.0f, thumb.top + inset, w, (std::max)(w, thumb.Height() - inset * 2.0f));
+			else
+				r = Gdiplus::RectF(thumb.left + inset, c - w / 2.0f, (std::max)(w, thumb.Width() - inset * 2.0f), w);
+			const COLORREF col = m_dragging ? m_thumbHot : (m_hot ? m_thumb : thumbNormal);
+			Gdiplus::SolidBrush br(GpSB(col));
+			Gdiplus::GraphicsPath path;
+			AddPillSB(path, r, w / 2.0f);
+			g.FillPath(&br, &path);
 		}
-		CBrush brush(c);
-		CPen pen(PS_SOLID, 1, c);
-		CBrush* ob = dc.SelectObject(&brush);
-		CPen* op = dc.SelectObject(&pen);
-		dc.Polygon(pts, 3);
-		dc.SelectObject(ob);
-		dc.SelectObject(op);
+
+		// 양 끝 화살표 (펼쳤을 때만, 서서히 나타남): 둥근 모서리의 작은 삼각형, 누르면 살짝 작아짐
+		if (e > 0.01f)
+		{
+			for (int which = 1; which <= 2; ++which)
+			{
+				const CRect ar = ArrowRect(which);
+				if (ar.IsRectEmpty())
+					continue;
+				const bool pressed = (which == 1 && m_repeatCode == SB_LINEUP) || (which == 2 && m_repeatCode == SB_LINEDOWN);
+				COLORREF col = (pressed || m_hotArrow == which) ? m_thumbHot : thumbNormal;
+				float alpha = 255.0f * e;
+				if (!m_enabled)
+					alpha *= 0.4f;
+				const float scale = pressed ? 0.8f : 1.0f;
+				const float s = (std::max)(3.0f, thick * 0.22f) * scale;   // 삼각형 반 너비
+				const float h = s * 0.95f;                                    // 삼각형 높이
+				const float cx = (ar.left + ar.right) / 2.0f;
+				const float cy = (ar.top + ar.bottom) / 2.0f;
+				Gdiplus::PointF pts[3];
+				const float dir = (which == 1) ? -1.0f : 1.0f;
+				if (m_vert)
+				{
+					pts[0] = Gdiplus::PointF(cx - s, cy - dir * h / 2.0f);
+					pts[1] = Gdiplus::PointF(cx + s, cy - dir * h / 2.0f);
+					pts[2] = Gdiplus::PointF(cx, cy + dir * h / 2.0f);
+				}
+				else
+				{
+					pts[0] = Gdiplus::PointF(cx - dir * h / 2.0f, cy - s);
+					pts[1] = Gdiplus::PointF(cx - dir * h / 2.0f, cy + s);
+					pts[2] = Gdiplus::PointF(cx + dir * h / 2.0f, cy);
+				}
+				const Gdiplus::Color gc = GpSB(col, static_cast<BYTE>(alpha));
+				Gdiplus::SolidBrush br(gc);
+				Gdiplus::Pen pen(gc, 1.5f);
+				pen.SetLineJoin(Gdiplus::LineJoinRound);
+				g.FillPolygon(&br, pts, 3);
+				g.DrawPolygon(&pen, pts, 3);
+			}
+		}
 	}
 	paintDC.BitBlt(0, 0, rc.Width(), rc.Height(), &dc, 0, 0, SRCCOPY);
 	dc.SelectObject(oldBuf);
+}
+
+bool CDarkScrollBar::WantExpanded() const
+{
+	return m_overBar || m_dragging || m_repeatCode >= 0 || ::GetTickCount64() < m_collapseAt;
+}
+
+void CDarkScrollBar::StartAnim()
+{
+	if (GetSafeHwnd())
+		SetTimer(kAnimTimer, 15, nullptr);
 }
 
 void CDarkScrollBar::OnTimer(UINT_PTR nIDEvent)
@@ -985,6 +1084,23 @@ void CDarkScrollBar::OnTimer(UINT_PTR nIDEvent)
 	if (nIDEvent == kSyncTimer)
 	{
 		Sync();
+		return;
+	}
+	if (nIDEvent == kAnimTimer)
+	{
+		const bool want = WantExpanded();
+		const float target = want ? 1.0f : 0.0f;
+		const float prev = m_expand;
+		if (m_expand < target)
+			m_expand = (std::min)(target, m_expand + 0.2f);    // 펼침 ≈ 75ms
+		else if (m_expand > target)
+			m_expand = (std::max)(target, m_expand - 0.125f);  // 접힘 ≈ 120ms
+		if (m_expand != prev)
+			Invalidate(FALSE);
+		// 다 펼쳐졌고 마우스/드래그가 유지 중이면 (떠날 때 다시 시작) · 다 접혔으면 멈춤
+		const bool held = m_overBar || m_dragging || m_repeatCode >= 0;
+		if ((m_expand >= 1.0f && held) || (m_expand <= 0.0f && !want))
+			KillTimer(kAnimTimer);
 		return;
 	}
 	if (nIDEvent == kRepeatTimer)
@@ -1077,6 +1193,9 @@ void CDarkScrollBar::OnLButtonUp(UINT /*nFlags*/, CPoint /*point*/)
 		ReleaseCapture();
 	if (wasActive)
 		SendScroll(SB_ENDSCROLL);
+	if (!m_overBar)
+		m_collapseAt = ::GetTickCount64() + kCollapseDelay;
+	StartAnim();
 	Invalidate(FALSE);
 }
 
@@ -1087,6 +1206,9 @@ void CDarkScrollBar::OnCaptureChanged(CWnd* pWnd)
 		m_dragging = false;
 		m_repeatCode = -1;
 		KillTimer(kRepeatTimer);
+		if (!m_overBar)
+			m_collapseAt = ::GetTickCount64() + kCollapseDelay;
+		StartAnim();
 		Invalidate(FALSE);
 	}
 	CWnd::OnCaptureChanged(pWnd);
@@ -1111,6 +1233,16 @@ void CDarkScrollBar::OnMouseMove(UINT nFlags, CPoint point)
 		return;
 	}
 
+	// 스크롤바 위에 올라오면 펼침 (모서리 칸은 제외)
+	const bool over = m_barRect.PtInRect(point) != FALSE;
+	if (over != m_overBar)
+	{
+		m_overBar = over;
+		if (!over)
+			m_collapseAt = ::GetTickCount64() + kCollapseDelay;
+		StartAnim();
+	}
+
 	// 마우스가 썸 위에 있으면 밝게
 	CRect thumb;
 	const bool hot = GetThumbRect(thumb) && thumb.PtInRect(point);
@@ -1133,6 +1265,12 @@ void CDarkScrollBar::OnMouseMove(UINT nFlags, CPoint point)
 
 void CDarkScrollBar::OnMouseLeave()
 {
+	if (m_overBar)
+	{
+		m_overBar = false;
+		m_collapseAt = ::GetTickCount64() + kCollapseDelay;
+		StartAnim();
+	}
 	if (m_hot || m_hotArrow)
 	{
 		m_hot = false;

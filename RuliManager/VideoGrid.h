@@ -51,6 +51,7 @@ public:
 	void SetShowImage(bool show);   // false: 이미지 없이 글자만 있는 카드
 	void SetBackColor(COLORREF bg); // 배경색 (어두운 색이면 글자/카드 색도 어둡게 맞춤)
 	int  HitTest(CPoint pt) const;
+	int  GroupHeaderAt(CPoint pt) const;   // 묶음 머리줄 위면 그 묶음 첫 카드 번호 (아니면 -1) - [레이블] 머리줄 오른쪽 클릭
 	// 카드 크기를 고정 (0 이면 기본: 썸네일 + 글자 4줄). 남는 폭은 양쪽으로 나눠 가운데 정렬
 	void SetFixedTile(int cardW, int cardH);
 	void SetTilePad(int pad);
@@ -67,7 +68,7 @@ public:
 	void SetHeaderHeight(int h);
 	int  HeaderHeight() const { return m_headerH; }
 	int  ScrollY() const { return m_scroll; }
-	void ScrollToTop() { if (GetSafeHwnd()) SetScroll(0); }   // 맨 위로 (탭 전환 · 카드로 들어갈 때)
+	void ScrollToTop() { if (GetSafeHwnd()) { SetScrollX(0); SetScroll(0); } }   // 맨 위 · 맨 왼쪽으로 (탭 전환 · 카드로 들어갈 때 · 뷰 모드 전환)
 	// 세로 스크롤바 숨김 (머리 영역(도구줄)만 쓸 때 - 영상 탭 [리스트] 보기)
 	void SetScrollHidden(bool hidden) { if (m_scrollHidden == hidden) return; m_scrollHidden = hidden; if (GetSafeHwnd()) { UpdateLayout(); Invalidate(FALSE); } }
 
@@ -76,8 +77,9 @@ public:
 	bool LineMode() const { return !m_lines.empty(); }
 	// 묶음 머리줄 높이 (줄 배치에서 header 인 줄 위) - 0 = 없음
 	void SetGroupHeaderHeight(int h);
-	// 고정 카드 폭을 격자 폭에 맞춤 (한 줄에 카드 하나 - 표 형태 보기), 높이는 SetFixedTile 값
-	void SetFillWidth(bool fill);
+	// 고정 카드 폭을 격자 폭에 맞춤 (표 형태 보기): 카드가 minW 이상 되는 만큼 한 줄에 maxCols 개까지 (모자라면 1개), 높이는 SetFixedTile 값
+	//  줄 배치에서는 한 줄(GridLine)의 카드가 그 개수를 넘으면 다음 화면 줄로 넘김 - minW 0 = 끔
+	void SetFillColumns(int minW, int maxCols);
 
 protected:
 	bool m_scrollHidden = false;
@@ -116,7 +118,8 @@ protected:
 	int  m_scrollX = 0;              // 줄 배치 가로 스크롤 위치
 	// 묶음 머리줄 (줄 배치 + header): 화면 줄마다 높이가 달라짐
 	int  m_groupH = 0;
-	bool m_fillWidth = false;
+	int  m_fillMinW = 0;             // SetFillColumns (0 = 끔)
+	int  m_fillMaxCols = 1;
 	std::vector<int>  m_bandTop;     // 화면 줄 r 의 띠(머리줄 포함) 위쪽 (내용 좌표, 머리 영역 제외) - 크기 = 줄 수 + 1 (마지막 = 전체 높이)
 	std::vector<int>  m_rowHdr;      // 화면 줄 r 위 머리줄 높이 (0 = 없음)
 	std::vector<int>  m_rowHdrCard;  // 그 머리줄의 첫 카드
