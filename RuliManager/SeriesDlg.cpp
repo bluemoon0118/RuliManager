@@ -5,6 +5,7 @@
 #include "TextInfoDlg.h"
 #include <algorithm>
 #include <cstdlib>
+#include <map>
 #include <windowsx.h>   // GET_X_LPARAM
 
 #ifdef _DEBUG
@@ -85,6 +86,381 @@ namespace
 }
 
 // ===========================================================================
+// CVarList (줄 높이가 다른 목록 - 픽셀 단위 스크롤)
+
+BEGIN_MESSAGE_MAP(CVarList, CWnd)
+	ON_WM_PAINT()
+	ON_WM_ERASEBKGND()
+	ON_WM_SIZE()
+	ON_WM_VSCROLL()
+	ON_WM_MOUSEWHEEL()
+	ON_WM_LBUTTONDOWN()
+	ON_WM_LBUTTONDBLCLK()
+	ON_WM_KEYDOWN()
+	ON_WM_GETDLGCODE()
+	ON_WM_TIMER()
+END_MESSAGE_MAP()
+
+BOOL CVarList::CreateOver(CWnd* placeholder)
+{
+	if (!placeholder)
+		return FALSE;
+	CWnd* parent = placeholder->GetParent();
+	CRect rc;
+	placeholder->GetWindowRect(&rc);
+	parent->ScreenToClient(&rc);
+	const UINT id = placeholder->GetDlgCtrlID();
+	const CString cls = AfxRegisterWndClass(CS_DBLCLKS, ::LoadCursor(nullptr, IDC_ARROW), nullptr, nullptr);
+	if (!CWnd::CreateEx(0, cls, L"", WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_TABSTOP | WS_BORDER, rc, parent, id))
+		return FALSE;
+	SetFont(parent->GetFont());
+	SetWindowPos(placeholder, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);   // 탭 순서: 자리 바로 다음
+	placeholder->DestroyWindow();
+	CDarkDialogTheme::ThemeChild(GetSafeHwnd());   // 어두운 스크롤바
+	UpdateScrollBar();
+	return TRUE;
+}
+
+void CVarList::ResetContent()
+{
+	m_tops.assign(1, 0);
+	m_sel = -1;
+	m_scroll = m_target = 0;
+	if (m_animating)
+	{
+		KillTimer(kAnimTimer);
+		m_animating = false;
+	}
+	UpdateScrollBar();
+	Invalidate(FALSE);
+}
+
+int CVarList::AddString(LPCTSTR)
+{
+	const int index = GetCount();
+	MEASUREITEMSTRUCT mis = {};
+	mis.CtlType = ODT_LISTBOX;
+	mis.CtlID = GetDlgCtrlID();
+	mis.itemID = static_cast<UINT>(index);
+	mis.itemHeight = 16;
+	if (CWnd* p = GetParent())
+		p->SendMessage(WM_MEASUREITEM, mis.CtlID, reinterpret_cast<LPARAM>(&mis));
+	m_tops.push_back(m_tops.back() + (std::max)(1, static_cast<int>(mis.itemHeight)));
+	UpdateScrollBar();
+	Invalidate(FALSE);
+	return index;
+}
+
+int CVarList::GetItemRect(int index, LPRECT rc) const
+{
+	if (index < 0 || index >= GetCount() || !rc)
+		return LB_ERR;
+	CRect client;
+	GetClientRect(&client);
+	::SetRect(rc, 0, m_tops[index] - m_scroll, client.right, m_tops[index + 1] - m_scroll);
+	return 0;
+}
+
+UINT CVarList::ItemFromPoint(CPoint pt, BOOL& outside) const
+{
+	CRect client;
+	GetClientRect(&client);
+	const int y = pt.y + m_scroll;
+	const int n = GetCount();
+	outside = TRUE;
+	if (n <= 0)
+		return 0;
+	if (!client.PtInRect(pt) || y < 0 || y >= m_tops[n])
+		return static_cast<UINT>(y < 0 ? 0 : n - 1);
+	auto it = std::upper_bound(m_tops.begin(), m_tops.end(), y);
+	const int i = (std::max)(0, (std::min)(n - 1, static_cast<int>(it - m_tops.begin()) - 1));
+	outside = FALSE;
+	return static_cast<UINT>(i);
+}
+
+int CVarList::GetTopIndex() const
+{
+	BOOL outside = TRUE;
+	return GetCount() > 0 ? static_cast<int>(ItemFromPoint(CPoint(1, 0), outside)) : 0;
+}
+
+int CVarList::SetTopIndex(int index)
+{
+	if (index < 0 || index >= GetCount())
+		return LB_ERR;
+	SetScroll(m_tops[index]);
+	return 0;
+}
+
+int CVarList::SetCurSel(int index)
+{
+	if (index < -1 || index >= GetCount())
+		index = -1;
+	if (index != m_sel)
+	{
+		m_sel = index;
+		Invalidate(FALSE);
+	}
+	if (index >= 0)
+		EnsureVisible(index);
+	return index;
+}
+
+int CVarList::MaxScroll() const
+{
+	CRect client;
+	GetClientRect(&client);
+	return (std::max)(0, m_tops.back() - static_cast<int>(client.Height()));
+}
+
+void CVarList::UpdateScrollBar()
+{
+	if (!GetSafeHwnd())
+		return;
+	CRect client;
+	GetClientRect(&client);
+	SCROLLINFO si = { sizeof(si) };
+	si.fMask = SIF_RANGE | SIF_PAGE | SIF_POS | SIF_DISABLENOSCROLL;
+	si.nMin = 0;
+	si.nMax = (std::max)(0, m_tops.back() - 1);
+	si.nPage = static_cast<UINT>((std::max)(0, static_cast<int>(client.Height())));
+	m_scroll = (std::max)(0, (std::min)(m_scroll, MaxScroll()));
+	m_target = (std::max)(0, (std::min)(m_target, MaxScroll()));
+	si.nPos = m_scroll;
+	SetScrollInfo(SB_VERT, &si, TRUE);
+}
+
+void CVarList::SetScroll(int pos)
+{
+	pos = (std::max)(0, (std::min)(pos, MaxScroll()));
+	m_target = pos;
+	if (m_animating)
+	{
+		KillTimer(kAnimTimer);
+		m_animating = false;
+	}
+	if (pos == m_scroll)
+		return;
+	m_scroll = pos;
+	SetScrollPos(SB_VERT, m_scroll, TRUE);
+	Invalidate(FALSE);
+}
+
+void CVarList::ScrollTo(int pos)
+{
+	m_target = (std::max)(0, (std::min)(pos, MaxScroll()));
+	if (m_target == m_scroll)
+		return;
+	if (!m_animating)
+	{
+		SetTimer(kAnimTimer, 10, nullptr);
+		m_animating = true;
+	}
+}
+
+void CVarList::OnTimer(UINT_PTR nIDEvent)
+{
+	if (nIDEvent != kAnimTimer)
+	{
+		CWnd::OnTimer(nIDEvent);
+		return;
+	}
+	const int diff = m_target - m_scroll;
+	if (diff == 0)
+	{
+		KillTimer(kAnimTimer);
+		m_animating = false;
+		return;
+	}
+	int step = diff / 3;   // 남은 거리의 1/3 씩 (끝으로 갈수록 천천히)
+	if (step == 0)
+		step = (diff > 0) ? 1 : -1;
+	m_scroll += step;
+	SetScrollPos(SB_VERT, m_scroll, TRUE);
+	Invalidate(FALSE);
+	UpdateWindow();
+}
+
+void CVarList::EnsureVisible(int index)
+{
+	if (index < 0 || index >= GetCount())
+		return;
+	CRect client;
+	GetClientRect(&client);
+	const int top = m_tops[index], bottom = m_tops[index + 1];
+	if (top < m_scroll)
+		SetScroll(top);
+	else if (bottom > m_scroll + client.Height())
+		SetScroll((std::min)(top, bottom - static_cast<int>(client.Height())));
+}
+
+void CVarList::Notify(UINT code)
+{
+	if (CWnd* p = GetParent())
+		p->SendMessage(WM_COMMAND, MAKEWPARAM(GetDlgCtrlID(), code), reinterpret_cast<LPARAM>(GetSafeHwnd()));
+}
+
+void CVarList::SelectByUser(int index)
+{
+	if (index < 0 || index >= GetCount())
+		return;
+	const bool changed = (index != m_sel);
+	SetCurSel(index);
+	if (changed)
+		Notify(LBN_SELCHANGE);
+}
+
+void CVarList::OnPaint()
+{
+	CPaintDC paint(this);
+	CRect client;
+	GetClientRect(&client);
+	if (client.IsRectEmpty())
+		return;
+	CDC mem;
+	mem.CreateCompatibleDC(&paint);
+	CBitmap bmp;
+	bmp.CreateCompatibleBitmap(&paint, client.Width(), client.Height());
+	CBitmap* ob = mem.SelectObject(&bmp);
+	mem.FillSolidRect(client, DarkColors::Edit);
+	CFont* of = mem.SelectObject(GetFont());
+	const int n = GetCount();
+	if (n > 0)
+	{
+		BOOL outside = TRUE;
+		const int first = static_cast<int>(ItemFromPoint(CPoint(1, 0), outside));
+		for (int i = first; i < n; ++i)
+		{
+			const int top = m_tops[i] - m_scroll;
+			if (top >= client.bottom)
+				break;
+			// 부모의 WM_DRAWITEM 으로 그림 (목록 상자와 같은 방식)
+			DRAWITEMSTRUCT dis = {};
+			dis.CtlType = ODT_LISTBOX;
+			dis.CtlID = GetDlgCtrlID();
+			dis.itemID = static_cast<UINT>(i);
+			dis.itemAction = ODA_DRAWENTIRE;
+			dis.itemState = (i == m_sel) ? ODS_SELECTED : 0;
+			dis.hwndItem = GetSafeHwnd();
+			dis.hDC = mem.GetSafeHdc();
+			dis.rcItem = CRect(0, top, client.right, m_tops[i + 1] - m_scroll);
+			if (CWnd* p = GetParent())
+				p->SendMessage(WM_DRAWITEM, dis.CtlID, reinterpret_cast<LPARAM>(&dis));
+		}
+	}
+	paint.BitBlt(0, 0, client.Width(), client.Height(), &mem, 0, 0, SRCCOPY);
+	mem.SelectObject(of);
+	mem.SelectObject(ob);
+}
+
+void CVarList::OnSize(UINT nType, int cx, int cy)
+{
+	CWnd::OnSize(nType, cx, cy);
+	UpdateScrollBar();
+	Invalidate(FALSE);
+}
+
+void CVarList::OnVScroll(UINT nSBCode, UINT /*nPos*/, CScrollBar* /*pScrollBar*/)
+{
+	CRect client;
+	GetClientRect(&client);
+	const int line = (std::max)(8, static_cast<int>(client.Height()) / 20);
+	int pos = m_target;
+	switch (nSBCode)
+	{
+	case SB_LINEUP:   pos -= line; break;
+	case SB_LINEDOWN: pos += line; break;
+	case SB_PAGEUP:   pos -= client.Height(); break;
+	case SB_PAGEDOWN: pos += client.Height(); break;
+	case SB_TOP:      pos = 0; break;
+	case SB_BOTTOM:   pos = MaxScroll(); break;
+	case SB_THUMBTRACK:
+	case SB_THUMBPOSITION:
+	{
+		SCROLLINFO si = { sizeof(si), SIF_TRACKPOS };
+		GetScrollInfo(SB_VERT, &si);
+		SetScroll(si.nTrackPos);   // 끌기는 바로
+		return;
+	}
+	default:
+		return;
+	}
+	ScrollTo(pos);
+}
+
+BOOL CVarList::OnMouseWheel(UINT /*nFlags*/, short zDelta, CPoint /*pt*/)
+{
+	// 휠 한 칸 = 글자 3줄 정도 (Windows 설정의 휠 줄 수), 짧은 애니메이션으로 이어서
+	UINT lines = 3;
+	::SystemParametersInfoW(SPI_GETWHEELSCROLLLINES, 0, &lines, 0);
+	if (lines == WHEEL_PAGESCROLL)
+	{
+		CRect client;
+		GetClientRect(&client);
+		ScrollTo(m_target - (zDelta > 0 ? 1 : -1) * static_cast<int>(client.Height()));
+		return TRUE;
+	}
+	CClientDC dc(this);
+	CFont* of = dc.SelectObject(GetFont());
+	const int lh = dc.GetTextExtent(L"A").cy;
+	dc.SelectObject(of);
+	const int px = static_cast<int>(lines) * lh * zDelta / WHEEL_DELTA;
+	ScrollTo(m_target - px);
+	return TRUE;
+}
+
+void CVarList::OnLButtonDown(UINT /*nFlags*/, CPoint point)
+{
+	SetFocus();
+	BOOL outside = TRUE;
+	const int i = static_cast<int>(ItemFromPoint(point, outside));
+	if (!outside)
+		SelectByUser(i);
+}
+
+void CVarList::OnLButtonDblClk(UINT /*nFlags*/, CPoint point)
+{
+	BOOL outside = TRUE;
+	ItemFromPoint(point, outside);
+	if (!outside)
+		Notify(LBN_DBLCLK);
+}
+
+void CVarList::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+{
+	const int n = GetCount();
+	if (n <= 0)
+	{
+		CWnd::OnKeyDown(nChar, nRepCnt, nFlags);
+		return;
+	}
+	CRect client;
+	GetClientRect(&client);
+	int i = m_sel;
+	switch (nChar)
+	{
+	case VK_UP:   i = (i < 0) ? 0 : (std::max)(0, i - 1); break;
+	case VK_DOWN: i = (i < 0) ? 0 : (std::min)(n - 1, i + 1); break;
+	case VK_HOME: i = 0; break;
+	case VK_END:  i = n - 1; break;
+	case VK_PRIOR:
+	case VK_NEXT:
+	{
+		// 한 화면 위 · 아래의 줄
+		const int base = (i < 0) ? 0 : m_tops[i];
+		const int y = base + (nChar == VK_NEXT ? 1 : -1) * static_cast<int>(client.Height());
+		auto it = std::upper_bound(m_tops.begin(), m_tops.end(), (std::max)(0, y));
+		i = (std::max)(0, (std::min)(n - 1, static_cast<int>(it - m_tops.begin()) - 1));
+		break;
+	}
+	default:
+		CWnd::OnKeyDown(nChar, nRepCnt, nFlags);
+		return;
+	}
+	SelectByUser(i);
+}
+
+// ===========================================================================
 // CSeriesDlg (품번 관리)
 
 CSeriesDlg::CSeriesDlg(CVideoLibrary& lib, const CString& selectName, CWnd* pParent)
@@ -96,13 +472,15 @@ void CSeriesDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_SR_SEARCH, m_editSearch);
-	DDX_Control(pDX, IDC_SR_GRID, m_grid);
 	DDX_Control(pDX, IDC_SR_STUDIO, m_comboStudio);
 	DDX_Control(pDX, IDC_SR_CODE, m_editCode);
 	DDX_Control(pDX, IDC_SR_LABEL, m_editLabel);
 	DDX_Control(pDX, IDC_SR_ALT, m_editAlt);
 	DDX_Control(pDX, IDC_SR_DESC, m_editDesc);
 	DDX_Control(pDX, IDC_SR_IMAGE, m_image);
+	DDX_Control(pDX, IDC_SR_TYPE, m_comboType);
+	DDX_Control(pDX, IDC_SR_SUBCOMBO, m_subCombo);
+	DDX_Control(pDX, IDC_SR_SUBNUMS, m_editSubNums);
 }
 
 BEGIN_MESSAGE_MAP(CSeriesDlg, CDialogEx)
@@ -128,6 +506,15 @@ BEGIN_MESSAGE_MAP(CSeriesDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_SR_IMG_BROWSE, &CSeriesDlg::OnBnClickedImgBrowse)
 	ON_BN_CLICKED(IDC_SR_IMG_CLEAR, &CSeriesDlg::OnBnClickedImgClear)
 	ON_BN_CLICKED(IDC_SR_PASTE, &CSeriesDlg::OnBnClickedPaste)
+	ON_CBN_SELCHANGE(IDC_SR_TYPE, &CSeriesDlg::OnTypeChanged)
+	ON_BN_CLICKED(IDC_SR_SUB_ADD, &CSeriesDlg::OnBnClickedSubAdd)
+	ON_BN_CLICKED(IDC_SR_SUB_DEL, &CSeriesDlg::OnBnClickedSubDel)
+	ON_BN_CLICKED(IDC_SR_SUB_UP, &CSeriesDlg::OnBnClickedSubUp)
+	ON_BN_CLICKED(IDC_SR_SUB_DOWN, &CSeriesDlg::OnBnClickedSubDown)
+	ON_CBN_SELCHANGE(IDC_SR_SUBCOMBO, &CSeriesDlg::OnSubComboSelChange)
+	ON_CBN_EDITCHANGE(IDC_SR_SUBCOMBO, &CSeriesDlg::OnSubComboEditChange)
+	ON_CBN_KILLFOCUS(IDC_SR_SUBCOMBO, &CSeriesDlg::OnSubComboKillFocus)
+	ON_EN_CHANGE(IDC_SR_SUBNUMS, &CSeriesDlg::OnSubNumsChange)
 END_MESSAGE_MAP()
 
 BOOL CSeriesDlg::OnInitDialog()
@@ -137,6 +524,11 @@ BOOL CSeriesDlg::OnInitDialog()
 	m_image.SetBackColor(DarkColors::Preview);
 	m_image.SetPlaceholder(L"이미지 없음");
 	m_image.m_onDblClick = [this]() { OnBnClickedImgBrowse(); };
+
+	// 레이블 구분 콤보 · 복합 레이블 표 (열: 레이블명, 뒷번호) · 표 칸 입력 칸
+	m_comboType.AddString(L"싱글");
+	m_comboType.AddString(L"복합");
+	m_comboType.SetCurSel(0);
 
 	for (const NamedInfo& n : m_lib.studios)
 		m_backupStudios.push_back(n.series);
@@ -169,6 +561,7 @@ BOOL CSeriesDlg::OnInitDialog()
 		dc.SelectObject(of);
 		m_lineH = tm.tmHeight + tm.tmExternalLeading;
 	}
+	m_grid.CreateOver(GetDlgItem(IDC_SR_GRID));   // rc 의 목록 상자 자리에 부드럽게 스크롤하는 목록
 	{
 		// 표 자리(rc 의 목록) 위쪽에 열 머리글, 그 아래로 목록
 		CRect gr;
@@ -200,7 +593,12 @@ BOOL CSeriesDlg::OnInitDialog()
 
 	int selStudio = m_selectName.IsEmpty() ? -1 : m_lib.FindNamed(LIST_STUDIO, m_selectName);
 	CString selName;
-	if (selStudio >= 0)
+	if (m_selectOwner >= -1 && !m_selectCode.IsEmpty() && m_selectOwner < static_cast<int>(m_lib.studios.size()))
+	{
+		selStudio = (m_selectOwner < 0) ? LooseIdx() : m_selectOwner;   // 지정한 품번 항목
+		selName = m_selectCode;
+	}
+	else if (selStudio >= 0)
 	{
 		const std::vector<SeriesInfo> list = CVideoLibrary::ParseSeries(SeriesOf(selStudio));
 		if (!list.empty())
@@ -212,6 +610,20 @@ BOOL CSeriesDlg::OnInitDialog()
 		ShowEntry(-1, -1);
 		if (selStudio >= 0)
 			SelectStudioCombo(selStudio);   // 품번이 없는 제작사: [새 품번] 의 제작사로
+	}
+	if (m_newPrefill)
+	{
+		// [새 품번] 입력 상태로 품번 · 레이블 · 제작사 미리 채움 (확인/저장은 사용자가)
+		OnBnClickedNew();
+		const int sn = m_newStudio.IsEmpty() ? -1 : m_lib.FindNamed(LIST_STUDIO, m_newStudio);
+		SelectStudioCombo(sn >= 0 ? sn : LooseIdx());
+		m_editCode.SetWindowText(m_newCode);
+		m_editLabel.SetWindowText(m_newLabel);
+		m_dirty = true;
+		UpdateButtons();
+		m_editLabel.SetFocus();
+		m_editLabel.SetSel(0, -1);
+		return FALSE;   // 포커스를 직접 정함
 	}
 	return TRUE;
 }
@@ -298,6 +710,8 @@ void CSeriesDlg::FillGrid(int selStudio, const CString& selName)
 			if (!query.IsEmpty())
 			{
 				CString hay = NameOf(si) + L"\n" + s.name + L"\n" + s.label + L"\n" + s.altNames + L"\n" + s.desc;   // 다른 이름도 검색
+				for (const SubLabel& sl : s.subs)
+					hay += L"\n" + sl.label;   // 복합 레이블명
 				hay.MakeLower();
 				if (hay.Find(query) < 0)
 					continue;
@@ -346,7 +760,7 @@ void CSeriesDlg::FillGrid(int selStudio, const CString& selName)
 
 int CSeriesDlg::RowHeight(const Row& r) const
 {
-	const int lines = (std::max)(1, static_cast<int>(CVideoLibrary::SplitList(r.s.name).size()));
+	const int lines = (std::max)(1, static_cast<int>(CVideoLibrary::SplitList(r.s.name).size()));   // 복합 레이블은 "(*복합)" 한 줄이라 품번 수만
 	return (std::min)(255, m_lineH * lines + 8);   // 목록 줄 높이는 255 픽셀까지
 }
 
@@ -425,8 +839,225 @@ void CSeriesDlg::ShowFields(int studio, const SeriesInfo* s)
 	CString desc = s ? s->desc : CString();
 	m_editDesc.SetWindowText(desc);
 	SetImage(s ? s->image : CString());
+	m_comboType.SetCurSel((s && s->composite) ? 1 : 0);
+	FillSubList(s ? s->subs : std::vector<SubLabel>());
+	UpdateTypeUI();
 	m_loading = false;
 }
+
+void CSeriesDlg::UpdateTypeUI()
+{
+	const bool edit = (m_curStudio >= 0 || m_new);
+	const bool comp = IsCompositeSel();
+	const bool has = (m_subCur >= 0 && m_subCur < static_cast<int>(m_subs.size()));
+	GetDlgItem(IDC_SR_TYPE)->EnableWindow(edit);
+	GetDlgItem(IDC_SR_LABEL)->EnableWindow(edit && !comp);   // 복합: 레이블명은 콤보에서
+	GetDlgItem(IDC_SR_SUBCOMBO)->EnableWindow(edit && comp);
+	GetDlgItem(IDC_SR_SUB_ADD)->EnableWindow(edit && comp);
+	GetDlgItem(IDC_SR_SUB_DEL)->EnableWindow(edit && comp && has);
+	GetDlgItem(IDC_SR_SUB_UP)->EnableWindow(edit && comp && has && m_subCur > 0);
+	GetDlgItem(IDC_SR_SUB_DOWN)->EnableWindow(edit && comp && has && m_subCur + 1 < static_cast<int>(m_subs.size()));
+	GetDlgItem(IDC_SR_SUBNUMS)->EnableWindow(edit && comp && has);
+}
+
+void CSeriesDlg::FillSubList(const std::vector<SubLabel>& subs)
+{
+	m_subs = subs;
+	RefreshSubCombo(m_subs.empty() ? -1 : 0);
+}
+
+void CSeriesDlg::RefreshSubCombo(int sel)
+{
+	// 콤보 항목 = 복합 레이블명 (순서 = 저장 순서 = [레이블] 보기 출력 순서), 아래 칸 = 고른 레이블의 뒷번호 (줄마다 하나)
+	const bool wasLoading = m_loading;
+	m_loading = true;
+	m_subCombo.ResetContent();
+	for (const SubLabel& sl : m_subs)
+		m_subCombo.AddString(sl.label);
+	if (sel >= static_cast<int>(m_subs.size()))
+		sel = static_cast<int>(m_subs.size()) - 1;
+	m_subCur = sel;
+	m_subCombo.SetCurSel(sel);
+	if (sel < 0)
+		m_subCombo.SetWindowText(L"");
+	CString nums;
+	if (sel >= 0)
+		for (int n : CVideoLibrary::ParseSubNums(m_subs[sel].nums))
+		{
+			CString t;
+			t.Format(L"%d", n);
+			if (!nums.IsEmpty()) nums += L"\r\n";
+			nums += t;
+		}
+	m_editSubNums.SetWindowText(nums);
+	m_loading = wasLoading;
+	UpdateTypeUI();
+}
+
+void CSeriesDlg::StoreSubNums()
+{
+	if (m_subCur < 0 || m_subCur >= static_cast<int>(m_subs.size()))
+		return;
+	CString text;
+	m_editSubNums.GetWindowText(text);
+	CString nums;
+	for (int n : CVideoLibrary::ParseSubNums(text))
+	{
+		CString t;
+		t.Format(L"%d", n);
+		if (!nums.IsEmpty()) nums += L", ";
+		nums += t;
+	}
+	m_subs[m_subCur].nums = nums;
+}
+
+void CSeriesDlg::SyncSubComboItem(int idx)
+{
+	// 콤보 목록의 그 항목 글자를 이름 칸에 입력한 레이블명으로 (선택은 유지)
+	if (idx < 0 || idx >= static_cast<int>(m_subs.size()) || idx >= m_subCombo.GetCount())
+		return;
+	CString cur;
+	m_subCombo.GetLBText(idx, cur);
+	if (cur == m_subs[idx].label)
+		return;
+	const bool wasLoading = m_loading;
+	m_loading = true;
+	const int sel = m_subCombo.GetCurSel();
+	CString editText;
+	m_subCombo.GetWindowText(editText);
+	m_subCombo.DeleteString(idx);
+	m_subCombo.InsertString(idx, m_subs[idx].label);
+	if (sel >= 0)
+		m_subCombo.SetCurSel(sel);
+	else
+		m_subCombo.SetWindowText(editText);
+	m_loading = wasLoading;
+}
+
+std::vector<SubLabel> CSeriesDlg::ReadSubList()
+{
+	StoreSubNums();
+	std::vector<SubLabel> out;
+	for (SubLabel sl : m_subs)
+	{
+		sl.label.Trim();
+		sl.nums.Trim();
+		if (sl.label.IsEmpty() && sl.nums.IsEmpty())
+			continue;
+		out.push_back(sl);
+	}
+	return out;
+}
+
+void CSeriesDlg::OnTypeChanged()
+{
+	if (IsCompositeSel() && m_subs.empty())
+	{
+		// 복합으로 바꾸면: 지금 레이블명을 첫 레이블로
+		CString lb;
+		m_editLabel.GetWindowText(lb);
+		lb.Trim();
+		if (!lb.IsEmpty())
+		{
+			SubLabel sl;
+			sl.label = lb;
+			m_subs.push_back(sl);
+			RefreshSubCombo(0);
+		}
+	}
+	UpdateTypeUI();
+	OnFieldChanged();
+}
+
+void CSeriesDlg::OnSubComboSelChange()
+{
+	if (m_loading)
+		return;
+	const int sel = m_subCombo.GetCurSel();
+	if (sel < 0 || sel == m_subCur)
+		return;
+	StoreSubNums();                 // 지금 레이블의 뒷번호 저장
+	const int old = m_subCur;
+	SyncSubComboItem(old);          // 입력한 이름을 목록에도
+	RefreshSubCombo(sel);
+}
+
+void CSeriesDlg::OnSubComboEditChange()
+{
+	if (m_loading)
+		return;
+	CString t;
+	m_subCombo.GetWindowText(t);
+	if (m_subCur < 0 || m_subCur >= static_cast<int>(m_subs.size()))
+	{
+		// 레이블이 하나도 없을 때 이름을 입력하면 새 레이블
+		if (t.IsEmpty())
+			return;
+		SubLabel sl;
+		m_subs.push_back(sl);
+		m_subCur = static_cast<int>(m_subs.size()) - 1;
+		const bool wasLoading = m_loading;
+		m_loading = true;
+		DWORD selRange = m_subCombo.GetEditSel();
+		m_subCombo.AddString(t);
+		m_subCombo.SetWindowText(t);
+		m_subCombo.SetEditSel(LOWORD(selRange), HIWORD(selRange));
+		m_loading = wasLoading;
+		UpdateTypeUI();
+	}
+	m_subs[m_subCur].label = t;   // 고른 레이블 이름 바꾸기 (목록 글자는 포커스가 떠날 때)
+	OnFieldChanged();
+}
+
+void CSeriesDlg::OnSubComboKillFocus()
+{
+	SyncSubComboItem(m_subCur);
+}
+
+void CSeriesDlg::OnSubNumsChange()
+{
+	if (m_loading)
+		return;
+	StoreSubNums();
+	OnFieldChanged();
+}
+
+void CSeriesDlg::OnBnClickedSubAdd()
+{
+	StoreSubNums();
+	SyncSubComboItem(m_subCur);
+	SubLabel sl;
+	sl.label = L"새 레이블";
+	m_subs.push_back(sl);
+	RefreshSubCombo(static_cast<int>(m_subs.size()) - 1);
+	OnFieldChanged();
+	m_subCombo.SetFocus();
+	m_subCombo.SetEditSel(0, -1);   // 바로 이름 입력
+}
+
+void CSeriesDlg::OnBnClickedSubDel()
+{
+	if (m_subCur < 0 || m_subCur >= static_cast<int>(m_subs.size()))
+		return;
+	m_subs.erase(m_subs.begin() + m_subCur);
+	RefreshSubCombo((std::min)(m_subCur, static_cast<int>(m_subs.size()) - 1));
+	OnFieldChanged();
+}
+
+void CSeriesDlg::MoveSub(int delta)
+{
+	// 복합 레이블 순서 바꾸기 (= [레이블] 보기에서 묶음 출력 순서)
+	const int to = m_subCur + delta;
+	if (m_subCur < 0 || m_subCur >= static_cast<int>(m_subs.size()) || to < 0 || to >= static_cast<int>(m_subs.size()))
+		return;
+	StoreSubNums();
+	std::swap(m_subs[m_subCur], m_subs[to]);
+	RefreshSubCombo(to);
+	OnFieldChanged();
+}
+
+void CSeriesDlg::OnBnClickedSubUp()   { MoveSub(-1); }
+void CSeriesDlg::OnBnClickedSubDown() { MoveSub(+1); }
 
 void CSeriesDlg::ShowEntry(int studio, int idx)
 {
@@ -457,6 +1088,7 @@ void CSeriesDlg::UpdateButtons()
 		GetDlgItem(id)->EnableWindow(edit);
 	GetDlgItem(IDC_SR_DELETE)->EnableWindow(m_curStudio >= 0 || m_new);
 	GetDlgItem(IDC_SR_SAVE)->EnableWindow(m_dirty);
+	UpdateTypeUI();
 }
 
 void CSeriesDlg::OnFieldChanged()
@@ -472,6 +1104,8 @@ bool CSeriesDlg::Commit()
 	if (!m_dirty)
 		return true;
 	const int studio = ComboStudio();
+	const bool composite = IsCompositeSel();
+	const std::vector<SubLabel> subs = composite ? ReadSubList() : std::vector<SubLabel>();
 	CString codeText, label, desc, alt;
 	m_editCode.GetWindowText(codeText);
 	m_editLabel.GetWindowText(label);
@@ -486,7 +1120,7 @@ bool CSeriesDlg::Commit()
 	const std::vector<CString> codes = SplitCodes(codeText);
 	if (codes.empty())
 	{
-		if (m_new && label.IsEmpty() && desc.IsEmpty() && alt.IsEmpty() && m_curImage.IsEmpty())
+		if (m_new && label.IsEmpty() && desc.IsEmpty() && alt.IsEmpty() && m_curImage.IsEmpty() && subs.empty())
 		{
 			// 아무것도 넣지 않은 새 품번: 그냥 버림
 			m_dirty = false;
@@ -502,6 +1136,39 @@ bool CSeriesDlg::Commit()
 		AfxMessageBox(L"제작사를 고르세요.", MB_ICONWARNING);
 		m_comboStudio.SetFocus();
 		return false;
+	}
+	if (composite)
+	{
+		// 복합 레이블: 줄마다 레이블명 · 뒷번호, 같은 번호가 두 레이블에 있으면 안 됨
+		if (subs.empty())
+		{
+			AfxMessageBox(L"복합 레이블을 하나 이상 입력하세요. (레이블명 · 뒷번호)", MB_ICONWARNING);
+			m_subCombo.SetFocus();
+			return false;
+		}
+		std::map<int, CString> seen;
+		for (const SubLabel& sl : subs)
+		{
+			if (sl.label.IsEmpty())
+			{
+				AfxMessageBox(L"복합 레이블의 레이블명을 입력하세요.", MB_ICONWARNING);
+				m_subCombo.SetFocus();
+				return false;
+			}
+			for (int n : CVideoLibrary::ParseSubNums(sl.nums))
+			{
+				auto it = seen.find(n);
+				if (it != seen.end() && it->second.CompareNoCase(sl.label) != 0)
+				{
+					CString msg;
+					msg.Format(L"뒷번호 %d 이(가) 두 레이블('%s', '%s')에 있습니다.", n, static_cast<LPCWSTR>(it->second), static_cast<LPCWSTR>(sl.label));
+					AfxMessageBox(msg, MB_ICONWARNING);
+					m_subCombo.SetFocus();
+					return false;
+				}
+				seen[n] = sl.label;
+			}
+		}
 	}
 
 	// 같은 품번이 다른 항목에 있으면 확인 후 그쪽에서 뺌 (품번은 한 항목에만)
@@ -559,7 +1226,9 @@ bool CSeriesDlg::Commit()
 
 	SeriesInfo s;
 	s.name = CVideoLibrary::JoinList(codes);
-	s.label = label;
+	s.label = composite ? CString() : label;   // 복합: 레이블명은 표 (subs)
+	s.composite = composite;
+	s.subs = subs;
 	s.desc = desc;
 	s.altNames = alt;
 	s.image = m_curImage;
@@ -806,8 +1475,11 @@ void CSeriesDlg::OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpdis)
 		else
 		{
 			text = (col == 2) ? r.s.label : r.s.desc;
-			fmt |= DT_WORDBREAK | DT_EDITCONTROL;
-			dc->SetTextColor(drop ? RGB(255, 255, 255) : (col == 3 ? TCOL(TC_SUB) : DarkColors::Text));
+			const bool comp = (col == 2 && r.s.composite);
+			if (comp)
+				text = L"(*복합)";   // 복합 레이블: 한 줄로만 (레이블 · 뒷번호는 오른쪽 표에서), 다른 글자색
+			fmt |= comp ? DT_SINGLELINE : (DT_WORDBREAK | DT_EDITCONTROL);
+			dc->SetTextColor(drop ? RGB(255, 255, 255) : (comp ? TCOL(TC_ACCENTTEXT) : (col == 3 ? TCOL(TC_SUB) : DarkColors::Text)));
 			// 세로 가운데 (줄 수만큼)
 			CRect calc(cell.left, 0, cell.right, 0);
 			dc->DrawText(text, calc, fmt | DT_CALCRECT);
@@ -1222,6 +1894,16 @@ BOOL CSeriesDlg::PreTranslateMessage(MSG* pMsg)
 		&& (::GetKeyState(VK_CONTROL) & 0x8000))
 	{
 		MoveCurrent(pMsg->wParam == VK_UP ? -1 : +1);
+		return TRUE;
+	}
+	// 복합 레이블명 콤보에서 Enter = 이름 확정 (대화상자 [확인] 으로 닫히지 않게)
+	if (pMsg->message == WM_KEYDOWN && pMsg->wParam == VK_RETURN && m_subCombo.GetSafeHwnd() &&
+		(pMsg->hwnd == m_subCombo.GetSafeHwnd() || ::GetParent(pMsg->hwnd) == m_subCombo.GetSafeHwnd()))
+	{
+		if (m_subCombo.GetDroppedState())
+			return CDialogEx::PreTranslateMessage(pMsg);
+		SyncSubComboItem(m_subCur);
+		m_editSubNums.SetFocus();
 		return TRUE;
 	}
 	// 한 줄 칸(레이블명)에서 Enter = [저장] (여러 줄 칸은 줄바꿈, 대화상자 [확인] 으로 닫히지 않게)

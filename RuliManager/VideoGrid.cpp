@@ -140,11 +140,14 @@ void CVideoGrid::SetGroupHeaderHeight(int h)
 	}
 }
 
-void CVideoGrid::SetFillWidth(bool fill)
+void CVideoGrid::SetFillColumns(int minW, int maxCols)
 {
-	if (fill == m_fillWidth)
+	minW = (std::max)(0, minW);
+	maxCols = (std::max)(1, maxCols);
+	if (minW == m_fillMinW && maxCols == m_fillMaxCols)
 		return;
-	m_fillWidth = fill;
+	m_fillMinW = minW;
+	m_fillMaxCols = maxCols;
 	if (GetSafeHwnd())
 	{
 		UpdateLayout();
@@ -224,8 +227,13 @@ void CVideoGrid::BuildLinePositions(int count)
 			hdrRows.push_back(hh);
 		}
 		int c = (std::max)(0, m_lines[li].firstCol);
-		for (int i = s; i < e; ++i)   // 한 화면 줄에 모두 (줄 바꿈 없음)
+		for (int i = s; i < e; ++i)   // 한 화면 줄에 모두 (SetFillColumns 일 때는 칸 수를 넘으면 다음 화면 줄로)
 		{
+			if (m_fillMinW > 0 && i > s && c >= m_cols)
+			{
+				++r;
+				c = 0;
+			}
 			m_pos[i].x = c;
 			m_pos[i].y = r;
 			++c;
@@ -372,10 +380,16 @@ void CVideoGrid::UpdateLayout()
 	GetClientRect(&rc);
 	if (m_fixedW > 0 && m_fixedH > 0)
 	{
-		// 고정 크기 카드: 칸 = 카드 + 여백, 남는 폭은 가운데 정렬 (m_fillWidth: 카드 폭 = 격자 폭)
-		const int fw = m_fillWidth ? (std::max)(m_fixedW, static_cast<int>(rc.Width()) - m_pad * 2) : m_fixedW;
+		// 고정 크기 카드: 칸 = 카드 + 여백, 남는 폭은 가운데 정렬 (m_fillMinW: 격자 폭을 카드 n 개로 나눔)
+		int fw = m_fixedW;
+		int fillCols = 0;
+		if (m_fillMinW > 0)
+		{
+			fillCols = (std::max)(1, (std::min)(m_fillMaxCols, static_cast<int>(rc.Width()) / (m_fillMinW + m_pad * 2)));
+			fw = (std::max)(60, static_cast<int>(rc.Width()) / fillCols - m_pad * 2);
+		}
 		m_cellW = fw + m_pad * 2;
-		m_cols = (std::max)(1, rc.Width() / m_cellW);
+		m_cols = fillCols > 0 ? fillCols : (std::max)(1, rc.Width() / m_cellW);
 		m_offsetX = (std::max)(0, (static_cast<int>(rc.Width()) - m_cols * m_cellW) / 2);
 		m_tileH = m_fixedH + m_pad * 2;
 	}
@@ -707,6 +721,19 @@ int CVideoGrid::HitTest(CPoint pt) const
 	if (Variable() && y < RowTop(r))
 		return -1;   // 묶음 머리줄 위
 	return ItemAt(r, c);
+}
+
+int CVideoGrid::GroupHeaderAt(CPoint pt) const
+{
+	if (!Variable() || pt.x + m_scrollX < m_offsetX || pt.y < 0 || pt.y + m_scroll < m_headerH)
+		return -1;
+	const int y = pt.y + m_scroll - m_headerH;
+	const int r = BandAt(y);
+	if (r < 0 || r >= m_lineRows || r >= static_cast<int>(m_rowHdrCard.size()) || m_rowHdr[r] <= 0)
+		return -1;
+	if (y >= RowTop(r))
+		return -1;   // 카드 위 (머리줄 아래)
+	return m_rowHdrCard[r];
 }
 
 void CVideoGrid::EnsureVisible(int row)

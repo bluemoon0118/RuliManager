@@ -31,6 +31,7 @@ public:
 
 	BOOL Create(CWnd* parent, CWnd* target, bool vertical, TargetType type);
 	void SetColors(COLORREF track, COLORREF thumb, COLORREF thumbHot);
+	void SetBackColor(COLORREF back);   // 평상시(가는 선 상태) 바탕 = 대상 창 바탕색
 	void Sync();   // 대상 스크롤바의 위치/상태를 다시 읽어 맞춤
 
 protected:
@@ -40,6 +41,8 @@ protected:
 	COLORREF   m_track    = TCOL(TC_SCROLL);
 	COLORREF   m_thumb    = TCOL(TC_SCROLLTHUMB);
 	COLORREF   m_thumbHot = TCOL(TC_SCROLLTHUMBHOT);
+	COLORREF   m_back     = TCOL(TC_BACK);
+	bool       m_backSet  = false;
 
 	SCROLLINFO m_si = {};
 	bool  m_enabled = true;
@@ -50,6 +53,13 @@ protected:
 	bool  m_hot = false;
 	int   m_repeatCode = -1;      // 누르고 있을 때 반복할 SB_PAGEUP/SB_PAGEDOWN (트랙) · SB_LINEUP/SB_LINEDOWN (양 끝 버튼)
 	int   m_hotArrow = 0;         // 마우스가 올라간 끝 버튼 (0 없음, 1 위/왼쪽, 2 아래/오른쪽)
+
+	// Windows 11 방식: 평소엔 가는 선 썸만, 마우스를 올리면 트랙·화살표가 나타나며 썸이 굵어짐 (애니메이션)
+	bool      m_overBar = false;   // 마우스가 스크롤바 위에 있음
+	float     m_expand = 0.0f;     // 0 = 가는 선, 1 = 완전히 펼침
+	ULONGLONG m_collapseAt = 0;    // 마우스가 떠난 뒤 접기 시작할 시각 (GetTickCount64)
+	bool  WantExpanded() const;
+	void  StartAnim();
 
 	// 양 끝 화살표 버튼 (▲ / ▼): 길이 = 스크롤바 두께 (스크롤바가 짧으면 없음)
 	int   ArrowLen() const;

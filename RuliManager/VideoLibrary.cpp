@@ -3672,6 +3672,43 @@ bool CVideoLibrary::SyncNamedFromVideos()
 				continue;
 			SeriesInfo& s = list[index];
 			CString cur = s.label;
+			if (s.composite)
+			{
+				// 복합 레이블: 뒷번호가 맞는 레이블이 있으면 그 레이블명과 비교 (다르면 아래에서 다른 이름에 추가)
+				//  맞는 번호가 없으면 → 같은 이름의 복합 레이블에 이 번호를 더함, 그 이름도 없으면 새 복합 레이블 (이름, 번호)
+				const int k = SubLabelIndex(s, v.code);
+				if (k >= 0)
+					cur = s.subs[k].label;
+				else
+				{
+					const int n = CodeNumberOf(v.code);
+					if (n < 0)
+						continue;
+					CString num;
+					num.Format(L"%d", n);
+					bool done = false;
+					for (SubLabel& sl : s.subs)
+					{
+						CString l = sl.label;
+						if (l.Trim().CompareNoCase(lb) != 0)
+							continue;
+						sl.nums.Trim();
+						sl.nums += (sl.nums.IsEmpty() ? CString() : CString(L", ")) + num;
+						done = true;
+						break;
+					}
+					if (!done)
+					{
+						SubLabel sl;
+						sl.label = lb;
+						sl.nums = num;
+						s.subs.push_back(sl);
+					}
+					series = JoinSeries(list);
+					added = true;
+					continue;
+				}
+			}
 			if (cur.Trim().CompareNoCase(lb) == 0)
 				continue;
 			bool known = false;
@@ -3977,6 +4014,27 @@ std::vector<SeriesInfo> CVideoLibrary::ParseSeries(const CString& text)
 			f.Trim();
 			if (fi == 0) s.name = f; else if (fi == 1) s.code = f; else if (fi == 2) s.label = f; else if (fi == 3) s.desc = f; else if (fi == 4) s.image = f;
 			else if (fi == 5) { f.Replace(L'\x241E', L'\n'); s.altNames = f; }   // 레이블 다른 이름 (␞ → 줄바꿈)
+			else if (fi == 6) s.composite = (f.CompareNoCase(L"C") == 0);     // 레이블 구분 (C = 복합)
+			else if (fi == 7)
+			{
+				// 복합 레이블: 레이블␝번호 를 ␞ 로 이어서
+				int p = 0;
+				while (p <= f.GetLength())
+				{
+					int e = f.Find(L'\x241E', p);
+					if (e < 0) e = f.GetLength();
+					const CString item = f.Mid(p, e - p);
+					p = e + 1;
+					const int m = item.Find(L'\x241D');
+					SubLabel sl;
+					sl.label = (m < 0) ? item : item.Left(m);
+					sl.nums = (m < 0) ? CString() : item.Mid(m + 1);
+					sl.label.Trim();
+					sl.nums.Trim();
+					if (!sl.label.IsEmpty() || !sl.nums.IsEmpty())
+						s.subs.push_back(sl);
+				}
+			}
 			++fi;
 			if (sep < 0) break;
 			fpos = sep + 1;
@@ -4038,12 +4096,27 @@ CString CVideoLibrary::JoinSeries(const std::vector<SeriesInfo>& list)
 				alt += a;
 			}
 		}
-		if (!label.IsEmpty() || !desc.IsEmpty() || !image.IsEmpty() || !alt.IsEmpty())
+		CString subs;   // 복합 레이블: 레이블␝번호 를 ␞ 로 이어서
+		if (s.composite)
+			for (const SubLabel& sl : s.subs)
+			{
+				CString l = clean(sl.label), n = clean(sl.nums);
+				l.Remove(L'\x241D'); l.Remove(L'\x241E');
+				n.Remove(L'\x241D'); n.Remove(L'\x241E');
+				if (l.IsEmpty() && n.IsEmpty())
+					continue;
+				if (!subs.IsEmpty()) subs += L'\x241E';
+				subs += l + L'\x241D' + n;
+			}
+		const bool comp = s.composite;
+		if (!label.IsEmpty() || !desc.IsEmpty() || !image.IsEmpty() || !alt.IsEmpty() || comp)
 			line += CString(kSeriesSep) + kSeriesSep + label + kSeriesSep + desc;   // 둘째 칸(예전 품번)은 비움
-		if (!image.IsEmpty() || !alt.IsEmpty())
+		if (!image.IsEmpty() || !alt.IsEmpty() || comp)
 			line += CString(kSeriesSep) + image;   // 다섯째 칸: 레이블 대표 이미지
-		if (!alt.IsEmpty())
+		if (!alt.IsEmpty() || comp)
 			line += CString(kSeriesSep) + alt;     // 여섯째 칸: 레이블 다른 이름
+		if (comp)
+			line += CString(kSeriesSep) + L"C" + kSeriesSep + subs;   // 일곱째 칸: 레이블 구분 (C = 복합), 여덟째 칸: 복합 레이블 목록
 		if (!out.IsEmpty()) out += L"\n";
 		out += line;
 	}
@@ -4071,6 +4144,64 @@ CString CVideoLibrary::CodePrefixOf(const CString& code)
 		for (int i = 0; i < c.GetLength() && iswalpha(c[i]); ++i) prefix += c[i];
 	prefix.Trim();
 	return prefix;
+}
+
+int CVideoLibrary::CodeNumberOf(const CString& code)
+{
+	// 접두어 뒤의 숫자: "ABC-0123" → 123, "ABC123" → 123, "ABC-123A" → 123
+	CString c = code;
+	c.Trim();
+	c.MakeUpper();
+	int i = 0;
+	const int dash = c.Find(L'-');
+	if (dash > 0)
+		i = dash + 1;
+	else
+		while (i < c.GetLength() && iswalpha(c[i])) ++i;
+	while (i < c.GetLength() && !iswdigit(c[i]) && (c[i] == L'-' || c[i] == L'_' || c[i] == L' ')) ++i;
+	if (i >= c.GetLength() || !iswdigit(c[i]))
+		return -1;
+	long long n = 0;
+	for (; i < c.GetLength() && iswdigit(c[i]); ++i)
+	{
+		n = n * 10 + (c[i] - L'0');
+		if (n > 100000000) return -1;
+	}
+	return static_cast<int>(n);
+}
+
+std::vector<int> CVideoLibrary::ParseSubNums(const CString& nums)
+{
+	std::vector<int> out;
+	int cur = -1;
+	auto flush = [&]() { if (cur >= 0) { if (std::find(out.begin(), out.end(), cur) == out.end()) out.push_back(cur); } cur = -1; };
+	for (int i = 0; i < nums.GetLength(); ++i)
+	{
+		const wchar_t ch = nums[i];
+		if (iswdigit(ch))
+		{
+			if (cur < 0) cur = 0;
+			if (cur < 100000000) cur = cur * 10 + (ch - L'0');
+		}
+		else
+			flush();
+	}
+	flush();
+	return out;
+}
+
+int CVideoLibrary::SubLabelIndex(const SeriesInfo& s, const CString& code)
+{
+	if (!s.composite)
+		return -1;
+	const int n = CodeNumberOf(code);
+	if (n < 0)
+		return -1;
+	for (size_t k = 0; k < s.subs.size(); ++k)
+		for (int x : ParseSubNums(s.subs[k].nums))
+			if (x == n)
+				return static_cast<int>(k);
+	return -1;
 }
 
 CString CVideoLibrary::LabelForCode(const CString& code) const
@@ -4106,7 +4237,9 @@ void CVideoLibrary::RefreshDerivedLabels()
 		{
 			if (s.image.IsEmpty())
 				continue;
-			std::vector<CString> names{ s.label };   // 레이블 이름 + 다른 이름
+			std::vector<CString> names{ s.label };   // 레이블 이름 + 다른 이름 (+ 복합 레이블 이름)
+			for (const SubLabel& sl : s.subs)
+				names.push_back(sl.label);
 			{
 				int p = 0;
 				while (p <= s.altNames.GetLength())
@@ -4155,8 +4288,8 @@ int CVideoLibrary::FillSeriesLabel(const CString& code, const CString& label)
 				{
 					CString cur = s.label;
 					cur.Trim();
-					if (!cur.IsEmpty())
-						return 2;
+					if (!cur.IsEmpty() || s.composite)
+						return 2;   // 복합 레이블은 레이블 칸을 쓰지 않음
 					s.label = lb;
 					ownerSeries = JoinSeries(list);
 					return 1;
@@ -4313,6 +4446,12 @@ bool CVideoLibrary::SeriesInfoForCode(const CString& code, SeriesInfo& out) cons
 				if (p == prefix || (p.Find(L'-') > 0 && c.Left(p.GetLength()) == p))   // "SONE" 또는 "SONE-4" 처럼 더 긴 접두어
 				{
 					out = s;
+					if (s.composite)
+					{
+						// 복합 레이블: 뒷번호가 맞는 레이블 (없으면 레이블 없음)
+						const int k = SubLabelIndex(s, c);
+						out.label = (k >= 0) ? s.subs[k].label : CString();
+					}
 					return true;
 				}
 			}
@@ -4327,8 +4466,10 @@ bool CVideoLibrary::SeriesInfoForCode(const CString& code, SeriesInfo& out) cons
 	return false;
 }
 
-bool CVideoLibrary::SeriesSlotForCode(const CString& code, int& owner, int& index, int& part) const
+bool CVideoLibrary::SeriesSlotForCode(const CString& code, int& owner, int& index, int& part, int* sub) const
 {
+	if (sub)
+		*sub = -1;
 	CString c = code;
 	c.Trim();
 	c.MakeUpper();
@@ -4351,6 +4492,11 @@ bool CVideoLibrary::SeriesSlotForCode(const CString& code, int& owner, int& inde
 					owner = o;
 					index = static_cast<int>(i);
 					part = pi;
+					if (sub && list[i].composite)
+					{
+						const int k = SubLabelIndex(list[i], c);
+						*sub = (k >= 0) ? k : -2;   // 복합: 맞는 뒷번호가 없으면 -2 (레이블 없음)
+					}
 					return true;
 				}
 				++pi;
@@ -5574,6 +5720,97 @@ int CVideoLibrary::FindLabelLoose(const CString& label) const
 	return -1;
 }
 
+bool CVideoLibrary::FindCodeLabel(const CString& label, int& owner, int& index, int* sub) const
+{
+	// 품번 DB(제작사별 시리즈 + 제작사 없는 항목)의 레이블명 · 복합 레이블명 · 다른 이름에서만 찾음 (제작사 이름은 보지 않음)
+	owner = -1;
+	index = -1;
+	if (sub)
+		*sub = -1;
+	CString nm = label;
+	nm.Trim();
+	if (nm.IsEmpty())
+		return false;
+	auto loose = [](const CString& s)
+	{
+		CString k = CompactLower(s);
+		k.Remove(L'-'); k.Remove(L'.'); k.Remove(L'_'); k.Remove(L'\x30FB'); k.Remove(L'\x00B7');
+		return k;
+	};
+	for (int pass = 0; pass < 2; ++pass)   // 그대로(대소문자 무시) 먼저, 다음에 공백 · 기호 무시
+	{
+		const CString key = pass ? loose(nm) : nm;
+		if (key.IsEmpty())
+			continue;
+		for (int o = -1; o < static_cast<int>(studios.size()); ++o)
+		{
+			const std::vector<SeriesInfo> list = ParseSeries(o < 0 ? looseSeries : studios[o].series);
+			for (size_t i = 0; i < list.size(); ++i)
+			{
+				// 복합 레이블명 먼저 (몇 번째 레이블인지), 다음에 레이블명 · 다른 이름
+				if (list[i].composite)
+					for (size_t k = 0; k < list[i].subs.size(); ++k)
+					{
+						CString n = list[i].subs[k].label;
+						n.Trim();
+						if (!n.IsEmpty() && (pass ? (loose(n) == key) : (n.CompareNoCase(key) == 0)))
+						{
+							owner = o;
+							index = static_cast<int>(i);
+							if (sub) *sub = static_cast<int>(k);
+							return true;
+						}
+					}
+				std::vector<CString> names = SplitLines(list[i].altNames);
+				if (!list[i].composite)
+					names.insert(names.begin(), list[i].label);
+				for (CString n : names)
+				{
+					n.Trim();
+					if (n.IsEmpty())
+						continue;
+					if (pass ? (loose(n) == key) : (n.CompareNoCase(key) == 0))
+					{
+						owner = o;
+						index = static_cast<int>(i);
+						return true;
+					}
+				}
+			}
+		}
+	}
+	return false;
+}
+
+bool CVideoLibrary::AddCodeLabelAltName(int owner, int index, const CString& name)
+{
+	CString nm = name;
+	nm.Trim();
+	if (nm.IsEmpty() || owner >= static_cast<int>(studios.size()))
+		return false;
+	CString& text = (owner < 0) ? looseSeries : studios[owner].series;
+	std::vector<SeriesInfo> list = ParseSeries(text);
+	if (index < 0 || index >= static_cast<int>(list.size()))
+		return false;
+	SeriesInfo& s = list[index];
+	CString cur = s.label;
+	if (cur.Trim().CompareNoCase(nm) == 0)
+		return false;
+	for (const SubLabel& sl : s.subs)
+	{
+		CString l = sl.label;
+		if (l.Trim().CompareNoCase(nm) == 0)
+			return false;   // 복합 레이블명
+	}
+	for (CString a : SplitLines(s.altNames))
+		if (a.Trim().CompareNoCase(nm) == 0)
+			return false;
+	s.altNames.Trim();
+	s.altNames += (s.altNames.IsEmpty() ? CString() : CString(L"\n")) + nm;
+	text = JoinSeries(list);
+	return true;
+}
+
 int CVideoLibrary::FindStudioByLabel(const CString& label, CString* labelName) const
 {
 	const int li = FindLabelLoose(label);
@@ -5603,13 +5840,7 @@ void CVideoLibrary::ResolveVideoLabel(VideoItem& v) const
 	}
 	if (v.label.IsEmpty())
 		return;
-	// 레이블이 제작사 이름과 같으면 레이블은 비움
-	if (!v.studio.IsEmpty() && (v.label.CompareNoCase(v.studio) == 0 ||
-		(FindStudioLoose(v.label) >= 0 && FindStudioLoose(v.label) == FindStudioLoose(v.studio))))
-	{
-		v.label.Empty();
-		return;
-	}
+	// 레이블이 제작사 이름과 같아도 비우지 않음 (품번 DB 의 레이블로 추가되도록 - 예전에는 비워서 새 레이블이 등록되지 않았음)
 	const int li = FindLabelLoose(v.label);
 	if (li < 0)
 		return;
@@ -6223,15 +6454,11 @@ CString CVideoLibrary::ParsePastedVideoText(const CString& raw)
 	add(L"제목", title);
 	add(L"발매일", date);
 	add(L"배우", JoinList(cast));
-	// 제작사 → 스튜디오, 레이블 → 레이블 (제작사가 없으면 레이블을 스튜디오 칸에 → 등록된 레이블이면 상위 스튜디오로 바뀜)
-	if (!maker.IsEmpty())
-	{
-		add(L"제작사", maker);
-		if (label.CompareNoCase(maker) != 0)
-			add(L"레이블", label);
-	}
-	else
-		add(L"제작사", label);
+	// 제작사 → 제작사, 레이블 → 레이블 (따로 읽음)
+	//  - 예전: 제작사가 없으면 레이블을 제작사 칸에, 제작사와 같은 이름이면 레이블을 버림 → 품번 DB 에 없던 레이블이 추가되지 않던 문제
+	//  - 레이블 값은 SyncNamedFromVideos 에서 품번 DB 에 없는 품번이면 새 항목, 있으면 다른 이름으로 추가됨
+	add(L"제작사", maker);
+	add(L"레이블", label);
 	add(L"시리즈", series);
 	add(L"태그", JoinList(genres));
 	return out;

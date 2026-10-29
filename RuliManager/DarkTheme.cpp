@@ -247,19 +247,54 @@ void CDarkDialogTheme::ThemeChild(HWND hwnd)
 			::SetWindowTheme(hwnd, L"DarkMode_Explorer", nullptr);       // 메모 칸 스크롤바
 		DarkEdge::Attach(hwnd);                                         // 어두운 테두리
 	}
-	else if (_wcsicmp(cls, L"ListBox") == 0)
+	else if (_wcsicmp(cls, L"ListBox") == 0 || _wcsicmp(cls, WC_TREEVIEWW) == 0)
 	{
-		::SetWindowTheme(hwnd, L"DarkMode_Explorer", nullptr);
+		::SetWindowTheme(hwnd, L"DarkMode_Explorer", nullptr);           // 목록 · 트리(파일 관리) 스크롤바
 	}
 	else if (_wcsicmp(cls, L"ComboBox") == 0)
 	{
 		::SetWindowTheme(hwnd, L"DarkMode_CFD", nullptr);                // 어두운 콤보 테두리/버튼
 		DarkEdge::Attach(hwnd);                                         // 테두리를 에디트와 같은 어두운 색으로
 	}
+	else if (style & (WS_VSCROLL | WS_HSCROLL))
+	{
+		// 직접 만든 창(품번 관리 CVarList 등)의 기본 스크롤바도 어둡게
+		::SetWindowTheme(hwnd, L"DarkMode_Explorer", nullptr);
+	}
+}
+
+namespace DarkTitle
+{
+	void Apply(HWND hwnd)
+	{
+		if (!hwnd)
+			return;
+		typedef HRESULT(WINAPI* SetAttr)(HWND, DWORD, LPCVOID, DWORD);
+		static SetAttr fn = []() -> SetAttr
+		{
+			HMODULE m = ::LoadLibraryW(L"dwmapi.dll");
+			return m ? reinterpret_cast<SetAttr>(::GetProcAddress(m, "DwmSetWindowAttribute")) : nullptr;
+		}();
+		if (!fn)
+			return;
+		// 어두운 제목 표시줄: DWMWA_USE_IMMERSIVE_DARK_MODE = 20 (Windows 10 2004 이후), 예전 빌드는 19
+		const COLORREF back = TCOL(TC_BACK);
+		const int lum = (GetRValue(back) * 299 + GetGValue(back) * 587 + GetBValue(back) * 114) / 1000;
+		const BOOL dark = (lum < 128) ? TRUE : FALSE;
+		if (FAILED(fn(hwnd, 20, &dark, sizeof(dark))))
+			fn(hwnd, 19, &dark, sizeof(dark));
+		// Windows 11: 제목 표시줄 색 = 창 배경색 (DWMWA_CAPTION_COLOR = 35), 제목 글자 (36), 창 테두리 (34)
+		const COLORREF text = TCOL(TC_TEXT);
+		const COLORREF border = TCOL(TC_EDGE);
+		fn(hwnd, 35, &back, sizeof(back));
+		fn(hwnd, 36, &text, sizeof(text));
+		fn(hwnd, 34, &border, sizeof(border));
+	}
 }
 
 void CDarkDialogTheme::Apply(CWnd* dlg, std::initializer_list<UINT> dangerIds)
 {
+	DarkTitle::Apply(dlg->GetSafeHwnd());   // 제목 표시줄도 프로그램 색으로
 	if (!m_back.GetSafeHandle())
 		m_back.CreateSolidBrush(DarkColors::Back);
 	if (!m_edit.GetSafeHandle())

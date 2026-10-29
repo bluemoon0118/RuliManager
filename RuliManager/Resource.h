@@ -316,6 +316,13 @@
 #define IDC_SR_IMAGE_PATH               1356
 #define IDC_SR_HEADER                   1357
 #define IDC_SR_ALT                      1358
+#define IDC_SR_TYPE                     1359
+#define IDC_SR_SUBCOMBO                 1360
+#define IDC_SR_SUB_ADD                  1361
+#define IDC_SR_SUB_DEL                  1362
+#define IDC_SR_SUB_UP                   1363
+#define IDC_SR_SUB_DOWN                 1364
+#define IDC_SR_SUBNUMS                  1365
 #define ID_ACTOR_SHOWVIDEOS             32800
 #define ID_ACTOR_EDIT                   32801
 #define ID_MANAGE_ACTORS                32810
@@ -359,7 +366,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        146
 #define _APS_NEXT_COMMAND_VALUE         33048
-#define _APS_NEXT_CONTROL_VALUE         1359
+#define _APS_NEXT_CONTROL_VALUE         1366
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

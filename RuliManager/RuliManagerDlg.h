@@ -20,6 +20,8 @@
 #include <deque>
 #include <thread>
 #include <atomic>
+
+class CSeriesDlg;   // 품번 관리 창 (OpenSeriesManager)
 #include "DropCounter.h"
 #include "ScreenshotExtractor.h"
 #include "YearView.h"
@@ -198,15 +200,24 @@ protected:
 	int  m_lgroupH = 40;                         // 묶음 머리줄 높이 (이미지 없을 때)
 	int  m_limgH = 48;                           // 머리줄 레이블 이미지 높이 (이미지가 있는 묶음은 머리줄이 이만큼 + 여백 더 높음)
 	int  m_lcodeW = 120;                         // 품번 칸 폭 (품번 글꼴로 10글자)
-	struct LabelCols { CRect check, code, cover, title, actors, release; };
+	struct LabelCols { CRect check, cover, info, actors, code, release, title; };   // 왼쪽부터 체크 · 커버 · 정보(품번 / 발매일 / 제목 - 영상 카드처럼 줄마다) · 출연 배우
+	int  m_lcodeLineH = 18, m_llineH = 16;       // 정보 칸 줄 높이 (품번 글꼴 · 목록 글꼴)
 	LabelCols LabelColumns(const CRect& card);            // 줄 안 칸 자리 (머리줄 열 이름도 같은 x)
 	void LabelGroupKey(int itemIdx, CString& label, CString& code) const;   // 영상의 묶음 (레이블 이름 · 품번 접두어)
+	CString LabelViewCode(int itemIdx) const;                    // [레이블] 보기용 품번 (비어 있으면 파일 · 폴더 이름에서)
 	void GroupViewByLabel();                                     // m_view 를 레이블 → 품번 묶음 순으로 (묶음 안은 지금 정렬 그대로)
 	void UpdateLabelLines();                                     // 격자 줄 배치 + 묶음 머리줄 (레이블 보기가 아니면 지움)
 	void DrawLabelRow(CDC* dc, int g, const CRect& card, bool selected, bool focused);
 	void GridDrawGroupHeader(CDC* dc, int firstCard, const CRect& rc) override;
 	bool PkgAnchorRect(int g, CRect& rc);                  // [패키지] 팝업 기준 자리 (패키지 = 카드, 레이블 = 커버 칸, 격자 좌표)
 	afx_msg void OnBnClickedVideoModeLabel();
+	// [레이블] 보기 출연 배우 칩: 한 명씩 줄마다 (영상 상세 배우 칩 모양), 마우스를 올리면 배우 카드 팝업, 더블클릭 = 그 배우로
+	struct LabelChip { CString tag; CString text; CRect rc; int actor = -1; };   // tag: 배우 칸의 이름, text: 보이는 이름 (이 작품의 별칭), actor: -1 = DB 에 없음 · "+N"
+	std::vector<LabelChip> LabelActorChips(int row, const CRect& area);
+	static const int kLabelActorPart = 3000;     // GridHitPart: kLabelActorPart + 칩 번호
+	bool  m_labelActorPopupOn = false;
+	CRect m_labelChipScreen;
+	void  CheckLabelActorHover();
 	CDarkHeader m_listHeader;          // [리스트] 열 머리글 (어두운 색 + 정렬 삼각형)
 	// 영상 화면별 보기: 0 = [격자] (가로 카드), 1 = [리스트] (스프레드시트), 2 = [패키지] (세로 카드, 이미지만), 3 = [월 모드] (16:9 이미지만 빈틈없이 + 미리보기 자동 재생)
 	//  [0] 영상 탭, [1] 배우 출연작, [2] 제작사 · 레이블 영상, [3] 태그 영상, [4] 컬렉션 영상 - 레지스트리 Settings\VideoViewMode / …Actor / …Studio / …Tag / …Collection
@@ -220,6 +231,7 @@ protected:
 	afx_msg void OnNmCustomDrawList(NMHDR* pNMHDR, LRESULT* pResult);   // [리스트] 첫 열(체크 칸 오른쪽)에 커버 이미지
 	CFont      m_listFont;             // [리스트] 글꼴 (기본 글꼴 + 1pt, 머리글 · 별점 숫자 · 태그 칩도)
 	CFont      m_listCodeFont;         // [리스트] 품번 글꼴 (목록 글꼴 + 1pt, 굵게)
+	CFont      m_lblFont, m_lblCodeFont;   // [레이블] 보기 칸 글꼴 ([리스트] 글꼴 · 품번 글꼴보다 1pt 크게)
 	CString    ListPartLabel(int itemIdx) const;   // 분할 영상 순번 "(2/3)" (아니면 빈 문자열)
 	CImageList m_listRowImages;        // [리스트] 줄 높이용 빈 이미지 목록 (작은 아이콘 높이 = 커버 높이)
 	int  m_listCoverW = 96, m_listCoverH = 64;   // [리스트] 커버 칸 크기
@@ -884,6 +896,8 @@ protected:
 	afx_msg void OnManageStudios();
 	afx_msg void OnManageTags();
 	afx_msg void OnManageFiles();    // [목록 관리 ▾] → 파일 관리 (등록 폴더 트리 · 배우\[발매일]품번\품번.mp4 규칙 검사 · 복구)
+	void OpenSeriesManager(CSeriesDlg& dlg);   // 품번 관리 창 띄우고 바뀐 것 반영 (OnManageSeries · [레이블] 머리줄 메뉴)
+	void ShowLabelGroupMenu(int firstCard, CPoint screen);   // [레이블] 묶음 머리줄 오른쪽 클릭: 품번 관리에서 보기 / 등록
 	afx_msg void OnManageSeries();   // [목록 관리 ▾] → 품번 관리 (제작사 / 레이블의 시리즈 표)
 	afx_msg void OnBnClickedPickStudio();
 	afx_msg void OnBnClickedPickTags();
