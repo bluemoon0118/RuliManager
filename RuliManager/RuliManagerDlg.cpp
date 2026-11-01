@@ -14273,7 +14273,11 @@ void CRuliManagerDlg::ShowVideoContextMenu(int row, CPoint point)
 	{
 		// 미리보기 영상 (이미 있으면 "다시 만들기")
 		const int ci = (row >= 0 && row < static_cast<int>(m_view.size())) ? m_view[row] : -1;
-		const bool has = (ci >= 0) && ::PathFileExistsW(PreviewFileOf(ci));
+		// 분할 영상은 모든 파트에 미리보기가 있을 때만 "다시 만들기" (하나라도 없으면 없는 파트만 만듦)
+		bool has = (ci >= 0);
+		for (int p : SplitPartItems(ci))
+			if (!::PathFileExistsW(PreviewFileOf(p)))
+				has = false;
 		menu.AppendMenu(MF_STRING | ro, ID_VIDEO_MAKEPREVIEW, has ? L"미리보기 다시 만들기" : L"미리보기 만들기");
 	}
 	menu.AppendMenu(MF_SEPARATOR);
@@ -16959,7 +16963,47 @@ void CRuliManagerDlg::OnVideoMakePreview()
 	const int idx = GetSelectedItem();
 	if (idx < 0)
 		return;
+	// 분할 영상: 모든 파트를 한 번에 - 미리보기가 없는 파트만 (모두 있으면 [다시 만들기] = 모든 파트)
+	const std::vector<int> parts = SplitPartItems(idx);
+	if (parts.size() >= 2)
+	{
+		std::vector<int> missing;
+		for (int p : parts)
+			if (!::PathFileExistsW(PreviewFileOf(p)))
+				missing.push_back(p);
+		QueuePreviews(missing.empty() ? parts : missing);
+		return;
+	}
 	QueuePreviews({ idx });
+}
+
+std::vector<int> CRuliManagerDlg::SplitPartItems(int idx) const
+{
+	std::vector<int> out;
+	if (idx < 0 || idx >= static_cast<int>(m_lib.items.size()))
+		return out;
+	CString key;
+	int num = 0;
+	if (SplitPartName(m_lib.items[idx].path, key, num))
+	{
+		std::vector<std::pair<int, int>> parts;   // (순번, 항목)
+		for (size_t i = 0; i < m_lib.items.size(); ++i)
+		{
+			CString k;
+			int n = 0;
+			if (SplitPartName(m_lib.items[i].path, k, n) && k.CompareNoCase(key) == 0)
+				parts.push_back({ n, static_cast<int>(i) });
+		}
+		if (parts.size() >= 2)
+		{
+			std::sort(parts.begin(), parts.end());
+			for (const auto& p : parts)
+				out.push_back(p.second);
+			return out;
+		}
+	}
+	out.push_back(idx);
+	return out;
 }
 
 void CRuliManagerDlg::OnVideoMakePreviewChecked()

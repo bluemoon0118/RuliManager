@@ -1001,6 +1001,7 @@ protected:
 	CString           m_prevFirstError;    // 실패한 첫 영상과 이유 (모두 끝나면 한 번 알림)
 	CString PreviewFileOf(int idx) const;   // 영상 항목 → 미리보기 파일 경로 (없어도 경로는 돌려줌)
 	void QueuePreviews(const std::vector<int>& items);
+	std::vector<int> SplitPartItems(int idx) const;   // 분할 영상이면 같은 묶음의 모든 파트 항목 (순번 순), 아니면 {idx}
 	void MakeAllPreviews(CWnd* parent, bool regen = false);   // 설정 [미리보기 일괄 만들기]: 미리보기가 없는 영상만 (확인 후), regen = [미리보기 재생성]: 이미 있는 것도 다시
 	void DeleteAllPreviews(CWnd* parent); // 설정 [미리보기 모두 삭제]: previews 폴더의 미리보기 파일 모두 지움 (확인 후, 만드는 중이면 멈춤)   // 설정 [미리보기 일괄 만들기]: 미리보기가 없는 영상 모두 대기열에 (확인 후)
 	void StartNextPreview();
