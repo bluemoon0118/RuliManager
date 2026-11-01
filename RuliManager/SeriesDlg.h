@@ -4,6 +4,7 @@
 #include "DarkTheme.h"
 #include "ImagePreview.h"
 #include <vector>
+#include <set>
 
 // ---------------------------------------------------------------------------
 // 줄 높이가 다른 목록 (품번 관리 표) - 목록 상자(LBS_OWNERDRAWVARIABLE)처럼 쓰지만 픽셀 단위로 부드럽게 스크롤
@@ -117,6 +118,7 @@ protected:
 	CPoint  m_pressPt;
 	int     m_pressRow = -1;
 	std::vector<Row> m_rows;
+	std::set<CString> m_dupCodes;   // 여러 제작사에 등록된 품번 접두어 (대문자) - 표에서 주황색
 	int     m_curStudio = -1;      // 지금 편집 중인 항목 (제작사 인덱스, -1 = 없음)
 	CString m_curName;             // 그 항목의 품번 (저장된 값 - 인덱스 대신 이 이름으로 찾음)
 	bool    m_new = false;         // [새 품번] 입력 중

@@ -237,6 +237,7 @@
 #define IDC_DRILL_VIEW_YEAR             1276
 #define IDC_STUDIO_VIEW_GRID            1297
 #define IDC_STUDIO_VIEW_LIST            1298
+#define IDC_STUDIO_VIEW_TREE            1299
 #define IDC_COL_TITLE                   1299
 #define IDC_COL_MEMO                    1300
 #define IDC_COL_COVER                   1301
@@ -323,6 +324,7 @@
 #define IDC_SR_SUB_UP                   1363
 #define IDC_SR_SUB_DOWN                 1364
 #define IDC_SR_SUBNUMS                  1365
+#define IDC_STUDIO_TREE                 1366
 #define ID_ACTOR_SHOWVIDEOS             32800
 #define ID_ACTOR_EDIT                   32801
 #define ID_MANAGE_ACTORS                32810
@@ -366,7 +368,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        146
 #define _APS_NEXT_COMMAND_VALUE         33048
-#define _APS_NEXT_CONTROL_VALUE         1366
+#define _APS_NEXT_CONTROL_VALUE         1367
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

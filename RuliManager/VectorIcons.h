@@ -39,6 +39,7 @@ namespace VectorIcon
 	void GenreTagOff(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);    // 빗금 그은 꼬리표 (장르 칩 [장르숨김])
 	void ViewWall(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);      // 빈틈 거의 없는 3×3 바둑판 + 가운데 재생 (월 모드)
 	void ViewTreemap(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);   // 크기가 다른 사각형 묶음 (트리맵 차트)
+	void ViewTree(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);      // 위 왼쪽 상자 하나 → 꺾은 선 → 아래 상자 셋 (위 → 아래 계층, 왼쪽 정렬)
 	void ViewLabel(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);     // 위 머리줄 + 세로 썸네일 · 줄 두 개 (레이블별 표 보기)
 	void ViewYear(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);      // 달력 (연도별 보기)
 	void ViewPackage(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);   // 세로 케이스 한 장 (패키지)

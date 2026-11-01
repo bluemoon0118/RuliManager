@@ -9,4 +9,10 @@ namespace TextFB
 	void Draw(HDC hdc, const CString& text, const CRect& rc, UINT align = DT_LEFT, bool ellipsis = true);
 	inline int  Width(CDC* dc, const CString& text) { return Width(dc->GetSafeHdc(), text); }
 	inline void Draw(CDC* dc, const CString& text, const CRect& rc, UINT align = DT_LEFT, bool ellipsis = true) { Draw(dc->GetSafeHdc(), text, rc, align, ellipsis); }
+
+	// DrawText 대신 쓰는 함수 (같은 인자 · 같은 결과): 기본 글꼴에 없는 글자(일본 신자체 한자 등)가 있을 때만
+	//  글자 단위 대체 + 한자 크기 · 세로 위치 보정으로 그림 (한 줄 · 여러 줄 · DT_CALCRECT · 정렬 · "…"), 없으면 Windows DrawText 그대로
+	int DrawFmt(HDC hdc, const CString& text, LPRECT rc, UINT fmt);
+	inline int DrawFmt(CDC* dc, const CString& text, LPRECT rc, UINT fmt) { return DrawFmt(dc->GetSafeHdc(), text, rc, fmt); }
+	inline int DrawFmt(CDC* dc, LPCWSTR text, int len, LPRECT rc, UINT fmt) { return DrawFmt(dc->GetSafeHdc(), len < 0 ? CString(text) : CString(text, len), rc, fmt); }
 }

@@ -108,6 +108,7 @@
     <ClInclude Include="ScreenshotExtractor.h" />
     <ClInclude Include="PreviewVideo.h" />
     <ClInclude Include="TreemapView.h" />
+    <ClInclude Include="StudioTreeView.h" />
     <ClInclude Include="FileManageDlg.h" />
     <ClInclude Include="YearView.h" />
     <ClInclude Include="TagLinkDlg.h" />
@@ -167,6 +168,7 @@
     <ClCompile Include="VectorIcons.cpp" />
     <ClCompile Include="PreviewVideo.cpp" />
     <ClCompile Include="TreemapView.cpp" />
+    <ClCompile Include="StudioTreeView.cpp" />
     <ClCompile Include="FileManageDlg.cpp" />
     <ClCompile Include="ZoomSlider.cpp" />
     <ClCompile Include="StarRatingCtrl.cpp" />

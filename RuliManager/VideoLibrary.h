@@ -219,15 +219,16 @@ public:
 	static std::vector<SeriesInfo> ParseSeries(const CString& text);   // series 칸 → 시리즈 목록 (이름 없는 줄 · 같은 이름 중복은 뺌)
 	static CString JoinSeries(const std::vector<SeriesInfo>& list);
 	static std::vector<CString> SeriesNames(const CString& text);     // series 칸의 시리즈 이름만
-	CString SeriesForCode(const CString& code) const;                  // 영상 품번의 접두어가 등록된 시리즈 (없으면 빈 문자열)
-	bool    SeriesInfoForCode(const CString& code, SeriesInfo& out) const;   // 위와 같은 규칙으로 찾은 시리즈 정보 (레이블 · 설명 포함)
+	// 품번 → 품번 DB 항목: 같은 접두어가 여러 제작사에 있으면 studio(영상 제작사)와 같은 제작사의 항목, 없으면 찾지 못함 (*ambiguous = true)
+	CString SeriesForCode(const CString& code, const CString& studio = CString()) const;                  // 영상 품번의 접두어가 등록된 시리즈 (없으면 빈 문자열)
+	bool    SeriesInfoForCode(const CString& code, SeriesInfo& out, const CString& studio = CString(), bool* ambiguous = nullptr) const;   // 위와 같은 규칙으로 찾은 시리즈 정보 (레이블 · 설명 포함, 복합은 뒷번호의 레이블)
 	// 레이블 개편 (v0.8): 제작사 하위 레이블(labelInfos) 폐기 → 레이블 = 품번 DB(시리즈)의 "레이블" 칸
 	//  영상의 label 은 저장하지 않고 품번으로 품번 DB 에서 찾은 값 (RefreshDerivedLabels)
 	static CString CodePrefixOf(const CString& code);            // 품번 접두어 ('-' 앞, 없으면 앞쪽 영문 - 대문자)
 	static int     CodeNumberOf(const CString& code);            // 품번 뒷번호 (접두어 뒤 숫자, 앞의 0 무시 - 없으면 -1)
 	static std::vector<int> ParseSubNums(const CString& nums);   // 복합 레이블 뒷번호 칸 → 번호 목록 (쉼표 · 공백 · 줄바꿈 구분)
 	static int     SubLabelIndex(const SeriesInfo& s, const CString& code);   // 복합 레이블에서 품번 뒷번호가 맞는 레이블 (없거나 싱글이면 -1)
-	CString LabelForCode(const CString& code) const;             // 품번 DB 에서 찾은 레이블 (없으면 빈칸)
+	CString LabelForCode(const CString& code, const CString& studio = CString()) const;   // 품번 DB 에서 찾은 레이블 (없으면 빈칸)
 	bool    FindCodeLabel(const CString& label, int& owner, int& index, int* sub = nullptr) const;   // sub: 복합 레이블의 몇 번째 레이블 (싱글 · 다른 이름이면 -1)   // 품번 DB 레이블명 · 다른 이름으로 항목 찾기 (owner -1 = 제작사 없는 항목, 대소문자 · 공백 · 기호 무시)
 	bool    AddCodeLabelAltName(int owner, int index, const CString& name); // 품번 DB 항목의 "다른 이름" 에 추가 (레이블명 · 이미 있는 이름이면 false)
 	CString LabelImage(const CString& label) const;              // 그 레이블 이름을 가진 품번 DB 항목의 대표 이미지 (처음 찾은 것, 없으면 빈칸 - RefreshDerivedLabels 때 만든 표)
@@ -235,7 +236,8 @@ public:
 	CString looseSeries;                                         // 제작사 없는 품번 DB 항목 (시리즈 칸 형식 - DB "Q" 줄)
 	bool    SeriesRegistered(const CString& series) const;       // 품번 DB(제작사 · 제작사 없음)에 있는 시리즈 이름인지
 	// 품번이 속한 품번 DB 자리: owner = studios 인덱스 (studios.size() = 제작사 없는 항목), index = 그 목록의 순번 (레이블 순번), part = 항목 안 접두어 순서 - 없으면 false
-	bool    SeriesSlotForCode(const CString& code, int& owner, int& index, int& part, int* sub = nullptr) const;   // sub: 싱글 -1, 복합 = 맞는 레이블 번호 (없으면 -2)
+	bool    SeriesSlotForCode(const CString& code, int& owner, int& index, int& part, int* sub = nullptr,
+	                          const CString& studio = CString(), bool* ambiguous = nullptr) const;   // owner: studios 인덱스 (studios.size() = 제작사 없는 항목), sub: 싱글 -1, 복합 = 맞는 레이블 번호 (없으면 -2)
 	void    RefreshDerivedLabels();                              // 모든 영상의 label = LabelForCode(code)
 	int     FillSeriesLabel(const CString& code, const CString& label);   // 품번의 시리즈 레이블이 비어 있으면 채움 - 0 = 시리즈 없음, 1 = 채움, 2 = 이미 있음
 	bool    MigrateLabelsToSeries(CString* report = nullptr);    // 예전 레이블 → 품번 DB 레이블 (레이블 목록이나 영상 레이블 값이 있을 때만, 바꿨으면 true)

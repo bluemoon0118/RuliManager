@@ -1,4 +1,5 @@
 ﻿#include "pch.h"
+#include "TextDraw.h"   // TextFB::DrawFmt (일본 신자체 한자 대체 · 크기 보정)
 #include "DarkControls.h"   // DarkMenu: 테마 색 오른쪽 클릭 메뉴
 #include "RuliManager.h"
 #include "SeriesDlg.h"
@@ -6,6 +7,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <map>
+#include <set>
 #include <windowsx.h>   // GET_X_LPARAM
 
 #ifdef _DEBUG
@@ -34,8 +36,8 @@ namespace
 			if (c >= L'A' && c <= L'Z') ++letters;
 			else if (!(c >= L'0' && c <= L'9')) return CString();
 		}
-		if (letters < 2 || head.GetLength() > 10)
-			return CString();
+		if (letters < (dash > 0 ? 1 : 2) || head.GetLength() > 10)
+			return CString();   // "-" 로 나뉜 품번은 영문 1자 + 숫자 접두어도 (예: T28-498)
 		if (dash < 0)
 		{
 			// "-" 없이 붙은 번호는 뗌 (SONE479 → SONE), 앞쪽 숫자(300MIUM)는 유지
@@ -728,6 +730,24 @@ void CSeriesDlg::FillGrid(int selStudio, const CString& selName)
 		}
 	}
 
+	// 여러 제작사에 있는 품번 (검색과 상관없이 전체에서)
+	{
+		std::map<CString, std::set<int>> owners;
+		for (int si = 0; si <= LooseIdx(); ++si)
+			for (const SeriesInfo& s : CVideoLibrary::ParseSeries(SeriesOf(si)))
+				for (CString p : CVideoLibrary::SplitList(s.name))
+				{
+					p.Trim();
+					p.MakeUpper();
+					p.TrimRight(L'-');
+					if (!p.IsEmpty())
+						owners[p].insert(si);
+				}
+		m_dupCodes.clear();
+		for (const auto& kv : owners)
+			if (kv.second.size() > 1)
+				m_dupCodes.insert(kv.first);
+	}
 	// 제작사가 바뀔 때마다 배경색 2가지를 번갈아 (묶음 번호)
 	{
 		int band = 0;
@@ -1177,6 +1197,8 @@ bool CSeriesDlg::Commit()
 	for (int si = 0; si <= LooseIdx(); ++si)
 		for (const SeriesInfo& s : CVideoLibrary::ParseSeries(SeriesOf(si)))
 		{
+			if (si != studio)
+				continue;   // 다른 제작사는 같은 품번을 써도 됨 (레이블은 영상의 제작사로 고름)
 			if (!m_new && si == m_curStudio && s.name.CompareNoCase(m_curName) == 0)
 				continue;   // 지금 항목
 			for (CString p : CVideoLibrary::SplitList(s.name))
@@ -1191,7 +1213,7 @@ bool CSeriesDlg::Commit()
 		}
 	if (!hits.empty())
 	{
-		CString msg = L"다른 항목에 이미 있는 품번입니다:\n";
+		CString msg = L"같은 제작사의 다른 항목에 이미 있는 품번입니다:\n";
 		for (const Hit& h : hits)
 			msg += L"  " + h.code + L"  (" + NameOf(h.studio) + L" · " + h.entry + L")\n";
 		msg += L"\n그 항목에서 빼고 여기에 둘까요?";
@@ -1443,7 +1465,16 @@ void CSeriesDlg::OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpdis)
 				text += c;
 			}
 			fmt |= DT_TOP;
-			dc->SetTextColor(drop ? RGB(255, 255, 255) : DarkColors::Text);
+			// 같은 품번이 다른 제작사에도 있으면 주황색 (레이블은 영상의 제작사로 고름)
+			bool dup = false;
+			for (CString p : CVideoLibrary::SplitList(r.s.name))
+			{
+				p.Trim();
+				p.MakeUpper();
+				p.TrimRight(L'-');
+				if (m_dupCodes.count(p)) { dup = true; break; }
+			}
+			dc->SetTextColor(drop ? RGB(255, 255, 255) : (dup ? RGB(0xF0, 0xA0, 0x50) : DarkColors::Text));
 		}
 		else if (col == 0)
 		{
@@ -1463,12 +1494,12 @@ void CSeriesDlg::OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpdis)
 			dc->SetTextColor(DarkColors::Text);
 			const CRect group(cell.left, rc.top - above + 4, cell.right, rc.top - above + total - 4);
 			CRect calc(group.left, 0, group.right, 0);
-			dc->DrawText(text, calc, fmt | DT_CALCRECT);
+			TextFB::DrawFmt(dc, text, calc, fmt | DT_CALCRECT);
 			const int h = (std::min)(static_cast<int>(calc.Height()), static_cast<int>(group.Height()));
 			CRect tr(group.left, group.top + (group.Height() - h) / 2, group.right, group.top + (group.Height() - h) / 2 + h);
 			const int clip = dc->SaveDC();
 			dc->IntersectClipRect(CRect(studioCell.left, rc.top, studioCell.right - 1, rc.bottom - (sameAsNext ? 0 : 1)));   // 이 줄 자리만
-			dc->DrawText(text, tr, fmt);
+			TextFB::DrawFmt(dc, text, tr, fmt);
 			dc->RestoreDC(clip);
 			continue;
 		}
@@ -1482,12 +1513,12 @@ void CSeriesDlg::OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpdis)
 			dc->SetTextColor(drop ? RGB(255, 255, 255) : (comp ? TCOL(TC_ACCENTTEXT) : (col == 3 ? TCOL(TC_SUB) : DarkColors::Text)));
 			// 세로 가운데 (줄 수만큼)
 			CRect calc(cell.left, 0, cell.right, 0);
-			dc->DrawText(text, calc, fmt | DT_CALCRECT);
+			TextFB::DrawFmt(dc, text, calc, fmt | DT_CALCRECT);
 			const int h = (std::min)(static_cast<int>(calc.Height()), static_cast<int>(cell.Height()));
 			cell.top += (cell.Height() - h) / 2;
 			cell.bottom = cell.top + h;
 		}
-		dc->DrawText(text, cell, fmt);
+		TextFB::DrawFmt(dc, text, cell, fmt);
 	}
 	dc->RestoreDC(saved);
 }

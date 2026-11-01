@@ -1,4 +1,5 @@
 ﻿#include "pch.h"
+#include "TextDraw.h"   // TextFB::DrawFmt (일본 신자체 한자 대체 · 크기 보정)
 #include "ActorStrip.h"
 
 #ifdef _DEBUG
@@ -230,7 +231,7 @@ void CActorStrip::OnPaint()
 			mem.SetBkMode(TRANSPARENT);
 			mem.SetTextColor(m_text);
 			CRect tr(0, 0, rc.right, m_cardH);
-			mem.DrawText(m_empty, tr, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+			TextFB::DrawFmt(&mem, m_empty, tr, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 			mem.SelectObject(old);
 		}
 	}

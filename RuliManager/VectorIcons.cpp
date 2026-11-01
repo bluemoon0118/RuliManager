@@ -582,6 +582,23 @@ namespace VectorIcon
 		});
 	}
 
+	void ViewTree(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			// 위 → 아래 계층 (왼쪽 정렬): 위 왼쪽 상위 상자 → 세로줄 → 가로줄 → 아래 하위 상자 셋 (선끼리 겹치지 않게 맞닿게)
+			AddRoundRect(p, 2.0f, 2.5f, 8.0f, 5.0f, 0.8f);             // 상위 (왼쪽 위)
+			AddRoundRect(p, 5.4f, 7.5f, 1.2f, 4.5f, 0.3f);             // 상위 → 가로줄 (세로)
+			AddRoundRect(p, 5.4f, 12.0f, 14.2f, 1.2f, 0.3f);           // 가로줄
+			for (int i = 0; i < 3; ++i)
+			{
+				const float cx = 6.0f + i * 6.5f;
+				AddRoundRect(p, cx - 0.6f, 13.2f, 1.2f, 2.3f, 0.3f);   // 가로줄 → 하위 (세로)
+				AddRoundRect(p, cx - 2.8f, 15.5f, 5.6f, 4.8f, 0.8f);   // 하위
+			}
+		});
+	}
+
 	void ViewLabel(CDC* dc, const CRect& area, COLORREF col, double fill)
 	{
 		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
