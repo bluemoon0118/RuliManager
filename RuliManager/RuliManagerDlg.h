@@ -66,6 +66,9 @@ class CRuliManagerDlg : public CDialogEx, public IVideoGridOwner
 {
 public:
 	CRuliManagerDlg(CWnd* pParent = nullptr);
+	void ShowHelp(HWND active);   // F1: 설명서(help\index.html)를 지금 화면(active = 활성 창)에 맞는 장으로 열기
+	CString HelpTopic() const;     // 메인 창에서 지금 보는 화면 → 설명서 장 이름 (index.html#…)
+	static void OpenHelpFile(const CString& topic);
 
 #ifdef AFX_DESIGN_TIME
 	enum { IDD = IDD_RULIMANAGER_DIALOG };

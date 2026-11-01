@@ -17,6 +17,13 @@
 ## v0.83 (현재)
 - 버전 0.82 → 0.83 (Version.h: APP_VERSION_MINOR 83, APP_VERSION_STR "0.83" → 창 제목 "RuliManager v0.83", 파일 버전 0.83.0.0)
 
+### 추가
+- F1 설명서: 어느 화면에서든 F1 을 누르면 `help\index.html` (설명서 - 화면 그림은 프로그램 색 · 배치를 본뜬 SVG 도식) 을 기본 브라우저로, 지금 화면에 맞는 장으로 엶
+  - 메인 창: 영상 / 배우 / 배우 출연작 / 제작사 / 제작사 영상 / 태그 / 컬렉션, 대화상자: 품번 관리 · 설정 · 배우 관리 · 제작사 관리 · 태그 관리 · 파일 관리 · 텍스트 입력 · 태그 연결 (모르는 창은 메인 화면 기준)
+  - CRuliManagerApp::PreTranslateMessage (F1, 모달 창 안에서도) → CRuliManagerDlg::ShowHelp / HelpTopic / OpenHelpFile - 브라우저 실행 파일(AssocQueryString http)에 `file:///…/index.html#장` 으로 넘김 (못 찾으면 장 없이 파일 열기)
+  - help 폴더 찾기: 실행 파일 폴더부터 위로 3단계 (개발 중 x64\Debug → 프로젝트 폴더의 help), 배포할 때는 RuliManager.exe 옆에 help 폴더를 함께 둠
+  - 설명서 원본: `help\build.py` (본문) · `figs.py` (그림) · `svg.py` (그리기 도우미) → `python build.py 0.83` 으로 index.html 다시 만듦
+
 ### 변경
 - 영상 오른쪽 클릭 [미리보기 만들기]: 분할 영상이면 모든 파트를 한 번에 대기열에 넣음 - 미리보기가 이미 있는 파트는 건너뛰고 없는 파트만, 모든 파트에 있으면 메뉴가 [미리보기 다시 만들기] 이고 모든 파트를 다시 만듦 (SplitPartItems)
 - 태그 탭 위쪽 정렬 콤보(이름 / 영상수)를 바꾸면 카드 스크롤을 맨 위로
