@@ -27,25 +27,28 @@ class CSeriesDlg;   // 품번 관리 창 (OpenSeriesManager)
 #include "YearView.h"
 #include "PreviewVideo.h"
 #include "TreemapView.h"
+#include "StudioTreeView.h"
 
 // 컬렉션 · 제작사 영상 화면 위쪽 정보 (배우 출연작 화면의 배우 정보 자리): 제목(크게) · 정보 줄 · 메모 + (제작사) 하위 레이블 이미지 칸
 //  - 더블클릭 = 편집 (m_onDblClick), 레이블 칸 더블클릭 = 그 레이블 영상 (m_onSubDblClick)
 class CCollectionInfoPanel : public CWnd
 {
 public:
-	struct SubItem { CString name; Gdiplus::Bitmap* img = nullptr; };
+	struct SubItem { CString name; Gdiplus::Bitmap* img = nullptr; COLORREF back = CLR_INVALID; };   // back: 칸 배경 (CLR_INVALID = 공통 색)
 	BOOL Create(CWnd* parent, UINT id);
 	void SetInfo(const CString& title, const CString& subLine, const CString& memo, bool favorite);
 	void SetSubItems(const CString& caption, const std::vector<SubItem>& items, COLORREF tileBack);   // 비우면 표시 안 함
 	std::function<void(int)> m_onSubDblClick;
 	void SetColors(COLORREF back, COLORREF text, COLORREF sub) { m_back = back; m_text = text; m_sub = sub; if (GetSafeHwnd()) Invalidate(FALSE); }
 	int  CalcHeight(int width);   // 지금 내용을 그리는 데 필요한 높이
+	void SetFitHeight(int h) { m_fitH = h; }   // 아래 칸 아래 끝을 이 높이에 맞춤 (0 = 기본 크기)
 	std::function<void()> m_onDblClick;
 
 protected:
 	CString  m_title, m_memo, m_subLine;
 	bool     m_fav = false;
 	CString  m_subCaption;
+	int      m_fitH = 0;               // 아래 칸 아래 끝 맞춤 높이 (왼쪽 커버 높이)
 	std::vector<SubItem> m_subs;
 	std::vector<CRect>   m_subRects;   // 마지막 배치의 레이블 칸 (클라이언트 좌표)
 	COLORREF m_tileBack = RGB(0x3E, 0x37, 0x56);
@@ -94,7 +97,7 @@ protected:
 	void UpdateModeButtons();
 	static inline const COLORREF& kScrollColor = TCOL(TC_SCROLL); // #6C7478 (스크롤바 배경)
 	static inline const COLORREF& kThumbBackColor = TCOL(TC_THUMB); // #2A353D (격자 이미지 배경)
-	CDarkScrollBar m_scrollBars[11];
+	CDarkScrollBar m_scrollBars[13];
 	void CreateScrollBars();
 	CListCtrl  m_list;
 	CEdit      m_editSearch;
@@ -121,13 +124,21 @@ protected:
 	void ShowVideoContextMenu(int row, CPoint point);   // 영상 오른쪽 클릭 메뉴 (격자 · 목록 · 연도별 공통)
 	afx_msg void OnBnClickedDrillViewGrid();
 	afx_msg void OnBnClickedDrillViewYear();
-	// 제작사 탭 보기: [격자] (바둑판) / [리스트] (줄마다 제작사 + 그 레이블) - 레지스트리 Settings\StudioView
-	CDarkButton m_studioViewBtns[2];
-	int  m_studioView = 0;              // 0 = 격자, 1 = 리스트
+	// 제작사 탭 보기: [격자] (바둑판) / [리스트] (줄마다 제작사 + 그 레이블) / [계층] (상위 → 하위 가로 트리) - 레지스트리 Settings\StudioView
+	CDarkButton m_studioViewBtns[3];
+	int  m_studioView = 0;              // 0 = 격자, 1 = 리스트, 2 = 계층
 	bool StudioListView() const { return m_mode == MODE_STUDIO && m_drill.IsEmpty() && m_studioView == 1; }
+	bool StudioTreeActive() const { return m_mode == MODE_STUDIO && m_drill.IsEmpty() && m_studioView == 2; }
 	void SetStudioView(int mode);
 	afx_msg void OnBnClickedStudioViewGrid();
 	afx_msg void OnBnClickedStudioViewList();
+	afx_msg void OnBnClickedStudioViewTree();
+	// [계층] 보기: 제작사 격자(m_catGrid)의 자식, 도구줄 아래 전체 - 노드는 m_catRows 의 제작사 (페이지 없이 전체)
+	CStudioTreeView m_studioTree;
+	void LayoutStudioTree();
+	void RebuildStudioTree();
+	void DrawStudioTreeNode(CDC* dc, int row, const CRect& rc, bool selected, bool hot);
+	void ShowStudioTreeMenu(int row, CPoint screen);
 	// 영상 보기: [가로] 격자 (기존 영상 카드) / [세로] 격자 (배우 카드처럼 세로 3:4, 이미지만) - 영상 탭 · 배우 출연작 · 제작사 영상 · 태그 영상 화면별로 저장
 	//  세로: 가로가 더 긴 이미지 = 오른쪽 절반, 세로가 더 긴 이미지 = 폭에 맞춰 비율 유지 (넘치면 위아래를 잘라 가운데)
 	CDarkButton m_videoViewBtns[2];
@@ -313,6 +324,8 @@ protected:
 	afx_msg void OnActorDelete();
 	afx_msg void OnVideoTextInfo();
 	afx_msg void OnVideoPasteInfo();
+	void PasteVideoInfoText(int idx, const CString& pasted);   // 웹페이지 붙여넣기 해석 ~ 적용 (붙여넣기 창 · 텍스트 파일 끌어다 놓기)
+	bool DropTextOnVideo(const CString& file, CPoint ptDlg);   // .txt 를 영상 카드 · 목록 줄에 놓음 → 그 영상에 웹페이지 붙여넣기 (처리했으면 true)
 	// 격자 빈곳 오른쪽 클릭 → 새 항목
 	afx_msg void OnNewActor();
 	afx_msg void OnNewStudio();
@@ -406,6 +419,7 @@ protected:
 	CRect      m_pkgHoverCard;            // 그 카드 (화면 좌표 - 움직이면 닫고 다시)
 	ULONGLONG  m_pkgHoverTick = 0;        // 올라간 시각 (0.25초 뒤 팝업)
 	ULONGLONG  m_pkgRepaintTick = 0;      // 팝업 다시 그린 시각 (커버를 읽는 중일 수 있어 0.25초마다)
+	bool       m_treeCardDraw = false;    // 제작사 [계층] 노드로 카드를 그리는 중 (격자 마우스 오버 표시 없음)
 	bool       m_popupCardDraw = false;   // 팝업에 카드를 그리는 중 (마우스 오버 표시 · 페이드 없음)
 	void CheckPackageHover();
 	// [패키지] 팝업 카드: 커버에 마우스 → 미리보기 (재생 창은 팝업의 자식, m_previewPlayers 를 같이 씀), 분할 영상은 파트 칸 (팝업에서 고름)
@@ -471,7 +485,7 @@ protected:
 	ULONGLONG m_totalVideoBytes = 0;   // 필터된 영상 전체 크기
 	int& CurPageRef();             // 지금 보이는 목록의 페이지 번호
 	int  CurTotal() const;         // 지금 보이는 목록의 전체 개수
-	int  EffPageSize() const { return (StudioListView() || VideoLabelActive()) ? 0 : m_pageSize; }   // 제작사 탭 [리스트] · 영상 [레이블] 보기: 페이지 나누지 않음 (전체)
+	int  EffPageSize() const { return (StudioListView() || StudioTreeActive() || VideoLabelActive()) ? 0 : m_pageSize; }   // 제작사 탭 [리스트] · 영상 [레이블] 보기: 페이지 나누지 않음 (전체)
 	int  PageCount(int total, int size = -1) const { if (size < 0) size = EffPageSize(); return (size <= 0 || total <= 0) ? 1 : (total + size - 1) / size; }
 	void SlicePage(int& page, int total, int& first, int& last, int size = -1) const;   // 페이지 범위 [first, last) (size < 0: 지금 탭 값)
 	void ResetCurPage() { CurPageRef() = 0; }

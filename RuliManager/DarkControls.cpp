@@ -1,4 +1,5 @@
 ﻿#include "pch.h"
+#include "TextDraw.h"   // TextFB::DrawFmt (일본 신자체 한자 대체 · 크기 보정)
 #include "DarkControls.h"
 #include "VectorIcons.h"
 #include <memory>
@@ -64,7 +65,7 @@ void CDarkCombo::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		dc.SetTextColor(IsWindowEnabled() ? textColor : Dim(textColor));
 		CFont* old = dc.SelectObject(GetFont());
 		rc.DeflateRect(4, 0);
-		dc.DrawText(text, &rc, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS);
+		TextFB::DrawFmt(&dc, text, &rc, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS);
 		dc.SelectObject(old);
 	}
 
@@ -267,7 +268,7 @@ void CDarkButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		// 설정 버튼: 글자 없이 가운데 톱니바퀴 (벡터)
 		VectorIcon::Gear(&dc, tr, disabled ? Dim(textColor) : textColor, 0.72, m_iconAngle);
 	}
-	else if (m_icon == ICON_VIEW_GRID || m_icon == ICON_VIEW_LIST || m_icon == ICON_VIEW_PACKAGE || m_icon == ICON_VIEW_YEAR || m_icon == ICON_VIEW_WALL || m_icon == ICON_VIEW_TREEMAP || m_icon == ICON_VIEW_LABEL)
+	else if (m_icon == ICON_VIEW_GRID || m_icon == ICON_VIEW_LIST || m_icon == ICON_VIEW_PACKAGE || m_icon == ICON_VIEW_YEAR || m_icon == ICON_VIEW_WALL || m_icon == ICON_VIEW_TREEMAP || m_icon == ICON_VIEW_LABEL || m_icon == ICON_VIEW_TREE)
 	{
 		// 보기 방식 버튼: 글자 없이 가운데 아이콘 (벡터)
 		const COLORREF ic = disabled ? Dim(textColor) : textColor;
@@ -277,6 +278,7 @@ void CDarkButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		else if (m_icon == ICON_VIEW_WALL) VectorIcon::ViewWall(&dc, tr, ic, 0.66);
 		else if (m_icon == ICON_VIEW_TREEMAP) VectorIcon::ViewTreemap(&dc, tr, ic, 0.66);
 		else if (m_icon == ICON_VIEW_LABEL) VectorIcon::ViewLabel(&dc, tr, ic, 0.66);
+		else if (m_icon == ICON_VIEW_TREE)  VectorIcon::ViewTree(&dc, tr, ic, 0.66);
 		else                               VectorIcon::ViewPackage(&dc, tr, ic, 0.66);
 	}
 	else if (m_icon == ICON_GENRE_OFF || m_icon == ICON_GENRE_ON)
@@ -350,11 +352,11 @@ void CDarkButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 			VectorIcon::GenderMale(&dc, sq, iconColor, 0.95);
 
 		CRect textRc(left + iconW + gap, tr.top, tr.right, tr.bottom);
-		dc.DrawText(text, &textRc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+		TextFB::DrawFmt(&dc, text, &textRc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 	}
 	else
 	{
-		dc.DrawText(text, &tr, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+		TextFB::DrawFmt(&dc, text, &tr, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 	}
 	dc.SelectObject(oldFont);
 
@@ -679,7 +681,7 @@ void CDarkDateTime::OnPaint()
 		CRect hl(tr.left - 2, 3, (std::min)(static_cast<int>(tr.left) + tw + 2, static_cast<int>(tr.right)), rc.bottom - 3);   // CRect 는 LONG
 		mem.FillSolidRect(&hl, TCOL(TC_HILITE));
 	}
-	mem.DrawText(text, &tr, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
+	TextFB::DrawFmt(&mem, text, &tr, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
 
 	mem.SelectObject(oldFont);
 	dc.BitBlt(0, 0, rc.Width(), rc.Height(), &mem, 0, 0, SRCCOPY);
@@ -1437,19 +1439,19 @@ void CDarkCheck::PaintTo(CDC* dc)
 	{
 		// 여러 줄: 높이를 재서 세로 가운데
 		CRect calc = tr;
-		dc->DrawText(text, calc, DT_WORDBREAK | DT_CALCRECT | (hidePrefix ? DT_HIDEPREFIX : 0));
+		TextFB::DrawFmt(dc, text, calc, DT_WORDBREAK | DT_CALCRECT | (hidePrefix ? DT_HIDEPREFIX : 0));
 		tr.top += (tr.Height() - calc.Height()) / 2;
 		tr.bottom = tr.top + calc.Height();
 		fmt = DT_WORDBREAK | DT_LEFT | (hidePrefix ? DT_HIDEPREFIX : 0);
 	}
 	else
 		fmt |= DT_SINGLELINE;
-	dc->DrawText(text, tr, fmt);
+	TextFB::DrawFmt(dc, text, tr, fmt);
 	// 키보드 포커스: 글자 둘레 점선 (마우스로 누를 때는 표시 안 함)
 	if (GetFocus() == this && !(::SendMessageW(m_hWnd, WM_QUERYUISTATE, 0, 0) & UISF_HIDEFOCUS) && !text.IsEmpty())
 	{
 		CRect fr = tr;
-		dc->DrawText(text, fr, (fmt & ~DT_VCENTER) | DT_CALCRECT);
+		TextFB::DrawFmt(dc, text, fr, (fmt & ~DT_VCENTER) | DT_CALCRECT);
 		const int h = fr.Height();
 		fr.OffsetRect(0, (tr.Height() - h) / 2 - (fr.top - tr.top));
 		fr.InflateRect(2, 1);

@@ -3596,7 +3596,7 @@ bool CVideoLibrary::SyncNamedFromVideos()
 		if (v.series.IsEmpty() && !v.code.IsEmpty())
 		{
 			// 품번 접두어가 등록된 시리즈면 그 시리즈로 (레이블 · 제작사는 아래에서 채움)
-			const CString s = SeriesForCode(v.code);
+			const CString s = SeriesForCode(v.code, v.studio);
 			if (!s.IsEmpty()) { v.series = s; fromCode = true; }
 		}
 		if (v.series.IsEmpty())
@@ -3663,7 +3663,30 @@ bool CVideoLibrary::SyncNamedFromVideos()
 		if (lb.IsEmpty() || v.code.IsEmpty())
 			continue;
 		int owner = -1, index = -1, part = -1;
-		if (SeriesSlotForCode(v.code, owner, index, part))
+		bool amb = false;
+		const bool found = SeriesSlotForCode(v.code, owner, index, part, nullptr, v.studio, &amb);
+		const int vs = v.studio.IsEmpty() ? -1 : FindNamed(LIST_STUDIO, v.studio);
+		if (!found && amb && vs < 0)
+			continue;   // 같은 접두어가 여러 제작사에 있는데 영상 제작사를 모름 → 어느 쪽인지 알 수 없어 건너뜀
+		if (found && vs >= 0 && owner < static_cast<int>(studios.size()) && owner != vs)
+		{
+			// 그 접두어 항목이 다른 제작사 하나뿐: 읽은 레이블이 그 항목 이름(레이블명 · 복합 레이블명 · 다른 이름)이면 그대로,
+			//  다른 이름이면 이 영상 제작사의 새 항목으로 (같은 접두어를 다른 제작사가 씀)
+			const std::vector<SeriesInfo> ol = ParseSeries(studios[owner].series);
+			bool same = false;
+			if (index >= 0 && index < static_cast<int>(ol.size()))
+			{
+				std::vector<CString> names = SplitLines(ol[index].altNames);
+				names.push_back(ol[index].label);
+				for (const SubLabel& sl : ol[index].subs)
+					names.push_back(sl.label);
+				for (CString nm : names)
+					if (nm.Trim().CompareNoCase(lb) == 0) { same = true; break; }
+			}
+			if (same)
+				continue;
+		}
+		else if (found)
 		{
 			// 이미 있는 품번: 레이블명이 다르면 그 항목의 "다른 이름" 에 추가 (레이블명 자체는 바꾸지 않음)
 			CString& series = (owner >= 0 && owner < static_cast<int>(studios.size())) ? studios[owner].series : looseSeries;
@@ -4204,10 +4227,10 @@ int CVideoLibrary::SubLabelIndex(const SeriesInfo& s, const CString& code)
 	return -1;
 }
 
-CString CVideoLibrary::LabelForCode(const CString& code) const
+CString CVideoLibrary::LabelForCode(const CString& code, const CString& studio) const
 {
 	SeriesInfo s;
-	if (code.IsEmpty() || !SeriesInfoForCode(code, s))
+	if (code.IsEmpty() || !SeriesInfoForCode(code, s, studio))
 		return CString();
 	CString l = s.label;
 	l.Trim();
@@ -4259,7 +4282,7 @@ void CVideoLibrary::RefreshDerivedLabels()
 			}
 		}
 	for (VideoItem& v : items)
-		v.label = LabelForCode(v.code);
+		v.label = LabelForCode(v.code, v.studio);   // 같은 접두어가 여러 제작사에 있으면 영상 제작사로
 }
 
 int CVideoLibrary::FillSeriesLabel(const CString& code, const CString& label)
@@ -4412,71 +4435,44 @@ bool CVideoLibrary::MigrateLabelsToSeries(CString* report)
 	return true;
 }
 
-CString CVideoLibrary::SeriesForCode(const CString& code) const
+CString CVideoLibrary::SeriesForCode(const CString& code, const CString& studio) const
 {
 	SeriesInfo s;
-	return SeriesInfoForCode(code, s) ? s.name : CString();
+	return SeriesInfoForCode(code, s, studio) ? s.name : CString();
 }
 
-bool CVideoLibrary::SeriesInfoForCode(const CString& code, SeriesInfo& out) const
+bool CVideoLibrary::SeriesInfoForCode(const CString& code, SeriesInfo& out, const CString& studio, bool* ambiguous) const
 {
-	CString c = code;
-	c.Trim();
-	c.MakeUpper();
-	if (c.IsEmpty())
+	int owner = -1, index = -1, part = -1, sub = -1;
+	if (!SeriesSlotForCode(code, owner, index, part, &sub, studio, ambiguous))
 		return false;
-	// 품번의 접두어: '-' 앞 (없으면 앞쪽 영문자)
-	CString prefix;
-	const int dash = c.Find(L'-');
-	if (dash > 0)
-		prefix = c.Left(dash);
-	else
-		for (int i = 0; i < c.GetLength() && iswalpha(c[i]); ++i) prefix += c[i];
-	auto match = [&](const std::vector<SeriesInfo>& list) -> bool
-	{
-		for (const SeriesInfo& s : list)
-		{
-			for (CString p : SplitList(s.name))   // 시리즈 이름 = 품번 접두어 (쉼표로 여러 개도 가능)
-			{
-				p.Trim();
-				p.MakeUpper();
-				p.TrimRight(L'-');
-				if (p.IsEmpty())
-					continue;
-				if (p == prefix || (p.Find(L'-') > 0 && c.Left(p.GetLength()) == p))   // "SONE" 또는 "SONE-4" 처럼 더 긴 접두어
-				{
-					out = s;
-					if (s.composite)
-					{
-						// 복합 레이블: 뒷번호가 맞는 레이블 (없으면 레이블 없음)
-						const int k = SubLabelIndex(s, c);
-						out.label = (k >= 0) ? s.subs[k].label : CString();
-					}
-					return true;
-				}
-			}
-		}
+	const std::vector<SeriesInfo> list = ParseSeries(owner < static_cast<int>(studios.size()) ? studios[owner].series : looseSeries);
+	if (index < 0 || index >= static_cast<int>(list.size()))
 		return false;
-	};
-	for (const NamedInfo& lb : labelInfos)
-		if (match(ParseSeries(lb.series))) return true;
-	for (const NamedInfo& st : studios)
-		if (match(ParseSeries(st.series))) return true;
-	if (match(ParseSeries(looseSeries))) return true;   // 제작사 없는 항목
-	return false;
+	out = list[index];
+	if (out.composite)
+		out.label = (sub >= 0 && sub < static_cast<int>(out.subs.size())) ? out.subs[sub].label : CString();   // 복합: 뒷번호가 맞는 레이블 (없으면 레이블 없음)
+	return true;
 }
 
-bool CVideoLibrary::SeriesSlotForCode(const CString& code, int& owner, int& index, int& part, int* sub) const
+bool CVideoLibrary::SeriesSlotForCode(const CString& code, int& owner, int& index, int& part, int* sub, const CString& studio, bool* ambiguous) const
 {
+	// 품번 접두어가 맞는 품번 DB 항목 - 같은 접두어가 여러 제작사에 있으면 영상의 제작사(studio)로 고름
+	//  - 하나뿐: 그 항목 (제작사와 상관없이)
+	//  - 여러 개: 제작사가 같은 항목, 없으면 찾지 못함 (*ambiguous = true → 레이블 없음, 제작사를 넣어야 함)
 	if (sub)
 		*sub = -1;
+	if (ambiguous)
+		*ambiguous = false;
 	CString c = code;
 	c.Trim();
 	c.MakeUpper();
 	const CString prefix = CodePrefixOf(code);
 	if (c.IsEmpty() || prefix.IsEmpty())
 		return false;
-	auto match = [&](const CString& series, int o) -> bool
+	struct Hit { int owner, index, part, sub; };
+	std::vector<Hit> hits;
+	auto scan = [&](const CString& series, int o)
 	{
 		const std::vector<SeriesInfo> list = ParseSeries(series);
 		for (size_t i = 0; i < list.size(); ++i)
@@ -4487,27 +4483,49 @@ bool CVideoLibrary::SeriesSlotForCode(const CString& code, int& owner, int& inde
 				p.Trim();
 				p.MakeUpper();
 				p.TrimRight(L'-');
-				if (!p.IsEmpty() && (p == prefix || (p.Find(L'-') > 0 && c.Left(p.GetLength()) == p)))
+				if (!p.IsEmpty() && (p == prefix || (p.Find(L'-') > 0 && c.Left(p.GetLength()) == p)))   // "SONE" 또는 "SONE-4" 처럼 더 긴 접두어
 				{
-					owner = o;
-					index = static_cast<int>(i);
-					part = pi;
-					if (sub && list[i].composite)
+					Hit h = { o, static_cast<int>(i), pi, -1 };
+					if (list[i].composite)
 					{
 						const int k = SubLabelIndex(list[i], c);
-						*sub = (k >= 0) ? k : -2;   // 복합: 맞는 뒷번호가 없으면 -2 (레이블 없음)
+						h.sub = (k >= 0) ? k : -2;   // 복합: 맞는 뒷번호가 없으면 -2 (레이블 없음)
 					}
-					return true;
+					hits.push_back(h);
+					return;   // 한 제작사(목록)에서는 첫 항목만 (같은 제작사 안에서는 접두어가 겹치지 않음)
 				}
 				++pi;
 			}
 		}
-		return false;
 	};
 	for (size_t s = 0; s < studios.size(); ++s)
-		if (match(studios[s].series, static_cast<int>(s)))
-			return true;
-	return match(looseSeries, static_cast<int>(studios.size()));
+		scan(studios[s].series, static_cast<int>(s));
+	scan(looseSeries, static_cast<int>(studios.size()));   // 제작사 없는 항목
+	if (hits.empty())
+		return false;
+	const Hit* pick = nullptr;
+	if (hits.size() == 1)
+		pick = &hits[0];
+	else
+	{
+		CString st = studio;
+		st.Trim();
+		const int sn = st.IsEmpty() ? -1 : FindStudioLoose(st);
+		for (const Hit& h : hits)
+			if (sn >= 0 && h.owner == sn) { pick = &h; break; }
+		if (!pick)
+		{
+			if (ambiguous)
+				*ambiguous = true;
+			return false;
+		}
+	}
+	owner = pick->owner;
+	index = pick->index;
+	part = pick->part;
+	if (sub)
+		*sub = pick->sub;
+	return true;
 }
 
 bool CVideoLibrary::SeriesRegistered(const CString& series) const
@@ -6618,7 +6636,7 @@ CString CVideoLibrary::ParsePastedActorText(const CString& raw)
 
 CString CVideoLibrary::ExtractCode(const CString& name)
 {
-	// 영문 2~6자 + (- 또는 _ 또는 없음) + 숫자 2~5자  →  "ABC-123" (대문자)
+	// 영문 2~6자 + (- 또는 _ 또는 없음) + 숫자 2~6자  →  "ABC-123" (대문자) - 6자리 예: HODV-021348
 	//  - [2024.12.10] 같은 대괄호 날짜 · 해상도(1080p) 는 숫자 앞에 영문이 없어 걸리지 않음
 	const int n = name.GetLength();
 	for (int i = 0; i < n; ++i)
@@ -6638,12 +6656,46 @@ CString CVideoLibrary::ExtractCode(const CString& name)
 		int m = k;
 		while (m < n && isDigit(name[m])) ++m;
 		const int digits = m - k;
-		if (digits < 2 || digits > 5 || (m < n && isAlpha(name[m]) && !(m + 1 >= n || !isAlpha(name[m + 1]))))
+		if (digits < 2 || digits > 6 || (m < n && isAlpha(name[m]) && !(m + 1 >= n || !isAlpha(name[m + 1]))))
 			continue;   // 숫자 뒤에 영문 단어가 이어지면(예: 1080p 이외의 긴 단어) 제외
 		CString prefix = name.Mid(i, letters);
 		prefix.MakeUpper();
 		if (prefix == L"MP" || prefix == L"HD" || prefix == L"FHD" || prefix == L"UHD" || prefix == L"CD" || prefix == L"PART")
 			continue;   // 품번이 아닌 흔한 표기
+		return prefix + L"-" + name.Mid(k, digits);
+	}
+	// 2차: 영문 · 숫자가 섞인 접두어 + "-" 또는 "_" + 숫자 2~6자  예) T28-498, S2M-012, 300MIUM-123, 259LUXU_1500
+	//  - 접두어: 단어 시작부터 영문 · 숫자 2~10자 (영문 1자 이상 · 숫자 1자 이상), 구분자 필수 (숫자만 이어지면 접두어와 번호를 나눌 수 없음)
+	//  - 코덱 · 형식 표기(H264, X265, MP4 …)는 제외
+	for (int i = 0; i < n; ++i)
+	{
+		auto isAlpha = [](wchar_t ch) { return (ch >= L'A' && ch <= L'Z') || (ch >= L'a' && ch <= L'z'); };
+		auto isDigit = [](wchar_t ch) { return ch >= L'0' && ch <= L'9'; };
+		if (!(isAlpha(name[i]) || isDigit(name[i])) || (i > 0 && (isAlpha(name[i - 1]) || isDigit(name[i - 1]))))
+			continue;   // 단어 시작에서만
+		int j = i, letters = 0, nums = 0;
+		while (j < n && (isAlpha(name[j]) || isDigit(name[j])))
+		{
+			if (isAlpha(name[j])) ++letters; else ++nums;
+			++j;
+		}
+		const int len = j - i;
+		if (len < 2 || len > 10 || letters < 1 || nums < 1 || j >= n || (name[j] != L'-' && name[j] != L'_'))
+			continue;
+		const int k = j + 1;
+		int m = k;
+		while (m < n && isDigit(name[m])) ++m;
+		const int digits = m - k;
+		if (digits < 2 || digits > 6 || (m < n && isAlpha(name[m]) && !(m + 1 >= n || !isAlpha(name[m + 1]))))
+			continue;
+		CString prefix = name.Mid(i, len);
+		prefix.MakeUpper();
+		static const wchar_t* const kNotCode[] = { L"H264", L"H265", L"X264", L"X265", L"MP4", L"MP3", L"M4V", L"AAC2", L"AC3", L"DTS5", L"HEVC10", L"4K60", L"8K60" };
+		bool skip = false;
+		for (const wchar_t* w : kNotCode)
+			if (prefix == w) { skip = true; break; }
+		if (skip || (isDigit(prefix[0]) && letters == 1 && (prefix.Right(1) == L"P" || prefix.Right(1) == L"K")))
+			continue;   // 1080P · 720P · 4K 같은 해상도 표기
 		return prefix + L"-" + name.Mid(k, digits);
 	}
 	return CString();

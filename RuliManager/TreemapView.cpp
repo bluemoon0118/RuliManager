@@ -289,7 +289,7 @@ void CTreemapView::OnPaint()
 	if (m_items.empty())
 	{
 		mem.SetTextColor(Mix(m_text, m_back, 0.45));
-		mem.DrawText(m_emptyText, -1, &client, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+		TextFB::DrawFmt(&mem, m_emptyText, -1, &client, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 	}
 
 	TEXTMETRIC tm = {};

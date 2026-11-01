@@ -1,4 +1,5 @@
 ﻿#include "pch.h"
+#include "TextDraw.h"   // TextFB::DrawFmt (일본 신자체 한자 대체 · 크기 보정)
 #include "VideoGrid.h"
 #include <algorithm>
 #include "DarkControls.h"
@@ -813,7 +814,7 @@ void CVideoGrid::OnPaint()
 		mem.SetTextColor(m_sub);
 		CRect emptyRc = client;
 		emptyRc.top = (std::max)(emptyRc.top, static_cast<LONG>(m_headerH - m_scroll));
-		mem.DrawText(L"표시할 동영상이 없습니다.", -1, &emptyRc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+		TextFB::DrawFmt(&mem, L"표시할 동영상이 없습니다.", -1, &emptyRc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 	}
 
 	// 다시 그릴 영역(스크롤로 새로 드러난 띠 등)에 걸친 줄만 그림
@@ -898,19 +899,19 @@ void CVideoGrid::OnPaint()
 
 			mem.SelectObject(bold);
 			mem.SetTextColor(m_text);
-			mem.DrawText(name, &text, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+			TextFB::DrawFmt(&mem, name, &text, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
 
 			mem.SelectObject(normal);
 			text.OffsetRect(0, m_lineH);
 			mem.SetTextColor(m_accent);
-			mem.DrawText(release, &text, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+			TextFB::DrawFmt(&mem, release, &text, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
 
 			text.OffsetRect(0, m_lineH);
 			text.bottom = text.top + m_lineH * 2;
 			memo.Replace(L"\r\n", L" ");
 			memo.Replace(L'\n', L' ');
 			mem.SetTextColor(m_sub);
-			mem.DrawText(memo, &text, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL | DT_END_ELLIPSIS | DT_NOPREFIX);
+			TextFB::DrawFmt(&mem, memo, &text, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL | DT_END_ELLIPSIS | DT_NOPREFIX);
 		}
 	}
 

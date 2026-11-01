@@ -338,7 +338,7 @@ void CYearView::OnPaint()
 	{
 		mem.SetTextColor(m_label);
 		CRect tr = rc;
-		mem.DrawText(L"영상 없음", tr, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+		TextFB::DrawFmt(&mem, L"영상 없음", tr, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 	}
 	else
 	{
@@ -435,7 +435,7 @@ void CYearView::OnPaint()
 			const int saved = mem.SaveDC();
 			mem.IntersectClipRect(m_labelW, 0, rc.right, m_headH);
 			CRect tr(cx + m_gap, m_legendH, cx + cw, m_headH - 4);
-			mem.DrawText(label, tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+			TextFB::DrawFmt(&mem, label, tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 			mem.RestoreDC(saved);
 		}
 		mem.FillSolidRect(0, m_headH - 2, rc.Width(), 2, m_line);   // 머리글 밑줄
@@ -451,10 +451,10 @@ void CYearView::OnPaint()
 				{
 					mem.SetTextColor(m_label);
 					CRect ar(lx, 0, lx + 200, m_legendH);
-					mem.DrawText(L"→", ar, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_CALCRECT);
+					TextFB::DrawFmt(&mem, L"→", ar, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_CALCRECT);
 					const int aw = ar.Width();
 					ar = CRect(lx, 0, lx + aw, m_legendH);
-					mem.DrawText(L"→", ar, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+					TextFB::DrawFmt(&mem, L"→", ar, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 					lx += aw + 8;
 				}
 				const int sy = (m_legendH - sw) / 2;

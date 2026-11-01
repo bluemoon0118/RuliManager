@@ -781,12 +781,12 @@ void CGenreChipBar::OnPaint()
 		const int cw = count.IsEmpty() ? 0 : mem.GetTextExtent(count).cx;
 		CRect tr(r.left + kGenrePadX, r.top, r.right - kGenrePadX - (cw > 0 ? cw + kGenreCountGap : 0), r.bottom);
 		mem.SetTextColor((sel || hot || tagChip) ? RGB(255, 255, 255) : TCOL(TC_TEXT));
-		mem.DrawText(name, tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+		TextFB::DrawFmt(&mem, name, tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 		if (cw > 0)
 		{
 			CRect cr(r.right - kGenrePadX - cw, r.top, r.right - kGenrePadX, r.bottom);
 			mem.SetTextColor((sel || hot) ? RGB(255, 225, 225) : (tagChip ? RGB(205, 240, 220) : TCOL(TC_SUB2)));
-			mem.DrawText(count, cr, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+			TextFB::DrawFmt(&mem, count, cr, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 		}
 	}
 	paint.BitBlt(0, 0, rc.Width(), rc.Height(), &mem, 0, 0, SRCCOPY);

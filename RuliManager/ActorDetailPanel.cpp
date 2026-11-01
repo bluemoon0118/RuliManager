@@ -713,7 +713,7 @@ int CActorDetailPanel::MemoHeight(CDC& dc, int width)
 	TEXTMETRIC tm = {};
 	dc.GetTextMetrics(&tm);
 	CRect r(0, 0, width, 0);
-	dc.DrawText(m_memo, r, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL | DT_NOPREFIX | DT_CALCRECT);
+	TextFB::DrawFmt(&dc, m_memo, r, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL | DT_NOPREFIX | DT_CALCRECT);
 	dc.SelectObject(old);
 	const int maxH = tm.tmHeight * 8;   // 너무 길면 8줄까지만 (나머지는 … 로)
 	return (std::min)(static_cast<int>(r.Height()), maxH);
@@ -787,7 +787,7 @@ void CActorDetailPanel::OnPaint()
 	{
 		mem.SetTextColor(m_label);
 		CRect tr(0, 0, rc.right, rowH);
-		mem.DrawText(L"(선택된 배우 없음)", tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+		TextFB::DrawFmt(&mem, L"(선택된 배우 없음)", tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 	}
 	else
 	{
@@ -815,7 +815,7 @@ void CActorDetailPanel::OnPaint()
 		{
 			const int rh = r.links.empty() ? infoH : LinkRowHeight(rowH);   // 이 줄 높이 (링크 줄은 아이콘 크기만큼)
 			mem.SetTextColor(m_label);
-			mem.DrawText(r.label, CRect(0, y, labelW, y + rh), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+			TextFB::DrawFmt(&mem, r.label, CRect(0, y, labelW, y + rh), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 			mem.SetTextColor(m_text);
 			CRect vr(labelW, y, rowRight, y + rh);
 			if (!r.symbol.IsEmpty())
@@ -837,7 +837,7 @@ void CActorDetailPanel::OnPaint()
 				CCountryCombo::DrawFlag(&mem, r.flag, vr.left, y + (rh - fh) / 2, fh);
 				CRect tr = vr;
 				tr.left += fw + 6;
-				mem.DrawText(r.value, tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+				TextFB::DrawFmt(&mem, r.value, tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 			}
 			else if (!r.links.empty())
 			{
@@ -940,9 +940,9 @@ void CActorDetailPanel::OnPaint()
 			mem.SelectObject(InfoFont());
 			mem.SetTextColor(TCOL(TC_LIGHT));
 			CRect mr(sx, nameH + 4, rc.right, rc.bottom);
-			mem.DrawText(m_memo, mr, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL | DT_END_ELLIPSIS | DT_NOPREFIX);
+			TextFB::DrawFmt(&mem, m_memo, mr, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL | DT_END_ELLIPSIS | DT_NOPREFIX);
 			CRect full(mr.left, mr.top, mr.right, mr.top);
-			mem.DrawText(m_memo, full, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL | DT_NOPREFIX | DT_CALCRECT);
+			TextFB::DrawFmt(&mem, m_memo, full, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL | DT_NOPREFIX | DT_CALCRECT);
 			if (full.Height() > mr.Height())
 				m_textTips.push_back({ mr, m_memo });   // 메모가 잘림 → 마우스를 올리면 전체 메모
 		}
@@ -953,9 +953,9 @@ void CActorDetailPanel::OnPaint()
 			mem.SelectObject(InfoFont());
 			mem.SetTextColor(TCOL(TC_LIGHT));
 			CRect mr(0, y + 8, rc.right, y + 8 + mh);
-			mem.DrawText(m_memo, mr, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL | DT_END_ELLIPSIS | DT_NOPREFIX);
+			TextFB::DrawFmt(&mem, m_memo, mr, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL | DT_END_ELLIPSIS | DT_NOPREFIX);
 			CRect full(mr.left, mr.top, mr.right, mr.top);
-			mem.DrawText(m_memo, full, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL | DT_NOPREFIX | DT_CALCRECT);
+			TextFB::DrawFmt(&mem, m_memo, full, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL | DT_NOPREFIX | DT_CALCRECT);
 			const int visibleBottom = (std::min)(static_cast<int>(mr.bottom), static_cast<int>(rc.bottom));   // 패널 아래로 넘친 부분도 잘린 것
 			if (full.bottom > visibleBottom)
 				m_textTips.push_back({ CRect(mr.left, mr.top, mr.right, visibleBottom), m_memo });   // 메모가 잘림 → 전체 메모
@@ -1060,7 +1060,7 @@ void CLinkBar::OnPaint()
 	const int h = rc.Height();
 	const CString cap = L"링크:";
 	const int capW = mem.GetTextExtent(cap).cx;
-	mem.DrawText(cap, CRect(0, 0, capW + 2, h), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+	TextFB::DrawFmt(&mem, cap, CRect(0, 0, capW + 2, h), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 	// 아이콘: 줄 높이에 맞춘 정사각형 (위아래 2px 여백, 예전의 1.5배), 사이에 가는 세로 구분선, 넘치면 생략
 	const int sz = (std::max)(18, h - 4);
 	const int sepGap = 7;

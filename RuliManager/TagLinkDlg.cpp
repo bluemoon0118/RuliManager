@@ -243,8 +243,8 @@ void CTagLinkView::OnPaint()
 	lt.Format(L"%s (%d)", static_cast<LPCWSTR>(m_headCur), static_cast<int>(m_all.size()));
 	CString rt;
 	rt.Format(L"%s (%d)", static_cast<LPCWSTR>(m_headWeb), static_cast<int>(m_web.size()));
-	mem.DrawText(lt, hl, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-	mem.DrawText(rt, hr, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+	TextFB::DrawFmt(&mem, lt, hl, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+	TextFB::DrawFmt(&mem, rt, hr, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 	mem.FillSolidRect(m_pad, m_headH - 1, rc.Width() - m_pad * 2, 1, TCOL(TC_BORDER));
 
 	std::vector<bool> linkedTag(m_all.size(), false);

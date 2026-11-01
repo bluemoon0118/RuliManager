@@ -790,19 +790,19 @@ void CMediaInfoLabel::OnPaint()
 		mem.SetTextColor(m_sub);
 		if (leftW)
 		{
-			mem.DrawText(left, CRect(x, rc.top, x + leftW, rc.bottom), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+			TextFB::DrawFmt(&mem, left, CRect(x, rc.top, x + leftW, rc.bottom), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 			x += leftW;
 		}
 		if (sepW)
 		{
-			mem.DrawText(sep, CRect(x, rc.top, x + sepW, rc.bottom), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+			TextFB::DrawFmt(&mem, sep, CRect(x, rc.top, x + sepW, rc.bottom), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 			x += sepW;
 		}
 		if (resW)
 		{
 			mem.SelectObject(&m_bold);
 			mem.SetTextColor(m_text);
-			mem.DrawText(res, CRect(x, rc.top, x + resW, rc.bottom), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+			TextFB::DrawFmt(&mem, res, CRect(x, rc.top, x + resW, rc.bottom), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 		}
 		mem.SelectObject(old);
 	}
