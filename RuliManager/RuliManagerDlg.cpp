@@ -19,7 +19,9 @@
 #include "TextDraw.h"
 
 #include <uxtheme.h>
+#include <shlwapi.h>
 #pragma comment(lib, "uxtheme.lib")
+#pragma comment(lib, "shlwapi.lib")   // AssocQueryString (F1 설명서를 기본 브라우저로)
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "msimg32.lib")   // AlphaBlend (영상 카드 덧그림 페이드)
 
@@ -18951,4 +18953,78 @@ void CRuliManagerDlg::OnBnClickedExportTxt()
 	msg.Format(L"정보 txt 생성 완료\n\n영상: %d개 생성/갱신, %d개 변경 없음%s\n배우: %d개 생성/갱신, %d개 변경 없음, 배우 폴더 없음 %d명%s",
 		vWritten, vSame, static_cast<LPCWSTR>(vFailText), aWritten, aSame, aNoFolder, static_cast<LPCWSTR>(aFailText));
 	AfxMessageBox(msg, (vFail || aFail) ? MB_ICONWARNING : MB_ICONINFORMATION);
+}
+
+// ---------------------------------------------------------------------------
+// F1 설명서: help\index.html (프로그램 폴더 또는 그 위 폴더) 을 기본 브라우저로, 화면에 맞는 장(#topic)으로
+
+CString CRuliManagerDlg::HelpTopic() const
+{
+	switch (m_mode)
+	{
+	case MODE_ACTOR:      return m_drill.IsEmpty() ? L"actor" : L"actor-drill";
+	case MODE_STUDIO:     return m_drill.IsEmpty() ? L"studio" : L"studio-drill";
+	case MODE_TAG:        return L"tag";
+	case MODE_COLLECTION: return L"collection";
+	default:              return L"video";
+	}
+}
+
+void CRuliManagerDlg::ShowHelp(HWND active)
+{
+	// 떠 있는 창(대화상자)에 맞는 장 - 모르는 창이면 메인 화면 기준
+	CString topic = HelpTopic();
+	CWnd* w = active ? CWnd::FromHandlePermanent(active) : nullptr;
+	if (dynamic_cast<CSeriesDlg*>(w))           topic = L"series";
+	else if (dynamic_cast<CSettingsDlg*>(w))    topic = L"settings";
+	else if (dynamic_cast<CActorDlg*>(w))       topic = L"manage-actor";
+	else if (dynamic_cast<CFileManageDlg*>(w))  topic = L"manage-file";
+	else if (dynamic_cast<CTextInfoDlg*>(w) || dynamic_cast<CTagLinkDlg*>(w)) topic = L"input";
+	else if (dynamic_cast<CNameListDlg*>(w))
+	{
+		CString title;
+		w->GetWindowText(title);
+		topic = (title.Find(L"태그") >= 0) ? L"manage-tag" : L"manage-studio";
+	}
+	OpenHelpFile(topic);
+}
+
+void CRuliManagerDlg::OpenHelpFile(const CString& topic)
+{
+	// help\index.html 찾기: 실행 파일 폴더부터 위로 3단계 (개발 중에는 x64\Debug → 프로젝트 폴더)
+	wchar_t exe[MAX_PATH] = {};
+	::GetModuleFileNameW(nullptr, exe, MAX_PATH);
+	CString dir(exe);
+	CString file;
+	for (int up = 0; up <= 3 && file.IsEmpty(); ++up)
+	{
+		const int slash = dir.ReverseFind(L'\\');
+		if (slash < 0)
+			break;
+		dir = dir.Left(slash);
+		const CString cand = dir + L"\\help\\index.html";
+		if (::PathFileExistsW(cand))
+			file = cand;
+	}
+	if (file.IsEmpty())
+	{
+		AfxMessageBox(L"설명서 파일(help\\index.html)을 찾을 수 없습니다.\n\n"
+			L"프로그램(RuliManager.exe) 폴더에 help 폴더를 함께 두세요.", MB_ICONINFORMATION);
+		return;
+	}
+	// file:///D:/…/index.html#topic - 파일을 그냥 열면 #장 이 빠지므로 브라우저 실행 파일에 주소로 넘김
+	CString url = L"file:///" + file;
+	url.Replace(L'\\', L'/');
+	url.Replace(L" ", L"%20");
+	if (!topic.IsEmpty())
+		url += L"#" + topic;
+	wchar_t browser[MAX_PATH] = {};
+	DWORD len = MAX_PATH;
+	if (SUCCEEDED(::AssocQueryStringW(ASSOCF_NONE, ASSOCSTR_EXECUTABLE, L"http", L"open", browser, &len)) && browser[0])
+	{
+		const CString args = L"\"" + url + L"\"";
+		if (reinterpret_cast<INT_PTR>(::ShellExecuteW(nullptr, L"open", browser, args, nullptr, SW_SHOWNORMAL)) > 32)
+			return;
+	}
+	::ShellExecuteW(nullptr, L"open", file, nullptr, nullptr, SW_SHOWNORMAL);   // 브라우저를 못 찾으면 장 없이 열기
 }

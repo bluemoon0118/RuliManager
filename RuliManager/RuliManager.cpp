@@ -16,6 +16,23 @@ CRuliManagerApp::CRuliManagerApp()
 
 CRuliManagerApp theApp;
 
+BOOL CRuliManagerApp::PreTranslateMessage(MSG* pMsg)
+{
+	// F1: 지금 화면(떠 있는 대화상자면 그 창)에 맞는 설명서 장을 브라우저로 - 모달 창 안에서도 이 함수를 거침
+	if (pMsg->message == WM_KEYDOWN && pMsg->wParam == VK_F1
+		&& !(::GetKeyState(VK_CONTROL) & 0x8000) && !(::GetKeyState(VK_SHIFT) & 0x8000) && !(::GetKeyState(VK_MENU) & 0x8000))
+	{
+		CRuliManagerDlg* dlg = dynamic_cast<CRuliManagerDlg*>(m_pMainWnd);
+		if (dlg && dlg->GetSafeHwnd())
+		{
+			if (!(pMsg->lParam & 0x40000000))   // 누르고 있어서 반복되는 키는 무시
+				dlg->ShowHelp(::GetActiveWindow());
+			return TRUE;
+		}
+	}
+	return CWinApp::PreTranslateMessage(pMsg);
+}
+
 BOOL CRuliManagerApp::InitInstance()
 {
 	INITCOMMONCONTROLSEX icc = { sizeof(icc), ICC_WIN95_CLASSES | ICC_STANDARD_CLASSES };

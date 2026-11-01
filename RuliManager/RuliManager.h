@@ -12,6 +12,7 @@ public:
 	CRuliManagerApp();
 
 	virtual BOOL InitInstance();
+	virtual BOOL PreTranslateMessage(MSG* pMsg);   // F1 = 설명서 (메인 창 · 떠 있는 대화상자 모두)
 
 	bool m_restart = false;   // 창을 닫은 뒤 프로그램을 다시 시작 (설정 창에서 테마를 바꿈)
 
