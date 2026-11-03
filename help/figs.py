@@ -543,3 +543,39 @@ def fig_collection():
         s.video_card(0, 0, 136, f'영상 {i + 1}', f'ABC-{200 + i}', actors=1, tags=2)
         s.add('</g>')
     return s.render()
+
+
+def fig_video_check():
+    s = Svg(880, 360, '영상 검사 창')
+    s.window(0, 0, 880, 360, '영상 검사')
+    s.text(12, 50, '검사 방식', 10, SUB)
+    s.edit(70, 36, 230, '빠른 검사 (곳곳 몇 군데 · 1편에 몇 초) ▾', 20, 10)
+    x = 308
+    for t, w, c in (('시작', 50, ACC), ('중단', 50, ACC), ('선택 삭제', 66, DANGER), ('끝난 항목 지우기', 104, ACC)):
+        s.button(x, 36, w, t, c)
+        x += w + 6
+    s.button(808, 36, 60, '닫기', ACC)
+    s.rect(12, 66, 856, 22, COMBO, r=0)
+    for cx, t in ((20, '파일'), (270, '상태'), (360, '결과'), (650, '폴더')):
+        s.text(cx, 81, t, 10, TEXT, weight='bold')
+    rows = [('ABC-101.mp4', '정상', '#3DCC91', '정상 (빠른 검사 9곳)'),
+            ('ABC-102.mkv', '의심', '#F29D49', '의심 - 실패 1곳 · 오류 3줄'),
+            ('ABC-103_1.mp4', '손상', '#FF7373', '손상 - 9곳 중 7곳을 풀 수 없음'),
+            ('ABC-104.mp4', '검사 중 42%', '#48AFF0', '빠른 검사 중...'),
+            ('ABC-105.avi', '대기', TEXT, ''),
+            ('ABC-106.mp4', '대기', TEXT, '')]
+    y = 88
+    for i, (f, st, col, res) in enumerate(rows):
+        s.rect(12, y, 856, 22, ACC if i == 1 else BACK, r=0, op=0.9 if i == 1 else 1)
+        s.text(20, y + 15, f, 10, TEXT)
+        s.text(270, y + 15, st, 10, col, weight='bold')
+        s.text(360, y + 15, res, 10, col)
+        s.text(650, y + 15, 'D:\\Videos\\…', 10, SUB)
+        y += 22
+    s.rect(12, y + 8, 856, 92, EDIT, EDGE, r=2)
+    for k, t in enumerate(('D:\\Videos\\ABC-102.mkv', '빠른 검사 · 의심', '의심 - 실패 1곳 · 오류 3줄',
+                           '길이: 2:03:15 · 스트림 2개 (영상 1개) / 구간 검사: 9곳 중 1곳 실패 (1:49:24)',
+                           '[1:49:24] [h264 @ …] error while decoding MB 23 41')):
+        s.text(20, y + 24 + k * 16, t, 10, SUB if k else TEXT)
+    s.text(12, 346, '대기 2 · 정상 1 · 의심 1 · 손상 1   ▶ 검사 중: ABC-104.mp4 (42%)', 10, SUB)
+    return s.render()

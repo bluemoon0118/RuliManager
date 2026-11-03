@@ -17,6 +17,7 @@ namespace VectorIcon
 	void PlayCircle(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);  // 원 + 재생 (영상 수)
 	void Gear(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0, double rotateDeg = 0.0);   // rotateDeg: 시계 방향 회전 (돌아가는 톱니바퀴)
 	void Copy(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);        // 겹친 두 장 (복사 - 품번 복사 버튼)
+	void Inspect(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);     // 돋보기 + 재생 (영상 검사 - 메뉴 · 검사 창 아이콘)
 	// 메뉴 아이콘 (오른쪽 클릭 메뉴 왼쪽 - DarkMenu)
 	void Trash(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);       // 휴지통 (삭제)
 	void MinusCircle(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0); // 원 + 빼기 (컬렉션에서 빼기)

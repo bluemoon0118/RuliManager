@@ -1553,11 +1553,12 @@ namespace
 	// 메뉴 글자 → 아이콘 (위에서부터 먼저 맞는 것)
 	enum DarkMenuIcon { DMI_NONE = 0, DMI_UNCHECK, DMI_CHECKALL, DMI_TRASH, DMI_MINUS, DMI_ERASER, DMI_MERGE, DMI_PASTE, DMI_TEXT,
 		DMI_PICTURE, DMI_REFRESH, DMI_FOLDER, DMI_PLAY, DMI_COLLECTION, DMI_PLUS, DMI_PENCIL, DMI_GEAR, DMI_MOVIE, DMI_COPY,
-		DMI_ACTOR, DMI_STUDIO, DMI_TAG };   // 배우 · 제작사 · 태그 탭 상징 (목록 관리 메뉴)
+		DMI_ACTOR, DMI_STUDIO, DMI_TAG, DMI_INSPECT };   // INSPECT: 돋보기 (영상 검사)   // 배우 · 제작사 · 태그 탭 상징 (목록 관리 메뉴)
 	int DarkMenuIconFor(const CString& text)
 	{
 		struct Rule { const wchar_t* word; int icon; };
 		static const Rule rules[] = {
+			{ L"영상 검사", DMI_INSPECT },
 			{ L"체크 모두 해제", DMI_UNCHECK }, { L"체크 해제", DMI_UNCHECK }, { L"전체 체크", DMI_CHECKALL },
 			{ L"빼기", DMI_MINUS }, { L"삭제", DMI_TRASH }, { L"모두 지우기", DMI_TRASH },
 			{ L"비우기", DMI_ERASER }, { L"초기화", DMI_ERASER },
@@ -1601,6 +1602,7 @@ namespace
 		case DMI_ACTOR:      VectorIcon::User(dc, area, col); break;     // 배우 탭 버튼과 같은 사람
 		case DMI_STUDIO:     VectorIcon::Camera(dc, area, col); break;   // 제작사 탭: 비디오 카메라
 		case DMI_TAG:        VectorIcon::Tag(dc, area, col); break;      // 태그 탭: 꼬리표
+		case DMI_INSPECT:    VectorIcon::Inspect(dc, area, col); break;  // 영상 검사: 돋보기 + 재생
 		default: break;
 		}
 	}

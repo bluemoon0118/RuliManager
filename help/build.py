@@ -1,10 +1,15 @@
-import figs, sys
+import figs, anim, sys
 
 VERSION = sys.argv[1] if len(sys.argv) > 1 else '0.83'
 
 
 def fig(svg, cap):
     return f'<figure>{svg}<figcaption>{cap}</figcaption></figure>'
+
+
+def afig(svg, cap):
+    # 움직이는 그림: 누르면 멈춤 / 다시 재생
+    return f'<figure class="anim" title="누르면 멈춤 / 다시 재생">{svg}<figcaption><span class="badge">움직이는 그림</span> {cap}</figcaption></figure>'
 
 
 def ol(items):
@@ -72,6 +77,7 @@ S.append(('video', '영상 탭', f'''
 <p>등록된 모든 영상을 카드로 봅니다. 위 도구줄에서 정렬(이름 · 제목 · 크기 · 수정일 · 별점 · 발매일 · 배우 · 제작사 · 품번 · 재생 시간 · 해상도 등)과 방향 [▲▼] 을 고릅니다.</p>
 <h3>보기 방식</h3>
 {fig(figs.fig_views(), '[격자] [리스트] [패키지] [월 모드]')}
+{afig(anim.an_hover_preview(), '카드에 마우스를 올리면 미리보기 재생')}
 {ul(['<b>격자</b> - 기본 카드. 카드 이미지에 마우스를 올리면 미리보기 영상(만들어 둔 경우)이 그 자리에서 재생됩니다.',
      '<b>리스트</b> - 표 형태. 열 머리글을 누르면 정렬됩니다.',
      '<b>패키지</b> - 세로 커버만 촘촘히. 마우스를 올려 두면 격자 카드가 팝업으로 나옵니다.',
@@ -84,6 +90,7 @@ S.append(('video', '영상 탭', f'''
      '<b>오른쪽 클릭 메뉴</b> - 재생, 이 영상 새로고침, 탐색기에서 보기, 텍스트로 정보 입력, 웹페이지 내용 붙여넣기, 스크린샷 추출, 미리보기 만들기, 컬렉션에 추가, DB 에서 삭제.'])}
 <h3 id="split">분할 영상</h3>
 {fig(figs.fig_split(), '분할 영상 합쳐 보기')}
+{afig(anim.an_split_parts(), '파트 칸에서 원하는 파트 고르기')}
 <p><code>ABC-123_1.mp4</code>, <code>ABC-123_2.mp4</code> 처럼 이름 끝의 <code>_숫자</code> 만 다른 파일은 한 작품의 파트로 봅니다.
 설정에서 <b>분할 영상 합쳐서 보기</b> 를 켜면 첫 파트 카드 하나만 보이고, 카드 이미지를 파트 수만큼 나눠서 원하는 파트를 고르고 재생합니다.</p>
 {note('연결되지 않은 이동식 디스크의 영상은 보기 전용입니다. 재생 · 수정은 디스크를 연결한 뒤에 할 수 있습니다.')}
@@ -101,12 +108,14 @@ S.append(('detail', '영상 상세', f'''
      '<b>제작사 · 레이블 카드</b> - 로고와 이름. 품번으로 자동으로 정해지고, 제작사 카드를 더블클릭하면 다른 제작사로 바꿉니다.',
      '<b>시리즈</b> - 작품의 시리즈 이름을 자유롭게 적습니다 (검색에 포함).',
      '<b>맨 아래 띠</b> - 출연 배우 카드(더블클릭 = 배우 출연작으로). 설정 [상세 화면] 에서 스크린샷(오른쪽 클릭 [스크린샷 추출] 로 만든 장면)으로 바꿀 수 있습니다.'])}
+{afig(anim.an_rating(), '별점 · 물방울은 누르는 즉시 저장')}
+{afig(anim.an_tag_popup(), '태그 칩 위에 마우스 → 태그 카드 팝업')}
 ''', 1))
 
 S.append(('input', '정보 입력 (txt · 붙여넣기)', f'''
 <p>영상 정보를 하나하나 치지 않고 한 번에 채우는 방법이 세 가지 있습니다.</p>
 <h3>웹페이지 내용 붙여넣기</h3>
-{fig(figs.fig_paste(), '작품 사이트 내용으로 정보 채우기')}
+{afig(anim.an_paste(), '작품 사이트 내용으로 정보 채우기')}
 <p>작품 사이트 화면을 드래그해서 복사한 뒤, 영상 오른쪽 클릭 <b>[웹페이지 내용 붙여넣기...]</b> 창에 붙여넣으면 품번 · 제목 · 발매일 · 배우 · 제작사 · 레이블 · 태그를 찾아 채웁니다.
 처음 보는 태그나 제작사가 있으면 기존 항목에 연결할지, 새로 추가할지 묻습니다. [공백라인 제거] 로 빈 줄을 정리할 수 있습니다.</p>
 <h3>텍스트로 정보 입력</h3>
@@ -146,6 +155,7 @@ S.append(('actor', '배우 탭', f'''
 
 S.append(('actor-drill', '배우 출연작 화면', f'''
 <p>배우 카드를 더블클릭(또는 {K("Space")})하면 들어가는 화면입니다. 위에는 배우 정보, 아래에는 그 배우가 나온 영상, 오른쪽에는 고른 영상의 상세가 나옵니다.</p>
+{afig(anim.an_drill(), '배우 카드 더블클릭으로 들어가고 [◀ 배우 목록] 으로 돌아오기')}
 {fig(figs.fig_actor_drill(), '배우 출연작 화면 ([격자] 보기)')}
 {ol(['<b>[◀ 배우 목록]</b> - 배우 목록으로 돌아갑니다 ({K("Backspace")} 도 됨). 오른쪽 글자는 배우 이름과 출연 영상 수.',
      '<b>[격자 | 연도별]</b> - 출연작 보기 방식.',
@@ -163,6 +173,7 @@ S.append(('studio', '제작사 탭', f'''
 <p>제작사를 카드로 봅니다. 제작사는 상위 · 하위(예: 그룹 › 회사 › 브랜드)로 묶을 수 있고, 카드 배경색이 레벨을 나타냅니다.
 보기 방식은 <b>[격자 | 리스트 | 계층]</b> 세 가지입니다.</p>
 {fig(figs.fig_tree(), '[계층] 보기')}
+{afig(anim.an_tree_fold(), '− / + 로 하위 제작사 접고 펼치기')}
 {ul(['<b>격자</b> - 정렬([이름 | 영상수])과 검색 순서대로.',
      '<b>리스트</b> - 이름 · 영상 수 표. 열 머리글로 정렬.',
      '<b>계층</b> - 상위 → 하위 트리. − / + 로 접고 펼칩니다.',
@@ -228,6 +239,19 @@ S.append(('manage-file', '파일 관리', f'''
 <p><b>[목록 관리 ▾] → [파일 관리...]</b>. 등록 폴더의 실제 폴더 · 파일을 트리로 보여 주고, DB 정보와 폴더 구조(제작사 \\ 배우 \\ 영상)가 맞지 않는 영상을 찾아 고칩니다.
 항목을 오른쪽 클릭하면 폴더 열기 등의 메뉴가 나옵니다.</p>
 {note('파일 · 폴더 이름을 실제로 바꾸는 기능입니다. 고치기 전에 목록을 잘 확인하세요.')}
+''', 2))
+
+S.append(('video-check', '영상 검사', f'''
+<p><b>[목록 관리 ▾] → [영상 검사...]</b>. 영상 파일이 손상되었는지 ffmpeg 로 실제로 풀어 보며 검사합니다. 미리보기가 만들어지지 않는 영상의 원인을 찾을 때도 씁니다.
+검사 창은 열어 둔 채 다른 작업을 할 수 있고(모달리스), 닫아도 검사는 뒤에서 계속됩니다.</p>
+{fig(figs.fig_video_check(), '영상 검사 창')}
+{ul(['<b>목록에 넣기</b> - 영상 카드 오른쪽 클릭 <b>[영상 검사]</b> (분할 영상은 모든 파트), 카드를 체크했으면 <b>[영상 검사(n)]</b>. 여러 번 넣어도 되고, 넣은 순서대로 한 편씩 검사합니다.',
+     '<b>검사 방식</b> - <b>빠른 검사</b>: 머리 정보를 읽고 영상 곳곳(9곳)을 1초씩 풀어 봄, 1편에 몇 초. <b>정밀 검사</b>: 처음부터 끝까지 영상 · 소리를 모두 풀어 봄, 오래 걸림. 의심되는 영상만 정밀 검사하는 것을 권합니다.',
+     '<b>[중단]</b> - 지금 검사를 취소하고 남은 항목은 멈춤. <b>[시작]</b> 을 누르면 이어서 검사 (취소된 항목도 다시).',
+     '<b>결과</b> - <span style="color:#3DCC91">정상</span> · <span style="color:#F29D49">의심</span>(일부 구간 실패, 오류 몇 줄, 길이 정보 없음, 끝까지 풀리지 않음) · <span style="color:#FF7373">손상</span>(열리지 않음, 영상 스트림 없음, 절반 이상 구간 실패, 오류가 많음).',
+     '목록에서 고르면 아래 칸에 자세한 결과(길이 · 스트림, 실패한 위치, ffmpeg 오류 줄)가 나옵니다. 더블클릭하면 탐색기에서 그 파일을 보여 줍니다.',
+     '[선택 삭제] · [끝난 항목 지우기] 로 목록을 정리합니다. 결과는 프로그램을 닫으면 지워집니다.'])}
+{note('ffmpeg.exe 가 필요합니다 (미리보기 영상과 같은 위치). 연결되지 않은 이동식 디스크의 영상은 검사할 수 없습니다.')}
 ''', 2))
 
 S.append(('settings', '설정', f'''
@@ -302,6 +326,11 @@ table{border-collapse:collapse;width:100%}
 th,td{text-align:left;padding:7px 12px;border-bottom:1px solid var(--card)}
 th{background:var(--panel)}
 .hint{color:var(--sub);font-size:13px}
+figure.anim{cursor:pointer;outline:1px solid rgba(242,157,73,.35)}
+figure.anim.paused{outline-color:var(--sub)}
+figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재생)';color:#F29D49}
+.badge{display:inline-block;background:#F29D49;color:#10161A;font-weight:bold;font-size:11px;border-radius:3px;padding:0 6px;margin-right:4px}
+@media (prefers-reduced-motion: reduce){figure.anim figcaption::before{content:'시스템 설정이 움직임 줄이기면 처음에 멈춰 있습니다 - 눌러서 재생  ';color:var(--sub)}}
 '''
 
 JS = '''
@@ -311,6 +340,16 @@ const secs=links.map(a=>document.querySelector(a.getAttribute('href')));
 function mark(){let cur=0;const y=window.scrollY+80;secs.forEach((s,i)=>{if(s&&s.offsetTop<=y)cur=i;});
  links.forEach((a,i)=>a.classList.toggle('on',i===cur));}
 window.addEventListener('scroll',mark);window.addEventListener('hashchange',mark);mark();
+// 움직이는 그림: 누르면 멈춤 / 다시 재생, 화면 밖에서는 멈춤 (움직임 줄이기 설정이면 처음엔 멈춤)
+const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+document.querySelectorAll('figure.anim').forEach(f=>{
+ const svg=f.querySelector('svg');
+ if(reduce){svg.pauseAnimations();f.classList.add('paused');}
+ f.addEventListener('click',()=>{if(f.classList.toggle('paused'))svg.pauseAnimations();else svg.unpauseAnimations();});
+});
+const io=new IntersectionObserver(es=>es.forEach(e=>{const f=e.target,svg=f.querySelector('svg');
+ if(f.classList.contains('paused'))return; if(e.isIntersecting)svg.unpauseAnimations();else svg.pauseAnimations();}));
+document.querySelectorAll('figure.anim').forEach(f=>io.observe(f));
 '''
 
 html = f'''<!DOCTYPE html>
