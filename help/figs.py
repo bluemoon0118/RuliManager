@@ -45,39 +45,11 @@ def fig_main():
         s.video_card(24 + c * 146, 180 + r * 150, 136, f'영상 제목 {i + 1}', f'ABC-{101 + i}',
                      stars=(4 if i == 1 else 0), actors=1 + i % 3, tags=3 + i, drops=(2 if i == 2 else 0),
                      cover=covers[i], check=(i == 5), temp=(i == 7))
-    # 상세 패널
+    # 상세 패널 (현재 모양, 축소)
     s.rect(620, 94, 268, 400, '#1D272E', r=2)
-    s.rect(628, 102, 252, 142, '#3B5163', r=3)
-    s.play(754, 173, 22, op=0.35)
-    s.text(628, 260, '123분 | fps: 29.97 | 1080p', 9, SUB)
-    rows = [('품번', 'ABC-102'), ('제목', '영상 제목 2'), ('별점', None), ('발매일', '2024-05-17')]
-    y = 270
-    for lbl, val in rows:
-        s.text(628, y + 13, lbl, 10, SUB)
-        if val is None:
-            s.stars(664, y + 14, 4, 13)
-            s.path(f'M760,{y + 3} q6,8 0,12 q-6,-4 0,-12 Z', BLUE)
-            s.text(770, y + 14, '2', 10, SUB)
-        else:
-            s.edit(664, y, 216, val, 18, 10)
-        y += 24
-    s.text(628, y + 13, '배우', 10, SUB)
-    s.chip(664, y, '♀ 배우 이름')
-    y += 24
-    s.text(628, y + 13, '제작사', 10, SUB)
-    s.rect(664, y, 104, 30, CARD, r=3)
-    s.text(672, y + 19, '제작사', 10, TEXT)
-    s.rect(774, y, 106, 30, '#2B3A46', r=3)
-    s.text(782, y + 19, '레이블', 10, TEXT)
-    y += 36
-    s.text(628, y + 13, '태그', 10, SUB)
-    cx = 664
-    for t in ('드라마', '코미디'):
-        cx = s.chip(cx, y, t)
-    y += 24
-    s.text(628, y + 13, '메모', 10, SUB)
-    s.edit(664, y, 216, '', 40)
-    s.button(820, 470, 60, '저장', SAVE)
+    s.add('<g transform="translate(626,100) scale(0.795)">')
+    detail_panel(s, 0, 0, 320, compact=True)
+    s.add('</g>')
     # 아래 버튼
     x = 12
     for t, w, f in (('재생 (기본 플레이어)', 116, ACC), ('DB 삭제 (Del)', 90, DANGER), ('탐색기에서 보기', 98, ACC),
@@ -166,73 +138,228 @@ def fig_split():
     return s.render()
 
 
+def detail_panel(s, x0, y0, w, compact=False):
+    """현재 영상 상세 모양: 이미지 → 파일 줄 → 이미지 줄 → 품번 → 제목 → 별점 · 물방울 · [저장] → 발매일 · 검열
+    → 배우 칩 → 제작사 카드 → 레이블 카드 → 시리즈 → 태그 칩 → 맨 아래 출연 배우 카드 띠. 그린 부분의 줄 y 목록을 돌려줌"""
+    sc = 0.8 if compact else 1.0
+    fs = 9 if compact else 10
+    rh = 16 if compact else 18
+    lw = 40 if compact else 46
+    ys = {}
+    ih = w * 9 / 16 * (0.75 if compact else 0.8)
+    s.rect(x0, y0, w, ih, '#3B5163', r=3)
+    s.play(x0 + w / 2, y0 + ih / 2, ih * 0.16, op=0.35)
+    ys['img'] = y0 + ih / 2
+    y = y0 + ih + 5
+    s.text(x0, y + 11, '파일', fs, SUB)
+    s.text(x0 + lw, y + 11, 'ABC-123.mp4', fs, TEXT)
+    s.text(x0 + w, y + 11, '123분 | 29.97 | 1080p', fs - 1, SUB, 'end')
+    ys['file'] = y + 7
+    y += rh
+    s.text(x0 + lw, y + 11, 'ABC-123.jpg', fs, SUB2)
+    s.button(x0 + w - 150, y, 72, '이미지 검색...', ACC, rh - 2, fs - 1)
+    s.button(x0 + w - 74, y, 74, '이미지 변경...', ACC, rh - 2, fs - 1)
+    ys['image'] = y + 7
+    y += rh + 3
+    s.text(x0, y + 12, '품번', fs, SUB)
+    s.edit(x0 + lw, y, 110, 'ABC-123', rh, fs)
+    s.button(x0 + lw + 113, y, rh, '⧉', COMBO, rh, fs)
+    ys['code'] = y + 8
+    y += rh + 4
+    s.text(x0, y + 12, '제목', fs, SUB)
+    th = rh * 2.2
+    s.edit(x0 + lw, y, w - lw, '영상 제목 (여러 줄)', th, fs)
+    ys['title'] = y + 8
+    y += th + 4
+    s.text(x0, y + 12, '별점', fs, SUB)
+    s.stars(x0 + lw, y + 13, 3, fs + 4)
+    s.path(f'M{x0 + lw + 92},{y + 2} q6,8 0,12 q-6,-4 0,-12 Z', BLUE)
+    s.text(x0 + lw + 102, y + 13, '0', fs, SUB)
+    s.button(x0 + w - 54, y, 54, '저장', SAVE, rh, fs)
+    ys['rating'] = y + 8
+    y += rh + 4
+    s.text(x0, y + 12, '발매일', fs, SUB)
+    s.edit(x0 + lw, y, 90, '2024-05-17', rh, fs)
+    s.edit(x0 + lw + 96, y, 84, '해당없음 ▾', rh, fs)
+    ys['release'] = y + 8
+    y += rh + 4
+    s.text(x0, y + 12, '배우', fs, SUB)
+    cx = s.chip(x0 + lw, y, '♀ 배우 A', size=fs - 1, h=rh)
+    s.chip(cx, y, '♀ 배우 B', size=fs - 1, h=rh)
+    ys['actors'] = y + 8
+    y += rh + 4
+    ch = 26 if compact else 30
+    for lbl, nm, col in (('제작사', '제작사 이름', CARD), ('레이블', '레이블 이름', '#2B3A46')):
+        s.text(x0, y + ch / 2 + 4, lbl, fs, SUB)
+        s.rect(x0 + lw, y, w - lw, ch, col, r=3)
+        s.rect(x0 + lw + 4, y + 4, (ch - 8) * 16 / 9, ch - 8, '#4A5C6B', r=2)
+        s.text(x0 + lw + 10 + (ch - 8) * 16 / 9, y + ch / 2 + 4, nm, fs, TEXT, weight='bold')
+        ys['studio' if lbl == '제작사' else 'label'] = y + ch / 2
+        y += ch + 3
+    y += 1
+    s.text(x0, y + 12, '시리즈', fs, SUB)
+    s.edit(x0 + lw, y, w - lw, '', rh)
+    ys['series'] = y + 8
+    y += rh + 4
+    s.text(x0, y + 12, '태그', fs, SUB)
+    cx = x0 + lw
+    for t in ('드라마', '코미디'):
+        cx = s.chip(cx, y, t, size=fs - 1, h=rh)
+    s.chip(cx, y, '+ 입력', EDIT, size=fs - 1, h=rh, x_mark=False)
+    ys['tags'] = y + 8
+    y += rh + 8
+    # 맨 아래: 출연 배우 카드 띠 (설정에서 스크린샷으로 바꿀 수 있음)
+    cw = (w - 12) / 4
+    for i in range(4):
+        cx = x0 + i * (cw + 4)
+        s.rect(cx, y, cw, cw * 1.25, CARD, r=3)
+        s.rect(cx, y, cw, cw * 0.95, '#3E4F5E', r=3)
+        if i < 2:
+            s.person(cx + cw / 2, y + cw * 0.5, cw * 0.55, TEXT, 0.7)
+            s.text(cx + 4, y + cw * 1.15, f'배우 {chr(65 + i)}', fs - 2, TEXT)
+    ys['strip'] = y + cw * 0.6
+    return ys, y + cw * 1.25
+
+
 def fig_detail():
-    s = Svg(560, 470, '영상 상세 화면')
-    s.rect(0, 0, 330, 470, '#1D272E', r=4)
-    s.rect(10, 10, 310, 174, '#3B5163', r=3)
-    s.play(165, 97, 26, op=0.35)
-    s.button(150, 190, 80, '이미지 검색...', ACC, 18, 9)
-    s.button(236, 190, 84, '이미지 변경...', ACC, 18, 9)
-    s.text(10, 203, '123분 | fps 29.97 | 1080p', 9, SUB)
-    y = 216
-    s.text(10, y + 13, '품번', 10, SUB)
-    s.edit(52, y, 242, 'ABC-123', 18, 10)
-    s.button(298, y, 22, '⧉', COMBO, 18, 10)
-    y += 24
-    s.text(10, y + 13, '제목', 10, SUB)
-    s.edit(52, y, 268, '영상 제목', 30, 10)
-    y += 36
-    s.text(10, y + 13, '별점', 10, SUB)
-    s.stars(52, y + 14, 3, 14)
-    s.path(f'M150,{y + 3} q6,8 0,12 q-6,-4 0,-12 Z', BLUE)
-    s.text(160, y + 14, '0', 10, SUB)
-    y += 24
-    s.text(10, y + 13, '발매일', 10, SUB)
-    s.edit(52, y, 110, '2024-05-17', 18, 10)
-    s.edit(168, y, 90, '해당없음 ▾', 18, 10)
-    y += 24
-    s.text(10, y + 13, '배우', 10, SUB)
-    cx = s.chip(52, y, '♀ 배우 A')
-    s.chip(cx, y, '♀ 배우 B')
-    y += 24
-    s.text(10, y + 13, '제작사', 10, SUB)
-    s.rect(52, y, 130, 32, CARD, r=3)
-    s.text(60, y + 20, '제작사 이름', 10, TEXT)
-    s.rect(188, y, 132, 32, '#2B3A46', r=3)
-    s.text(196, y + 20, '레이블 이름', 10, TEXT)
-    y += 38
-    s.text(10, y + 13, '시리즈', 10, SUB)
-    s.edit(52, y, 268, '', 18)
-    y += 24
-    s.text(10, y + 13, '태그', 10, SUB)
-    cx = 52
-    for t in ('드라마', '코미디', '+ 입력'):
-        cx = s.chip(cx, y, t, COMBO if t[0] != '+' else EDIT, x_mark=(t[0] != '+'))
-    y += 24
-    s.text(10, y + 13, '메모', 10, SUB)
-    s.edit(52, y, 268, '', 34)
-    s.button(260, 440, 60, '저장', SAVE)
-    notes = [(14, '이미지 영역 - 이미지 파일을 끌어다 놓으면 교체, 더블클릭 = 원본 보기'),
-             (225, '품번 - 오른쪽 단추로 복사, 품번으로 제작사 · 레이블 자동 연결'),
-             (285, '별점(클릭 즉시 저장) · 물방울(클릭마다 +1, 오른쪽 클릭 = 초기화)'),
-             (333, '배우 칩 - 오른쪽 클릭 = 별칭 고르기, 더블클릭 = 배우로 이동'),
-             (358, '제작사 · 레이블 카드 - 더블클릭 = 바꾸기'),
-             (417, '태그 칩 - 입력하면 자동 완성, ⌄ = 목록에서 고르기'),
-             (450, '저장 - 다른 영상을 고르면 자동 저장')]
-    for i, (yy, t) in enumerate(notes, 1):
-        s.line(326, yy, 344, yy, CALL, 1)
-        s.call(354, yy, i)
-        words, line, ly = t.split(' '), '', yy + 4
-        out = []
-        for w in words:
-            if len(line) + len(w) > 17:
+    s = Svg(600, 640, '영상 상세 화면')
+    s.rect(0, 0, 340, 640, '#1D272E', r=4)
+    ys, _ = detail_panel(s, 10, 10, 320)
+    notes = [('img', '이미지 - 이미지 파일을 끌어다 놓으면 교체, 더블클릭 = 원본 크기로 보기'),
+             ('file', '파일 이름 · 재생 시간 · fps · 해상도'),
+             ('image', '이미지 검색 (품번으로 인터넷에서) · 이미지 변경'),
+             ('code', '품번 - 옆 단추로 복사, 품번으로 제작사 · 레이블 자동 연결'),
+             ('rating', '별점 · 물방울 (누르면 바로 저장), [저장]'),
+             ('release', '발매일 (숫자만 쳐도 됨) · 검열 정보'),
+             ('actors', '배우 칩 - 오른쪽 클릭 = 별칭, 더블클릭 = 배우로 이동'),
+             ('studio', '제작사 카드 - 더블클릭 = 바꾸기'),
+             ('label', '레이블 카드 - 품번 관리에서 정해짐'),
+             ('series', '시리즈 이름 (자유 입력)'),
+             ('tags', '태그 칩 - 입력하면 자동 완성, ⌄ = 목록'),
+             ('strip', '출연 배우 카드 (설정에서 스크린샷으로 바꿀 수 있음)')]
+    used = []
+    for i, (k, t) in enumerate(notes, 1):
+        yy = ys[k]
+        ty = max(yy, (used[-1] + 30) if used else 0)
+        used.append(ty)
+        s.line(334, yy, 352, ty, CALL, 1)
+        s.call(362, ty, i)
+        words, line, out = t.split(' '), '', []
+        for wd in words:
+            if len(line) + len(wd) > 19:
                 out.append(line)
-                line = w
+                line = wd
             else:
-                line = (line + ' ' + w).strip()
+                line = (line + ' ' + wd).strip()
         out.append(line)
         for j, l in enumerate(out):
-            s.text(370, ly + j * 13, l, 10, SUB)
+            s.text(378, ty + 4 + j * 13, l, 10, SUB)
+    return s.render()
+
+
+def drill_bar(s, x, y, back, title, extra=None):
+    s.button(x, y, 92, back, COMBO)
+    bx = x + 96
+    if extra:
+        for i, (ic, on) in enumerate(extra):
+            s.button(bx + i * 24, y, 22, ic, ACC if on else COMBO)
+        bx += len(extra) * 24 + 6
+    s.text(bx + 6, y + 14, title, 11, TEXT, weight='bold')
+
+
+def fig_actor_drill():
+    s = Svg(900, 470, '배우 출연작 화면')
+    s.rect(0, 0, 900, 470, BACK, r=4)
+    drill_bar(s, 10, 10, '◀ 배우 목록', '배우: 배우 A  (영상 40편)', [('▦', True), ('▥', False)])
+    # 위쪽: 사진 + 배우 정보 패널
+    s.rect(10, 40, 120, 160, '#3E4F5E', r=3)
+    s.person(70, 112, 90, TEXT, 0.75)
+    s.text(146, 64, '배우 A', 20, TEXT, weight='bold')
+    s.text(222, 64, '♥', 16, DANGER)
+    s.stars(146, 88, 5, 15)
+    rows = [('성별', '♀ 여성'), ('출생', '1998-02-17 (28세)'), ('국적', '일본'), ('신체', '162cm B88 W58 H86 (E컵)'),
+            ('경력', '데뷔 2018-04 (8년)'), ('링크', '● ● ●')]
+    for i, (k, v) in enumerate(rows):
+        s.text(146, 112 + i * 16, k, 10, SUB2)
+        s.text(186, 112 + i * 16, v, 10, TEXT)
+    # 출연작 격자
+    s.rect(10, 210, 590, 250, '#1D272E', r=2)
+    s.edit(18, 218, 66, '정렬 ▾', 18, 9)
+    for i in range(4):
+        s.button(90 + i * 22, 218, 20, '▦☰▤▣'[i], ACC if i == 0 else COMBO, 18, 9)
+    for i in range(4):
+        s.add(f'<g transform="translate({20 + i * 145},244) scale(0.98)">')
+        s.video_card(0, 0, 136, f'출연작 {i + 1}', f'ABC-{300 + i}', actors=1 + i % 2, tags=4)
+        s.add('</g>')
+    # 오른쪽 영상 상세 (축소)
+    s.rect(610, 40, 280, 420, '#1D272E', r=2)
+    s.add('<g transform="translate(616,46) scale(0.84)">')
+    detail_panel(s, 0, 0, 320, compact=True)
+    s.add('</g>')
+    for n, (cx, cy) in enumerate([(10, 10), (106, 10), (10, 40), (256, 58), (10, 210), (610, 40)], 1):
+        s.call(cx, cy, n)
+    return s.render()
+
+
+def fig_year():
+    s = Svg(900, 230, '배우 출연작 연도별 보기')
+    s.rect(0, 0, 900, 230, '#1D272E', r=4)
+    s.rect(0, 0, 900, 24, COMBO, r=0)
+    for m in range(12):
+        s.text(80 + m * 68 + 34, 16, f'{m + 1}월', 10, TEXT, 'middle', weight='bold')
+    import random
+    random.seed(3)
+    for r, yr in enumerate((2019, 2020, 2021)):
+        y = 30 + r * 66
+        s.text(40, y + 34, str(yr), 13, TEXT, 'middle', weight='bold')
+        s.line(0, y + 62, 900, y + 62, COMBO)
+        for m in range(12):
+            n = random.choice((0, 0, 1, 1, 2))
+            for k in range(n):
+                x = 80 + m * 68 + 4 + k * 32
+                s.rect(x, y + 6, 30, 50, ['#3B5163', '#4A3F5C', '#3F5A4B', '#5C4A3B'][(m + k) % 4], r=2)
+    return s.render()
+
+
+def fig_studio_drill():
+    s = Svg(900, 500, '제작사 영상 화면')
+    s.rect(0, 0, 900, 500, BACK, r=4)
+    drill_bar(s, 10, 10, '◀ 제작사 목록', '제작사: 회사 A  (영상 180편)')
+    # 위쪽: 로고 + 정보, 상위 · 하위 제작사 칸
+    s.rect(10, 40, 220, 124, '#4A5C6B', r=3)
+    s.text(120, 108, 'LOGO', 18, SUB, 'middle', weight='bold')
+    s.text(246, 62, '회사 A', 18, TEXT, weight='bold')
+    s.text(246, 84, '상위 제작사: 그룹 · 영상 180편 · 배우 64명', 10, SUB)
+    s.text(246, 102, '메모: 제작사 설명', 10, SUB2)
+    tiles = [('▲', '그룹', '#30404D'), ('└', '브랜드 1', '#2F4A3E'), ('└', '브랜드 2', '#2F4A3E')]
+    for i, (mk, nm, col) in enumerate(tiles):
+        x = 246 + i * 118
+        s.rect(x, 116, 112, 48, col, r=3)
+        s.rect(x + 6, 122, 48, 36, '#4A5C6B', r=2)
+        s.text(x + 62, 136, mk, 11, CALL if mk == '▲' else SUB, weight='bold')
+        s.text(x + 62, 154, nm, 10, TEXT, weight='bold')
+    # 도구줄 + [레이블] 보기
+    s.rect(10, 174, 590, 316, '#1D272E', r=2)
+    s.edit(18, 182, 66, '정렬 ▾', 18, 9)
+    for i, ic in enumerate(('▦', '☰', '▤', '▣', 'L')):
+        s.button(90 + i * 22, 182, 20, ic, ACC if i == 4 else COMBO, 18, 9)
+    s.text(206, 195, '← [레이블] 보기', 10, CALL)
+    for g, (lb, n) in enumerate((('레이블 1', 3), ('레이블 2', 2))):
+        y = 208 + g * 140
+        s.rect(18, y, 574, 22, COMBO, r=2)
+        s.rect(22, y + 3, 28, 16, '#4A5C6B', r=1)
+        s.text(56, y + 15, f'{lb}  ·  ABC  ·  {n}편', 10, TEXT, weight='bold')
+        for i in range(n):
+            s.add(f'<g transform="translate({22 + i * 120},{y + 26}) scale(0.68)">')
+            s.video_card(0, 0, 160, f'영상 {i + 1}', f'ABC-{101 + i + g * 10}', actors=1, tags=3)
+            s.add('</g>')
+    # 오른쪽 상세 (축소)
+    s.rect(610, 40, 280, 450, '#1D272E', r=2)
+    s.add('<g transform="translate(616,46) scale(0.84)">')
+    detail_panel(s, 0, 0, 320, compact=True)
+    s.add('</g>')
+    for n, (cx, cy) in enumerate([(10, 10), (10, 40), (246, 112), (90, 178), (18, 206), (610, 40)], 1):
+        s.call(cx, cy, n)
     return s.render()
 
 

@@ -3734,6 +3734,46 @@ bool CVideoLibrary::SyncNamedFromVideos()
 			}
 			if (cur.Trim().CompareNoCase(lb) == 0)
 				continue;
+			if (!s.composite)
+			{
+				// 같은 제작사에 같은 접두어의 복합 항목(일부 번호만 다른 레이블)이 있고, 읽은 레이블이 그 레이블명이면 → 그 레이블에 이 번호를 더함
+				const CString pre = CodePrefixOf(v.code);
+				const int n = CodeNumberOf(v.code);
+				bool done = false;
+				for (size_t j = 0; j < list.size() && !done && n >= 0; ++j)
+				{
+					if (!list[j].composite || static_cast<int>(j) == index)
+						continue;
+					bool samePre = false;
+					for (CString p : SplitList(list[j].name))
+					{
+						p.Trim();
+						p.MakeUpper();
+						p.TrimRight(L'-');
+						if (p == pre) { samePre = true; break; }
+					}
+					if (!samePre)
+						continue;
+					for (SubLabel& sl : list[j].subs)
+					{
+						CString l = sl.label;
+						if (l.Trim().CompareNoCase(lb) != 0)
+							continue;
+						CString num;
+						num.Format(L"%d", n);
+						sl.nums.Trim();
+						sl.nums += (sl.nums.IsEmpty() ? CString() : CString(L", ")) + num;
+						done = true;
+						break;
+					}
+				}
+				if (done)
+				{
+					series = JoinSeries(list);
+					added = true;
+					continue;
+				}
+			}
 			bool known = false;
 			{
 				int p = 0;
@@ -4474,7 +4514,11 @@ bool CVideoLibrary::SeriesSlotForCode(const CString& code, int& owner, int& inde
 	std::vector<Hit> hits;
 	auto scan = [&](const CString& series, int o)
 	{
+		// 한 제작사(목록) 안에서 같은 접두어는 싱글 항목 하나 + 복합 항목(일부 번호만 다른 레이블 - 예외)이 함께 있을 수 있음
+		//  고르는 순서: 복합 · 뒷번호가 맞음 > 싱글 > 복합 · 맞는 번호 없음 (레이블 없음)
 		const std::vector<SeriesInfo> list = ParseSeries(series);
+		Hit best = { o, -1, -1, -1 };
+		int bestRank = 0;
 		for (size_t i = 0; i < list.size(); ++i)
 		{
 			int pi = 0;
@@ -4486,17 +4530,25 @@ bool CVideoLibrary::SeriesSlotForCode(const CString& code, int& owner, int& inde
 				if (!p.IsEmpty() && (p == prefix || (p.Find(L'-') > 0 && c.Left(p.GetLength()) == p)))   // "SONE" 또는 "SONE-4" 처럼 더 긴 접두어
 				{
 					Hit h = { o, static_cast<int>(i), pi, -1 };
+					int rank = 2;   // 싱글
 					if (list[i].composite)
 					{
 						const int k = SubLabelIndex(list[i], c);
 						h.sub = (k >= 0) ? k : -2;   // 복합: 맞는 뒷번호가 없으면 -2 (레이블 없음)
+						rank = (k >= 0) ? 3 : 1;
 					}
-					hits.push_back(h);
-					return;   // 한 제작사(목록)에서는 첫 항목만 (같은 제작사 안에서는 접두어가 겹치지 않음)
+					if (rank > bestRank)
+					{
+						best = h;
+						bestRank = rank;
+					}
+					break;   // 이 항목은 끝 - 다음 항목도 봄
 				}
 				++pi;
 			}
 		}
+		if (bestRank > 0)
+			hits.push_back(best);
 	};
 	for (size_t s = 0; s < studios.size(); ++s)
 		scan(studios[s].series, static_cast<int>(s));

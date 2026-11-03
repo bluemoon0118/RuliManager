@@ -717,6 +717,11 @@ protected:
 	int  PartZoneAt(int g, const CRect& card, CPoint pt) const;   // 합친 카드 이미지 위 파트 칸 (0 부터, 아니면 -1)
 	std::map<CString, int> m_partTotal;   // 나눠진 영상 묶음(폴더 + 파일 이름의 마지막 '_' 왼쪽) → 파일 수 (카드의 (1/3) 표시)
 	static bool SplitPartName(const CString& path, CString& key, int& num);
+	// 분할 영상 합쳐서 보기: 영상 수를 셀 때 같은 묶음 파트는 한 편으로 (m_mergeKeys = 항목 → 묶음 키, 파일 2개 이상일 때만, 아니면 빈 문자열)
+	mutable std::vector<CString> m_mergeKeys;
+	void BuildMergeKeys() const;
+	bool CountOnce(std::set<CString>& seen, int idx, const CString& scope = CString()) const;   // 이 항목을 세는지 (합쳐 보기 꺼짐 · 분할 아님 = 늘 true, 같은 scope 안 같은 묶음은 처음 한 번만)
+	int  CountWorks(const std::vector<int>& idxs) const;   // 항목 목록의 영상 수 (합쳐 보기면 묶음 = 1편)
 	void RecyclePartImages(const std::vector<CString>& videoPaths, const CString& keepBase);   // 분할 파일별 이미지 → 휴지통   // "ABC-123_2.mp4" → 묶음 키 + 순번 2 (순번 없으면 false)
 	int   m_sortColumn = 0;
 	bool  m_sortAsc = true;
@@ -848,6 +853,7 @@ protected:
 	static const UINT_PTR kOverlayFadeTimer = 0x4F46;
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	static CString FindImageFor(const CString& videoPath);
+	static CString FindVerticalImageFor(const CString& videoPath);   // 세로 커버 "파일명_V.jpg" (없으면 빈 문자열) - [패키지] · [레이블] · [세로] 격자
 
 	// 영상 카드 (가로 이미지 / 제목 / 발매일(또는 ● 임시) / 메모 3줄 / 태그 수 · 배우 수)
 	int   m_vcardW = 255, m_vcardImgH = 143, m_vcardH = 330;
