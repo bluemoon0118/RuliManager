@@ -1133,16 +1133,20 @@ BOOL CRuliManagerDlg::OnInitDialog()
 		{
 			const NamedInfo& st = m_lib.studios[-code - 1];
 			const CString name = st.name;
-			int cnt = 0;
-			for (const VideoItem& v : m_lib.items)
-				if (v.studio.CompareNoCase(name) == 0) ++cnt;
+			std::vector<int> mine;
+			for (size_t vi = 0; vi < m_lib.items.size(); ++vi)
+				if (m_lib.items[vi].studio.CompareNoCase(name) == 0) mine.push_back(static_cast<int>(vi));
+			const int cnt = CountWorks(mine);   // 분할 영상 합쳐 보기: 묶음 = 1편
 			const bool child = !m_stripOwner.IsEmpty() && st.parent.CompareNoCase(m_stripOwner) == 0;   // 고른 제작사의 하위 제작사
 			t.Format(L"%s: %s\n영상 %d편 (더블클릭: 제작사 영상 보기)", child ? L"하위 제작사" : L"상위 제작사", static_cast<LPCWSTR>(name), cnt);
 		}
 		else
 		{
 			const CString name = m_lib.labelInfos[code].name;
-			t.Format(L"%s\n영상 %d편 (더블클릭: 레이블 영상 보기)", static_cast<LPCWSTR>(name), m_lib.CountLabelVideos(name));
+			std::vector<int> mine;
+			for (size_t vi = 0; vi < m_lib.items.size(); ++vi)
+				if (!m_lib.items[vi].label.IsEmpty() && m_lib.items[vi].label.CompareNoCase(name) == 0) mine.push_back(static_cast<int>(vi));
+			t.Format(L"%s\n영상 %d편 (더블클릭: 레이블 영상 보기)", static_cast<LPCWSTR>(name), CountWorks(mine));
 		}
 		return t;
 	};
@@ -3547,10 +3551,18 @@ void CRuliManagerDlg::UpdateStatus()
 		return;
 	}
 	CString s;
-	const int pendingCount = m_lib.PendingCount();
+	// 분할 영상 합쳐 보기: 묶음 = 1개
+	std::set<CString> seenWork;
+	int dbCount = 0, pendingCount = 0;
+	for (size_t i = 0; i < m_lib.items.size(); ++i)
+	{
+		const bool pend = m_lib.items[i].pending;
+		if (CountOnce(seenWork, static_cast<int>(i), pend ? L"P" : L"D"))
+			++(pend ? pendingCount : dbCount);
+	}
 	s.Format(L"DB %d개 · 임시 %d개 · 표시 %d개 · 등록 폴더 %d개",
-		static_cast<int>(m_lib.items.size()) - pendingCount, pendingCount,
-		static_cast<int>(m_view.size()),
+		dbCount, pendingCount,
+		CountWorks(m_view),
 		static_cast<int>(m_lib.folders.size()));
 	m_staticStatus.SetWindowText(s);
 }
@@ -4166,6 +4178,7 @@ LRESULT CRuliManagerDlg::OnRebuildCategories(WPARAM, LPARAM)
 
 void CRuliManagerDlg::RebuildCategories()
 {
+	BuildMergeKeys();   // 분할 영상 합쳐 보기: 영상 수 셀 때 묶음 = 1편
 	m_catsDirty = false;
 	if (m_mode == MODE_VIDEO)
 		return;
@@ -4269,6 +4282,7 @@ void CRuliManagerDlg::RebuildCategories()
 	{
 		const std::map<CString, int> nameIndex = m_lib.ActorNameIndex();
 		std::map<CString, std::set<CString>> actorsOf;
+		std::set<CString> seenLabel;   // 분할 영상 합쳐 보기: 묶음 = 1편
 		for (const VideoItem& v : m_lib.items)
 		{
 			CString l = v.label;
@@ -4276,7 +4290,8 @@ void CRuliManagerDlg::RebuildCategories()
 			if (l.IsEmpty())
 				continue;
 			l.MakeLower();
-			++labelVideoCounts[l];
+			if (CountOnce(seenLabel, static_cast<int>(&v - m_lib.items.data()), l))
+				++labelVideoCounts[l];
 			for (const CString& n : CVideoLibrary::SplitList(v.actors))
 				actorsOf[l].insert(m_lib.ActorKeyOf(nameIndex, n));
 		}
@@ -4284,8 +4299,10 @@ void CRuliManagerDlg::RebuildCategories()
 			m_labelActorCounts[kv.first] = static_cast<int>(kv.second.size());
 	}
 
+	std::set<CString> seenWork;   // 분할 영상 합쳐 보기: 같은 묶음 파트는 항목마다 1편
 	for (const VideoItem& v : m_lib.items)
 	{
+		const int vi = static_cast<int>(&v - m_lib.items.data());
 		// 제작사 탭: 하위 레이블 영상도 상위 제작사 합계에 넣음 (studioKeyOf)
 		if (m_mode == MODE_STUDIO)
 		{
@@ -4293,7 +4310,7 @@ void CRuliManagerDlg::RebuildCategories()
 			if (s.IsEmpty())
 			{
 				CString lb = v.label;
-				if (lb.Trim().IsEmpty())
+				if (lb.Trim().IsEmpty() && CountOnce(seenWork, vi, L"\x01"))
 					++none;
 				continue;
 			}
@@ -4302,13 +4319,15 @@ void CRuliManagerDlg::RebuildCategories()
 			Entry& e = groups[key];
 			if (e.name.IsEmpty())
 				e.name = s;
-			++e.count;
+			if (CountOnce(seenWork, vi, key))
+				++e.count;
 			continue;
 		}
 		const std::vector<CString> vals = GetCategoryValues(v, m_mode);
 		if (vals.empty())
 		{
-			++none;
+			if (CountOnce(seenWork, vi, L"\x01"))
+				++none;
 			continue;
 		}
 		const bool countIt = true;
@@ -4322,7 +4341,7 @@ void CRuliManagerDlg::RebuildCategories()
 			Entry& e = groups[key];
 			if (e.name.IsEmpty())
 				e.name = n;
-			if (countIt)
+			if (countIt && CountOnce(seenWork, vi, key))
 				++e.count;
 		}
 	}
@@ -5825,6 +5844,7 @@ void CRuliManagerDlg::OnBnClickedSettings()
 		AfxGetApp()->WriteProfileInt(L"Settings", L"MergeParts", m_mergeParts ? 1 : 0);
 		m_overlayFade.clear();   // 격자 칸 번호가 바뀜
 		ApplyFilter();
+		MarkCategoriesDirty();   // 배우 · 제작사 · 태그 · 컬렉션 카드의 영상 수도 다시 셈 (묶음 = 1편)
 	}
 	if (result == IDOK && dlg.m_shotCols != m_shotCols)
 	{
@@ -6703,6 +6723,8 @@ void CRuliManagerDlg::RebuildActorGrid()
 	m_actorCounts.clear();
 	m_actorBytes.clear();
 	const std::map<CString, int> nameIndex = m_lib.ActorNameIndex();
+	BuildMergeKeys();
+	std::set<CString> seenWork;   // 분할 영상 합쳐 보기: 같은 묶음 파트는 배우마다 1편 (용량은 모두 더함)
 	for (const VideoItem& v : m_lib.items)
 	{
 		std::set<CString> seen;   // 이름과 별칭이 함께 적혀 있어도 한 편으로
@@ -6711,7 +6733,8 @@ void CRuliManagerDlg::RebuildActorGrid()
 			const CString key = m_lib.ActorKeyOf(nameIndex, n);   // 별칭 → 배우 이름
 			if (seen.insert(key).second)
 			{
-				++m_actorCounts[key];
+				if (CountOnce(seenWork, static_cast<int>(&v - m_lib.items.data()), key))
+					++m_actorCounts[key];
 				m_actorBytes[key] += v.size;   // 트리맵 [용량] 기준
 			}
 		}
@@ -9742,9 +9765,15 @@ void CRuliManagerDlg::DrawTagPopupCard(CDC* dc, const CRect& outer, const CStrin
 	dc->SelectObject(normal);
 	int videos = 0;
 	{
+		std::set<CString> seenWork;   // 분할 영상 합쳐 보기: 묶음 = 1편
 		for (const VideoItem& v : m_lib.items)
 			for (const CString& t : CVideoLibrary::SplitList(v.tags))
-				if (t.CompareNoCase(name) == 0) { ++videos; break; }
+				if (t.CompareNoCase(name) == 0)
+				{
+					if (CountOnce(seenWork, static_cast<int>(&v - m_lib.items.data())))
+						++videos;
+					break;
+				}
 	}
 	CString vText;
 	vText.Format(L"%d", videos);
@@ -10146,6 +10175,7 @@ void CRuliManagerDlg::UpdateActorStudioStrip(int actorIdx)
 	if (actorIdx >= 0 && actorIdx < static_cast<int>(m_lib.actors.size()))
 	{
 		std::map<CString, int> studioCode;   // 제작사 이름(소문자) → 코드 (0 = 목록에 없는 제작사 → 표시 안 함)
+		std::set<CString> seenWork;   // 분할 영상 합쳐 보기: 묶음 = 1편
 		for (const VideoItem& v : m_lib.items)
 		{
 			bool mine = false;
@@ -10174,7 +10204,7 @@ void CRuliManagerDlg::UpdateActorStudioStrip(int actorIdx)
 				const int si = m_lib.FindNamed(LIST_STUDIO, studio);
 				it = studioCode.emplace(key, si >= 0 ? -(si + 1) : 0).first;
 			}
-			if (it->second != 0)
+			if (it->second != 0 && CountOnce(seenWork, static_cast<int>(&v - m_lib.items.data()), key))
 				++count[it->second];
 		}
 	}
@@ -11442,7 +11472,8 @@ namespace
 {
 	// 이미지 파일 → w×h 32비트 DIB (비율 유지 · 가운데 · 남는 곳은 배경색) - 백그라운드 스레드용 (화면 DC 를 쓰지 않음)
 	//  portrait: 세로 카드용 - 가로가 더 긴 이미지는 오른쪽 절반, 세로가 더 긴 이미지는 전체를 폭에 맞춤 (넘치는 위아래는 가운데 기준으로 잘라냄)
-	HBITMAP MakeCoverBitmap(const CString& file, int w, int h, COLORREF back, bool portrait = false)
+	//  whole: 세로 커버 파일(_V) - 가로가 더 길어도 반으로 자르지 않고 전체를 폭에 맞춤
+	HBITMAP MakeCoverBitmap(const CString& file, int w, int h, COLORREF back, bool portrait = false, bool whole = false)
 	{
 		CImage img;
 		if (file.IsEmpty() || !LoadImageFileSfw(img, file) || img.IsNull())   // SFW: 모자이크 (백그라운드 스레드)
@@ -11468,7 +11499,7 @@ namespace
 		{
 			const int iw0 = img.GetWidth(), ih0 = img.GetHeight();
 			int sx = 0, sw = iw0;
-			if (iw0 > ih0)
+			if (iw0 > ih0 && !whole)
 			{
 				sx = iw0 / 2;            // 가로가 더 긴 이미지: 오른쪽 절반 (앞표지)
 				sw = iw0 - sx;
@@ -11627,8 +11658,24 @@ CBitmap* CRuliManagerDlg::GetVideoCover(int itemIdx, int w, int h, bool* loading
 					r->key = job.key;
 					r->gen = job.gen;
 					r->item = job.item;
-					const CString file = FindImageFor(job.videoPath);
-					if (!file.IsEmpty())
+					// 세로 칸([패키지] · [레이블] · [세로] 격자): 세로 커버(파일명_V) 가 있으면 그것을 그대로
+					const CString vfile = job.portrait ? FindVerticalImageFor(job.videoPath) : CString();
+					CString vcache;   // 이동식 디스크 영상의 세로 커버 캐시 (가로 캐시 이름 + "_V")
+					if (job.portrait && !job.cacheFile.IsEmpty())
+					{
+						const int dot = job.cacheFile.ReverseFind(L'.');
+						vcache = (dot > 0) ? job.cacheFile.Left(dot) + L"_V" + job.cacheFile.Mid(dot) : job.cacheFile + L"_V";
+					}
+					const CString file = vfile.IsEmpty() ? FindImageFor(job.videoPath) : vfile;
+					if (!vfile.IsEmpty())
+					{
+						r->bmp = MakeCoverBitmap(vfile, job.w, job.h, kThumbBackColor, true, true);
+						if (r->bmp && !vcache.IsEmpty() && !::PathFileExistsW(vcache))
+							CVideoLibrary::SaveCoverCache(vfile, vcache);
+					}
+					else if (!vcache.IsEmpty() && !::PathFileExistsW(job.videoPath) && ::PathFileExistsW(vcache))
+						r->bmp = MakeCoverBitmap(vcache, job.w, job.h, kThumbBackColor, true, true);   // 디스크 연결 안 됨 → 캐시의 세로 커버
+					else if (!file.IsEmpty())
 					{
 						r->bmp = MakeCoverBitmap(file, job.w, job.h, kThumbBackColor, job.portrait);
 						// 이동식 디스크 영상: 커버를 캐시에 보관 (디스크를 빼도 표시)
@@ -11974,6 +12021,49 @@ void CRuliManagerDlg::DrawStudioMark(CDC* dc, const CRect& img, const CString& s
 bool CRuliManagerDlg::SplitPartName(const CString& path, CString& key, int& num)
 {
 	return CVideoLibrary::PartGroupKey(path, key, num);   // "ABC-123_2.mp4" → 묶음 키 + 순번 2
+}
+
+void CRuliManagerDlg::BuildMergeKeys() const
+{
+	// 항목 → 분할 묶음 키 (같은 묶음 파일이 2개 이상일 때만)
+	const size_t n = m_lib.items.size();
+	m_mergeKeys.assign(n, CString());
+	std::map<CString, int> total;
+	for (size_t i = 0; i < n; ++i)
+	{
+		CString key;
+		int num = 0;
+		if (SplitPartName(m_lib.items[i].path, key, num))
+		{
+			key.MakeLower();
+			m_mergeKeys[i] = key;
+			++total[key];
+		}
+	}
+	for (CString& k : m_mergeKeys)
+		if (!k.IsEmpty() && total[k] < 2)
+			k.Empty();
+}
+
+bool CRuliManagerDlg::CountOnce(std::set<CString>& seen, int idx, const CString& scope) const
+{
+	if (!m_mergeParts)
+		return true;
+	if (m_mergeKeys.size() != m_lib.items.size())
+		BuildMergeKeys();
+	if (idx < 0 || idx >= static_cast<int>(m_mergeKeys.size()) || m_mergeKeys[idx].IsEmpty())
+		return true;
+	return seen.insert(scope + L'\x1F' + m_mergeKeys[idx]).second;
+}
+
+int CRuliManagerDlg::CountWorks(const std::vector<int>& idxs) const
+{
+	std::set<CString> seen;
+	int n = 0;
+	for (int i : idxs)
+		if (CountOnce(seen, i))
+			++n;
+	return n;
 }
 
 void CRuliManagerDlg::DrawPartZones(CDC* dc, int row, const CRect& rc, const CRect& img, int radius, bool show)
@@ -13252,7 +13342,7 @@ CString CRuliManagerDlg::FindImageFor(const CString& videoPath)
 	if (key.IsEmpty())
 		return CString();
 
-	CString best;
+	CString best, bestV;
 	WIN32_FIND_DATAW fd = {};
 	HANDLE h = ::FindFirstFileW(dir + key + L"*", &fd);   // 이름이 key 로 시작하는 파일만
 	if (h != INVALID_HANDLE_VALUE)
@@ -13273,12 +13363,66 @@ CString CRuliManagerDlg::FindImageFor(const CString& videoPath)
 			const CString imgStem = name.Left(static_cast<int>(fext - static_cast<LPCWSTR>(name)));
 			if (keyOf(imgStem).CompareNoCase(key) != 0)
 				continue;   // ABC-1234.jpg 처럼 앞부분만 같은 다른 작품은 제외
+			if (imgStem.GetLength() > 2 && imgStem.Right(2).CompareNoCase(L"_V") == 0)
+			{
+				// 세로 커버(ABC-123_V.jpg)는 가로 커버가 하나도 없을 때만
+				if (bestV.IsEmpty() || ::StrCmpLogicalW(name, bestV) < 0)
+					bestV = name;
+				continue;
+			}
 			if (best.IsEmpty() || ::StrCmpLogicalW(name, best) < 0)
 				best = name;
 		} while (::FindNextFileW(h, &fd));
 		::FindClose(h);
 	}
+	if (best.IsEmpty())
+		best = bestV;
 	return best.IsEmpty() ? CString() : dir + best;
+}
+
+CString CRuliManagerDlg::FindVerticalImageFor(const CString& videoPath)
+{
+	// 세로 커버: 확장자를 뺀 파일 이름 + "_V" (예: ABC-123.mp4 → ABC-123_V.jpg)
+	//  분할 영상(ABC-123_2.mp4)은 파트 번호를 뺀 이름 + "_V" (ABC-123_V.jpg - "_2_V" 는 찾지 않음, 모든 파트 공용)
+	//  없으면 '_' 왼쪽 이름 + "_V" (ABC-123_1080p.mp4 → ABC-123_V.jpg)
+	static const wchar_t* const kImageExts[] = {
+		L".jpg", L".jpeg", L".png", L".webp", L".bmp", L".gif", L".tif", L".tiff", L".svg"
+	};
+	CString stem = videoPath;
+	const int ext = static_cast<int>(::PathFindExtensionW(videoPath) - static_cast<LPCWSTR>(videoPath));
+	if (ext > 0 && ext < videoPath.GetLength())
+		stem = videoPath.Left(ext);
+	const CString dir = videoPath.Left(static_cast<int>(::PathFindFileNameW(videoPath) - static_cast<LPCWSTR>(videoPath)));
+	CString name = stem.Mid(dir.GetLength());
+	CString partKey;
+	int partNum = 0;
+	if (SplitPartName(videoPath, partKey, partNum))
+	{
+		// 분할 파트: 마지막 "_번호" 를 뺀 이름
+		const int last = name.ReverseFind(L'_');
+		if (last > 0)
+		{
+			name = name.Left(last);
+			stem = dir + name;
+		}
+	}
+	std::vector<CString> bases = { stem };
+	const int us = name.Find(L'_');
+	if (us > 0)
+	{
+		CString key = name.Left(us);
+		key.Trim();
+		if (!key.IsEmpty())
+			bases.push_back(dir + key);
+	}
+	for (const CString& b : bases)
+		for (const wchar_t* e : kImageExts)
+		{
+			const CString candidate = b + L"_V" + e;
+			if (::PathFileExistsW(candidate))
+				return candidate;
+		}
+	return CString();
 }
 
 void CRuliManagerDlg::OpenImageViewer()
@@ -13748,6 +13892,7 @@ void CRuliManagerDlg::RenameRow(int row, CString newName)
 
 	const CString oldPath = v.path;
 	const CString oldImage = FindImageFor(oldPath);
+	const CString oldVImage = FindVerticalImageFor(oldPath);   // 세로 커버 (파일명_V)
 	if (idx == m_curItem)
 		m_preview.Clear();
 
@@ -13785,6 +13930,23 @@ void CRuliManagerDlg::RenameRow(int row, CString newName)
 				AfxMessageBox(L"동영상 이름은 바꿨지만, 같은 이름의 이미지 파일이 이미 있어 이미지 이름은 바꾸지 않았습니다.", MB_ICONWARNING);
 			else if (!MoveFileWithRetry(oldImage, newImage))
 				AfxMessageBox(L"동영상 이름은 바꿨지만, 이미지 이름은 바꾸지 못했습니다.\n" + LastErrorText(::GetLastError()), MB_ICONWARNING);
+		}
+	}
+	// 세로 커버 "파일명_V.jpg" 도 새 파일명으로 (확장자를 뺀 이름 그대로 붙은 것만 - '_' 왼쪽 이름으로 찾은 공용 세로 커버는 그대로)
+	if (!oldVImage.IsEmpty())
+	{
+		CString oldStem = oldPath, newStem = newPath;
+		::PathRemoveExtensionW(oldStem.GetBuffer());
+		oldStem.ReleaseBuffer();
+		::PathRemoveExtensionW(newStem.GetBuffer());
+		newStem.ReleaseBuffer();
+		const CString prefix = oldStem + L"_V";
+		if (oldVImage.GetLength() > prefix.GetLength() && _wcsnicmp(oldVImage, prefix, prefix.GetLength()) == 0
+			&& oldVImage[prefix.GetLength()] == L'.')
+		{
+			const CString newV = newStem + L"_V" + oldVImage.Mid(prefix.GetLength());
+			if (newV.CompareNoCase(oldVImage) != 0 && !::PathFileExistsW(newV))
+				MoveFileWithRetry(oldVImage, newV);
 		}
 	}
 
@@ -14802,6 +14964,7 @@ void CRuliManagerDlg::UpdateCollectionHeader()
 			if (!kids.empty())
 			{
 				std::map<CString, int> studioOf;   // 영상 제작사 글자(소문자) → studios 인덱스 (같은 이름은 한 번만 찾음)
+				std::set<CString> seenWork;   // 분할 영상 합쳐 보기: 묶음 = 1편
 				for (const VideoItem& v : m_lib.items)
 				{
 					if (v.studio.IsEmpty())
@@ -14811,7 +14974,7 @@ void CRuliManagerDlg::UpdateCollectionHeader()
 					auto f = studioOf.find(key);
 					if (f == studioOf.end())
 						f = studioOf.emplace(key, m_lib.FindStudioLoose(v.studio)).first;
-					if (f->second >= 0)
+					if (f->second >= 0 && CountOnce(seenWork, static_cast<int>(&v - m_lib.items.data()), key))
 						++videoCount[f->second];
 				}
 			}
@@ -14875,11 +15038,13 @@ void CRuliManagerDlg::UpdateCollectionHeader()
 	const CString name = m_catValue;
 	const int ci = m_lib.FindCollection(name);
 	int count = 0, first = -1;
+	std::set<CString> seenWork;   // 분할 영상 합쳐 보기: 묶음 = 1편
 	for (size_t i = 0; i < m_lib.items.size(); ++i)
 		if (m_lib.InCollection(m_lib.items[i], name))
 		{
 			if (first < 0) first = static_cast<int>(i);
-			++count;
+			if (CountOnce(seenWork, static_cast<int>(i)))
+				++count;
 		}
 	CString subLine;
 	subLine.Format(L"컬렉션 · 영상 %d편", count);
@@ -17450,6 +17615,7 @@ void CRuliManagerDlg::UpdateGenreBar(const std::vector<int>& before)
 	const CString& sel = m_genreSel[slot];   // 지금 화면의 고른 태그
 	// 태그별 건수 (대소문자 무시, 처음 나온 표기로)
 	std::map<CString, CGenreChipBar::Item> counts;   // 소문자 → 표시 이름 · 건수
+	std::set<CString> seenWork;   // 분할 영상 합쳐 보기: 묶음 = 1건
 	for (int i : before)
 	{
 		std::set<CString> seen;   // 한 영상에 같은 태그가 두 번 있어도 한 번만
@@ -17466,7 +17632,8 @@ void CRuliManagerDlg::UpdateGenreBar(const std::vector<int>& before)
 			CGenreChipBar::Item& it = counts[key];
 			if (it.name.IsEmpty())
 				it.name = name;
-			++it.count;
+			if (CountOnce(seenWork, i, key))
+				++it.count;
 		}
 	}
 	std::vector<CGenreChipBar::Item> items;
@@ -17492,7 +17659,7 @@ void CRuliManagerDlg::UpdateGenreBar(const std::vector<int>& before)
 			return a.count > b.count;
 		return a.name.CompareNoCase(b.name) < 0;
 	});
-	m_genreBar.SetItems(items, static_cast<int>(before.size()), sel);
+	m_genreBar.SetItems(items, CountWorks(before), sel);   // [전체 N건]
 	// 머리 영역 다시 배치는 ApplyFilter 끝(페이지 버튼까지 정해진 뒤)에서
 }
 

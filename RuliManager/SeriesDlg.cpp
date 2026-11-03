@@ -1191,7 +1191,29 @@ bool CSeriesDlg::Commit()
 		}
 	}
 
+	// 싱글 + 복합(예외 번호) 이 함께 있을 때 품번 칸이 똑같으면 항목을 구분할 수 없음 → 품번 칸을 다르게
+	{
+		const CString myName = CVideoLibrary::JoinList(codes);
+		for (const SeriesInfo& o : CVideoLibrary::ParseSeries(SeriesOf(studio)))
+		{
+			if (!m_new && studio == m_curStudio && o.name.CompareNoCase(m_curName) == 0)
+				continue;   // 지금 항목
+			if (o.composite != composite && o.name.CompareNoCase(myName) == 0)
+			{
+				CString msg;
+				msg.Format(L"같은 제작사에 품번 칸이 똑같은 항목('%s', %s)이 이미 있습니다.\n\n"
+					L"싱글 항목과 복합 항목(일부 번호만 다른 레이블)은 같은 품번을 함께 쓸 수 있지만, 품번 칸 전체가 같으면 구분할 수 없습니다.\n"
+					L"싱글 항목의 품번 칸에 다른 품번을 함께 넣거나(예: SDMU, SDMUA), 다른 항목과 합쳐 주세요.",
+					static_cast<LPCWSTR>(o.name), o.composite ? L"복합" : L"싱글");
+				AfxMessageBox(msg, MB_ICONWARNING);
+				m_editCode.SetFocus();
+				return false;
+			}
+		}
+	}
+
 	// 같은 품번이 다른 항목에 있으면 확인 후 그쪽에서 뺌 (품번은 한 항목에만)
+	//  - 예외: 싱글 항목과 복합 항목은 같은 품번을 함께 가질 수 있음 (복합 = 일부 번호만 다른 레이블, 나머지 번호는 싱글 항목의 레이블)
 	struct Hit { int studio; CString entry; CString code; };
 	std::vector<Hit> hits;
 	for (int si = 0; si <= LooseIdx(); ++si)
@@ -1201,6 +1223,8 @@ bool CSeriesDlg::Commit()
 				continue;   // 다른 제작사는 같은 품번을 써도 됨 (레이블은 영상의 제작사로 고름)
 			if (!m_new && si == m_curStudio && s.name.CompareNoCase(m_curName) == 0)
 				continue;   // 지금 항목
+			if (s.composite != composite)
+				continue;   // 싱글 + 복합(예외 번호) 은 함께 둠
 			for (CString p : CVideoLibrary::SplitList(s.name))
 			{
 				p.Trim();

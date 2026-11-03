@@ -44,7 +44,7 @@ th{background:var(--panel)}
 </style>
 </head>
 <body>
-<nav><div class="brand">RuliManager<small>설명서 · v0.83</small></div><a class="lv1" href="#start">시작하기</a><a class="lv1" href="#layout">화면 구성</a><a class="lv1" href="#video">영상 탭</a><a class="lv1" href="#detail">영상 상세</a><a class="lv1" href="#input">정보 입력 (txt · 붙여넣기)</a><a class="lv1" href="#preview">미리보기 영상</a><a class="lv1" href="#actor">배우 탭</a><a class="lv1" href="#studio">제작사 탭</a><a class="lv1" href="#tag">태그 탭</a><a class="lv1" href="#collection">컬렉션 탭</a><a class="lv1" href="#series">품번 관리</a><a class="lv2" href="#manage-actor">배우 관리</a><a class="lv2" href="#manage-studio">제작사 관리</a><a class="lv2" href="#manage-tag">태그 관리</a><a class="lv2" href="#manage-file">파일 관리</a><a class="lv1" href="#settings">설정</a><a class="lv1" href="#data">데이터와 백업</a><a class="lv1" href="#keys">단축키</a></nav>
+<nav><div class="brand">RuliManager<small>설명서 · v0.83</small></div><a class="lv1" href="#start">시작하기</a><a class="lv1" href="#layout">화면 구성</a><a class="lv1" href="#video">영상 탭</a><a class="lv1" href="#detail">영상 상세</a><a class="lv1" href="#input">정보 입력 (txt · 붙여넣기)</a><a class="lv1" href="#preview">미리보기 영상</a><a class="lv1" href="#actor">배우 탭</a><a class="lv2" href="#actor-drill">배우 출연작 화면</a><a class="lv1" href="#studio">제작사 탭</a><a class="lv2" href="#studio-drill">제작사 영상 화면</a><a class="lv1" href="#tag">태그 탭</a><a class="lv1" href="#collection">컬렉션 탭</a><a class="lv1" href="#series">품번 관리</a><a class="lv2" href="#manage-actor">배우 관리</a><a class="lv2" href="#manage-studio">제작사 관리</a><a class="lv2" href="#manage-tag">태그 관리</a><a class="lv2" href="#manage-file">파일 관리</a><a class="lv1" href="#settings">설정</a><a class="lv1" href="#data">데이터와 백업</a><a class="lv1" href="#keys">단축키</a></nav>
 <main>
 <h1>RuliManager 설명서</h1>
 <p class="hint">v0.83 기준 · 그림은 실제 화면을 단순하게 그린 것이라 세부 모양은 다를 수 있습니다 · 어느 화면에서든 <kbd>F1</kbd> 을 누르면 그 화면의 장이 열립니다.</p>
@@ -332,42 +332,80 @@ th{background:var(--panel)}
 <path d="M500,451.5 l6,0 l5,5 l-6,6 l-5,-5 Z" fill="#A7B6C2"/>
 <text x="514" y="458.5" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">10</text>
 <rect x="620" y="94" width="268" height="400" rx="2" fill="#1D272E"/>
-<rect x="628" y="102" width="252" height="142" rx="3" fill="#3B5163"/>
+<g transform="translate(626,100) scale(0.795)">
+<rect x="0" y="0" width="320" height="135.0" rx="3" fill="#3B5163"/>
 <g opacity="0.35">
-<circle cx="754" cy="173" r="22" fill="none" stroke="#F5F8FA" stroke-width="3.142857142857143"/>
-<path d="M747.4,163.1 L765.0,173 L747.4,182.9 Z" fill="#F5F8FA"/>
+<circle cx="160.0" cy="67.5" r="21.6" fill="none" stroke="#F5F8FA" stroke-width="3.085714285714286"/>
+<path d="M153.52,57.78 L170.8,67.5 L153.52,77.22 Z" fill="#F5F8FA"/>
 </g>
-<text x="628" y="260" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">123분 | fps: 29.97 | 1080p</text>
-<text x="628" y="283" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">품번</text>
-<rect x="664" y="270" width="216" height="18" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
-<text x="670" y="282.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-102</text>
-<text x="628" y="307" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">제목</text>
-<rect x="664" y="294" width="216" height="18" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
-<text x="670" y="306.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">영상 제목 2</text>
-<text x="628" y="331" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">별점</text>
-<text x="664" y="332" font-size="13" fill="#F2B824" text-anchor="start" font-weight="normal">★★★★☆</text>
-<path d="M760,321 q6,8 0,12 q-6,-4 0,-12 Z" fill="#48AFF0"/>
-<text x="770" y="332" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">2</text>
-<text x="628" y="355" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">발매일</text>
-<rect x="664" y="342" width="216" height="18" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
-<text x="670" y="354.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">2024-05-17</text>
-<text x="628" y="379" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">배우</text>
-<rect x="664" y="366" width="92.5" height="18" rx="9.0" fill="#394B59"/>
-<text x="672" y="378.6" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">♀ 배우 이름 ×</text>
-<text x="628" y="403" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">제작사</text>
-<rect x="664" y="390" width="104" height="30" rx="3" fill="#30404D"/>
-<text x="672" y="409" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">제작사</text>
-<rect x="774" y="390" width="106" height="30" rx="3" fill="#2B3A46"/>
-<text x="782" y="409" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">레이블</text>
-<text x="628" y="439" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">태그</text>
-<rect x="664" y="426" width="54.5" height="18" rx="9.0" fill="#394B59"/>
-<text x="672" y="438.6" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">드라마 ×</text>
-<rect x="723.5" y="426" width="54.5" height="18" rx="9.0" fill="#394B59"/>
-<text x="731.5" y="438.6" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">코미디 ×</text>
-<text x="628" y="463" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">메모</text>
-<rect x="664" y="450" width="216" height="40" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
-<rect x="820" y="470" width="60" height="20" rx="3" fill="#0F9960"/>
-<text x="850.0" y="483.96" font-size="11" fill="#F5F8FA" text-anchor="middle" font-weight="normal">저장</text>
+<text x="0" y="151.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">파일</text>
+<text x="40" y="151.0" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="normal">ABC-123.mp4</text>
+<text x="320" y="151.0" font-size="8" fill="#A7B6C2" text-anchor="end" font-weight="normal">123분 | 29.97 | 1080p</text>
+<text x="40" y="167.0" font-size="9" fill="#738694" text-anchor="start" font-weight="normal">ABC-123.jpg</text>
+<rect x="170" y="156.0" width="72" height="14" rx="3" fill="#137CBD"/>
+<text x="206.0" y="165.88" font-size="8" fill="#F5F8FA" text-anchor="middle" font-weight="normal">이미지 검색...</text>
+<rect x="246" y="156.0" width="74" height="14" rx="3" fill="#137CBD"/>
+<text x="283.0" y="165.88" font-size="8" fill="#F5F8FA" text-anchor="middle" font-weight="normal">이미지 변경...</text>
+<text x="0" y="187.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">품번</text>
+<rect x="40" y="175.0" width="110" height="16" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="46" y="186.24" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-123</text>
+<rect x="153" y="175.0" width="16" height="16" rx="3" fill="#394B59"/>
+<text x="161.0" y="186.24" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">⧉</text>
+<text x="0" y="207.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">제목</text>
+<rect x="40" y="195.0" width="280" height="35.2" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="46" y="215.84" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">영상 제목 (여러 줄)</text>
+<text x="0" y="246.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">별점</text>
+<text x="40" y="247.2" font-size="13" fill="#F2B824" text-anchor="start" font-weight="normal">★★★☆☆</text>
+<path d="M132,236.2 q6,8 0,12 q-6,-4 0,-12 Z" fill="#48AFF0"/>
+<text x="142" y="247.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">0</text>
+<rect x="266" y="234.2" width="54" height="16" rx="3" fill="#0F9960"/>
+<text x="293.0" y="245.44" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">저장</text>
+<text x="0" y="266.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">발매일</text>
+<rect x="40" y="254.2" width="90" height="16" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="46" y="265.44" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">2024-05-17</text>
+<rect x="136" y="254.2" width="84" height="16" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="142" y="265.44" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">해당없음 ▾</text>
+<text x="0" y="286.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">배우</text>
+<rect x="40" y="274.2" width="71.6" height="16" rx="8.0" fill="#394B59"/>
+<text x="48" y="285.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">♀ 배우 A ×</text>
+<rect x="116.6" y="274.2" width="71.6" height="16" rx="8.0" fill="#394B59"/>
+<text x="124.6" y="285.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">♀ 배우 B ×</text>
+<text x="0" y="311.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">제작사</text>
+<rect x="40" y="294.2" width="280" height="26" rx="3" fill="#30404D"/>
+<rect x="44" y="298.2" width="32.0" height="18" rx="2" fill="#4A5C6B"/>
+<text x="82.0" y="311.2" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="bold">제작사 이름</text>
+<text x="0" y="340.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">레이블</text>
+<rect x="40" y="323.2" width="280" height="26" rx="3" fill="#2B3A46"/>
+<rect x="44" y="327.2" width="32.0" height="18" rx="2" fill="#4A5C6B"/>
+<text x="82.0" y="340.2" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="bold">레이블 이름</text>
+<text x="0" y="365.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">시리즈</text>
+<rect x="40" y="353.2" width="280" height="16" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="0" y="385.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">태그</text>
+<rect x="40" y="373.2" width="48.8" height="16" rx="8.0" fill="#394B59"/>
+<text x="48" y="384.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">드라마 ×</text>
+<rect x="93.8" y="373.2" width="48.8" height="16" rx="8.0" fill="#394B59"/>
+<text x="101.8" y="384.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">코미디 ×</text>
+<rect x="147.6" y="373.2" width="44.4" height="16" rx="8.0" fill="#1B252C"/>
+<text x="155.6" y="384.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">+ 입력</text>
+<rect x="0.0" y="397.2" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="0.0" y="397.2" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+<g opacity="0.7">
+<circle cx="38.5" cy="420.8775" r="11.858000000000002" fill="#F5F8FA"/>
+<path d="M15.207499999999996,458.9925 Q15.207499999999996,436.54699999999997 38.5,436.54699999999997 Q61.792500000000004,436.54699999999997 61.792500000000004,458.9925 Z" fill="#F5F8FA"/>
+</g>
+<text x="4.0" y="485.75" font-size="7" fill="#F5F8FA" text-anchor="start" font-weight="normal">배우 A</text>
+<rect x="81.0" y="397.2" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="81.0" y="397.2" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+<g opacity="0.7">
+<circle cx="119.5" cy="420.8775" r="11.858000000000002" fill="#F5F8FA"/>
+<path d="M96.2075,458.9925 Q96.2075,436.54699999999997 119.5,436.54699999999997 Q142.79250000000002,436.54699999999997 142.79250000000002,458.9925 Z" fill="#F5F8FA"/>
+</g>
+<text x="85.0" y="485.75" font-size="7" fill="#F5F8FA" text-anchor="start" font-weight="normal">배우 B</text>
+<rect x="162.0" y="397.2" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="162.0" y="397.2" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+<rect x="243.0" y="397.2" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="243.0" y="397.2" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+</g>
 <rect x="12" y="506" width="116" height="20" rx="3" fill="#137CBD"/>
 <text x="70.0" y="519.96" font-size="11" fill="#F5F8FA" text-anchor="middle" font-weight="normal">재생 (기본 플레이어)</text>
 <rect x="134" y="506" width="90" height="20" rx="3" fill="#DB3737"/>
@@ -397,7 +435,7 @@ th{background:var(--panel)}
 <circle cx="12" cy="500" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
 <text x="12" y="504" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">8</text>
 </svg><figcaption>메인 화면 (영상 탭)</figcaption></figure>
-<ol class="callouts"><li><b>폴더 · 새로고침</b> - [폴더 관리] 로 등록 폴더 추가 · 제거, [새로고침] <kbd>F5</kbd> 은 새 파일 찾기, [재 스캔] 은 저장된 영상에도 폴더 구조를 다시 적용해 빈 배우 · 제작사 · 발매일을 채웁니다.</li><li><b>[목록 관리 ▾] · 검색</b> - 배우 / 제작사 / 태그 / 품번 / 파일 관리 창을 엽니다. 검색 칸은 이름 · 품번 · 제목 · 배우 · 제작사 · 태그를 바로 찾습니다 (띄어 쓰면 모두 포함하는 것만).</li><li><b>설정 (톱니바퀴)</b> - <a href="#settings">설정 창</a>. 미리보기를 만드는 동안에는 톱니바퀴가 돌고, 오른쪽 클릭으로 만들기를 멈출 수 있습니다.</li><li><b>탭</b> - <a href="#video">영상</a> · <a href="#actor">배우</a> · <a href="#studio">제작사</a> · <a href="#tag">태그</a> · <a href="#collection">컬렉션</a>.</li><li><b>도구줄</b> - 정렬 · 방향, 보기 방식, 확대 슬라이더, 장르 칩, 페이지 단추. 카드와 함께 스크롤됩니다.</li><li><b>카드 격자</b> - 고르면 오른쪽에 상세 정보, 더블클릭 · <kbd>Enter</kbd> · <kbd>Space</kbd> 는 재생(영상) 또는 들어가기(배우 · 제작사 · 태그 · 컬렉션).</li><li><b>상세 화면</b> - 고른 항목의 정보. <a href="#detail">영상 상세</a> 참고. 격자와 사이의 얇은 바를 누르면 접고 펼 수 있고, 설정에서 왼쪽 / 오른쪽 위치를 바꿀 수 있습니다.</li><li><b>아래 단추</b> - 재생, DB 에서 삭제 (파일은 지우지 않음), 탐색기에서 보기, DB 폴더 열기, DB 반영, 정보 txt 생성.</li></ol>
+<ol class="callouts"><li><b>폴더 · 새로고침</b> - [폴더 관리] 로 등록 폴더 추가 · 제거, [새로고침] <kbd>F5</kbd> 은 새 파일 찾기, [재 스캔] 은 저장된 영상에도 폴더 구조를 다시 적용해 빈 배우 · 제작사 · 발매일을 채웁니다.</li><li><b>[목록 관리 ▾] · 검색</b> - 배우 / 제작사 / 태그 / 품번 / 파일 관리 창을 엽니다. 검색 칸은 이름 · 품번 · 제목 · 배우 · 제작사 · 태그를 바로 찾습니다 (띄어 쓰면 모두 포함하는 것만).</li><li><b>설정 (톱니바퀴)</b> - <a href="#settings">설정 창</a>. 미리보기를 만드는 동안에는 톱니바퀴가 돌고, 오른쪽 클릭으로 만들기를 멈출 수 있습니다.</li><li><b>탭</b> - <a href="#video">영상</a> · <a href="#actor">배우</a> · <a href="#studio">제작사</a> · <a href="#tag">태그</a> · <a href="#collection">컬렉션</a>.</li><li><b>도구줄</b> - 정렬 · 방향, 보기 방식, 확대 슬라이더, 장르 칩, 페이지 단추. 카드와 함께 스크롤됩니다.</li><li><b>카드 격자</b> - 고르면 오른쪽에 상세 정보, 더블클릭 · <kbd>Enter</kbd> · <kbd>Space</kbd> 는 재생(영상) 또는 들어가기(<a href="#actor-drill">배우 출연작</a> · <a href="#studio-drill">제작사 영상 화면</a> · 태그 · 컬렉션).</li><li><b>상세 화면</b> - 고른 항목의 정보. <a href="#detail">영상 상세</a> 참고. 격자와 사이의 얇은 바를 누르면 접고 펼 수 있고, 설정에서 왼쪽 / 오른쪽 위치를 바꿀 수 있습니다.</li><li><b>아래 단추</b> - 재생, DB 에서 삭제 (파일은 지우지 않음), 탐색기에서 보기, DB 폴더 열기, DB 반영, 정보 txt 생성.</li></ol>
 <h3>영상 카드</h3>
 <figure><svg viewBox="0 0 560 220" role="img" aria-label="영상 카드 각 부분" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
 <g transform="translate(190,16) scale(1.45)">
@@ -625,99 +663,142 @@ th{background:var(--panel)}
 설정에서 <b>분할 영상 합쳐서 보기</b> 를 켜면 첫 파트 카드 하나만 보이고, 카드 이미지를 파트 수만큼 나눠서 원하는 파트를 고르고 재생합니다.</p>
 <p class="note"><b>주의</b> 연결되지 않은 이동식 디스크의 영상은 보기 전용입니다. 재생 · 수정은 디스크를 연결한 뒤에 할 수 있습니다.</p>
 </section><section id="detail"><h2>영상 상세</h2>
-<figure><svg viewBox="0 0 560 470" role="img" aria-label="영상 상세 화면" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
-<rect x="0" y="0" width="330" height="470" rx="4" fill="#1D272E"/>
-<rect x="10" y="10" width="310" height="174" rx="3" fill="#3B5163"/>
+<p>영상을 고르면 나오는 오른쪽 화면입니다 (설정에서 왼쪽으로 옮길 수 있음). 영상 탭, 배우 출연작, 제작사 · 태그 · 컬렉션 영상 화면에서 같은 모양입니다.</p>
+<figure><svg viewBox="0 0 600 640" role="img" aria-label="영상 상세 화면" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
+<rect x="0" y="0" width="340" height="640" rx="4" fill="#1D272E"/>
+<rect x="10" y="10" width="320" height="144.0" rx="3" fill="#3B5163"/>
 <g opacity="0.35">
-<circle cx="165" cy="97" r="26" fill="none" stroke="#F5F8FA" stroke-width="3.7142857142857144"/>
-<path d="M157.2,85.3 L178.0,97 L157.2,108.7 Z" fill="#F5F8FA"/>
+<circle cx="170.0" cy="82.0" r="23.04" fill="none" stroke="#F5F8FA" stroke-width="3.2914285714285714"/>
+<path d="M163.088,71.632 L181.52,82.0 L163.088,92.368 Z" fill="#F5F8FA"/>
 </g>
-<rect x="150" y="190" width="80" height="18" rx="3" fill="#137CBD"/>
-<text x="190.0" y="202.24" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">이미지 검색...</text>
-<rect x="236" y="190" width="84" height="18" rx="3" fill="#137CBD"/>
-<text x="278.0" y="202.24" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">이미지 변경...</text>
-<text x="10" y="203" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">123분 | fps 29.97 | 1080p</text>
-<text x="10" y="229" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">품번</text>
-<rect x="52" y="216" width="242" height="18" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
-<text x="58" y="228.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-123</text>
-<rect x="298" y="216" width="22" height="18" rx="3" fill="#394B59"/>
-<text x="309.0" y="228.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">⧉</text>
-<text x="10" y="253" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">제목</text>
-<rect x="52" y="240" width="268" height="30" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
-<text x="58" y="258.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">영상 제목</text>
-<text x="10" y="289" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">별점</text>
-<text x="52" y="290" font-size="14" fill="#F2B824" text-anchor="start" font-weight="normal">★★★☆☆</text>
-<path d="M150,279 q6,8 0,12 q-6,-4 0,-12 Z" fill="#48AFF0"/>
-<text x="160" y="290" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">0</text>
-<text x="10" y="313" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">발매일</text>
-<rect x="52" y="300" width="110" height="18" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
-<text x="58" y="312.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">2024-05-17</text>
-<rect x="168" y="300" width="90" height="18" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
-<text x="174" y="312.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">해당없음 ▾</text>
-<text x="10" y="337" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">배우</text>
-<rect x="52" y="324" width="83.0" height="18" rx="9.0" fill="#394B59"/>
-<text x="60" y="336.6" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">♀ 배우 A ×</text>
-<rect x="140.0" y="324" width="83.0" height="18" rx="9.0" fill="#394B59"/>
-<text x="148.0" y="336.6" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">♀ 배우 B ×</text>
-<text x="10" y="361" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">제작사</text>
-<rect x="52" y="348" width="130" height="32" rx="3" fill="#30404D"/>
-<text x="60" y="368" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">제작사 이름</text>
-<rect x="188" y="348" width="132" height="32" rx="3" fill="#2B3A46"/>
-<text x="196" y="368" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">레이블 이름</text>
-<text x="10" y="399" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">시리즈</text>
-<rect x="52" y="386" width="268" height="18" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
-<text x="10" y="423" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">태그</text>
-<rect x="52" y="410" width="54.5" height="18" rx="9.0" fill="#394B59"/>
-<text x="60" y="422.6" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">드라마 ×</text>
-<rect x="111.5" y="410" width="54.5" height="18" rx="9.0" fill="#394B59"/>
-<text x="119.5" y="422.6" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">코미디 ×</text>
-<rect x="171.0" y="410" width="52.0" height="18" rx="9.0" fill="#1B252C"/>
-<text x="179.0" y="422.6" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">+ 입력</text>
-<text x="10" y="447" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">메모</text>
-<rect x="52" y="434" width="268" height="34" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
-<rect x="260" y="440" width="60" height="20" rx="3" fill="#0F9960"/>
-<text x="290.0" y="453.96" font-size="11" fill="#F5F8FA" text-anchor="middle" font-weight="normal">저장</text>
-<line x1="326" y1="14" x2="344" y2="14" stroke="#F29D49" stroke-width="1"/>
-<circle cx="354" cy="14" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
-<text x="354" y="18" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">1</text>
-<text x="370" y="18" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">이미지 영역 - 이미지 파일을</text>
-<text x="370" y="31" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">끌어다 놓으면 교체, 더블클릭 =</text>
-<text x="370" y="44" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">원본 보기</text>
-<line x1="326" y1="225" x2="344" y2="225" stroke="#F29D49" stroke-width="1"/>
-<circle cx="354" cy="225" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
-<text x="354" y="229" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">2</text>
-<text x="370" y="229" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">품번 - 오른쪽 단추로 복사,</text>
-<text x="370" y="242" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">품번으로 제작사 · 레이블 자동</text>
-<text x="370" y="255" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">연결</text>
-<line x1="326" y1="285" x2="344" y2="285" stroke="#F29D49" stroke-width="1"/>
-<circle cx="354" cy="285" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
-<text x="354" y="289" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">3</text>
-<text x="370" y="289" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">별점(클릭 즉시 저장) ·</text>
-<text x="370" y="302" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">물방울(클릭마다 +1, 오른쪽</text>
-<text x="370" y="315" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">클릭 = 초기화)</text>
-<line x1="326" y1="333" x2="344" y2="333" stroke="#F29D49" stroke-width="1"/>
-<circle cx="354" cy="333" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
-<text x="354" y="337" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">4</text>
-<text x="370" y="337" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">배우 칩 - 오른쪽 클릭 = 별칭</text>
-<text x="370" y="350" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">고르기, 더블클릭 = 배우로 이동</text>
-<line x1="326" y1="358" x2="344" y2="358" stroke="#F29D49" stroke-width="1"/>
-<circle cx="354" cy="358" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
-<text x="354" y="362" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">5</text>
-<text x="370" y="362" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">제작사 · 레이블 카드 -</text>
-<text x="370" y="375" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">더블클릭 = 바꾸기</text>
-<line x1="326" y1="417" x2="344" y2="417" stroke="#F29D49" stroke-width="1"/>
-<circle cx="354" cy="417" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
-<text x="354" y="421" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">6</text>
-<text x="370" y="421" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">태그 칩 - 입력하면 자동 완성,</text>
-<text x="370" y="434" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">⌄ = 목록에서 고르기</text>
-<line x1="326" y1="450" x2="344" y2="450" stroke="#F29D49" stroke-width="1"/>
-<circle cx="354" cy="450" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
-<text x="354" y="454" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">7</text>
-<text x="370" y="454" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">저장 - 다른 영상을 고르면 자동</text>
-<text x="370" y="467" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">저장</text>
+<text x="10" y="170.0" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">파일</text>
+<text x="56" y="170.0" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">ABC-123.mp4</text>
+<text x="330" y="170.0" font-size="9" fill="#A7B6C2" text-anchor="end" font-weight="normal">123분 | 29.97 | 1080p</text>
+<text x="56" y="188.0" font-size="10" fill="#738694" text-anchor="start" font-weight="normal">ABC-123.jpg</text>
+<rect x="180" y="177.0" width="72" height="16" rx="3" fill="#137CBD"/>
+<text x="216.0" y="188.24" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">이미지 검색...</text>
+<rect x="256" y="177.0" width="74" height="16" rx="3" fill="#137CBD"/>
+<text x="293.0" y="188.24" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">이미지 변경...</text>
+<text x="10" y="210.0" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">품번</text>
+<rect x="56" y="198.0" width="110" height="18" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="62" y="210.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-123</text>
+<rect x="169" y="198.0" width="18" height="18" rx="3" fill="#394B59"/>
+<text x="178.0" y="210.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">⧉</text>
+<text x="10" y="232.0" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">제목</text>
+<rect x="56" y="220.0" width="274" height="39.6" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="62" y="243.4" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">영상 제목 (여러 줄)</text>
+<text x="10" y="275.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">별점</text>
+<text x="56" y="276.6" font-size="14" fill="#F2B824" text-anchor="start" font-weight="normal">★★★☆☆</text>
+<path d="M148,265.6 q6,8 0,12 q-6,-4 0,-12 Z" fill="#48AFF0"/>
+<text x="158" y="276.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">0</text>
+<rect x="276" y="263.6" width="54" height="18" rx="3" fill="#0F9960"/>
+<text x="303.0" y="276.20000000000005" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">저장</text>
+<text x="10" y="297.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">발매일</text>
+<rect x="56" y="285.6" width="90" height="18" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="62" y="298.20000000000005" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">2024-05-17</text>
+<rect x="152" y="285.6" width="84" height="18" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="158" y="298.20000000000005" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">해당없음 ▾</text>
+<text x="10" y="319.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">배우</text>
+<rect x="56" y="307.6" width="77.3" height="18" rx="9.0" fill="#394B59"/>
+<text x="64" y="319.84000000000003" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="normal">♀ 배우 A ×</text>
+<rect x="138.3" y="307.6" width="77.3" height="18" rx="9.0" fill="#394B59"/>
+<text x="146.3" y="319.84000000000003" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="normal">♀ 배우 B ×</text>
+<text x="10" y="348.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">제작사</text>
+<rect x="56" y="329.6" width="274" height="30" rx="3" fill="#30404D"/>
+<rect x="60" y="333.6" width="39.111111111111114" height="22" rx="2" fill="#4A5C6B"/>
+<text x="105.11111111111111" y="348.6" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">제작사 이름</text>
+<text x="10" y="381.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">레이블</text>
+<rect x="56" y="362.6" width="274" height="30" rx="3" fill="#2B3A46"/>
+<rect x="60" y="366.6" width="39.111111111111114" height="22" rx="2" fill="#4A5C6B"/>
+<text x="105.11111111111111" y="381.6" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">레이블 이름</text>
+<text x="10" y="408.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">시리즈</text>
+<rect x="56" y="396.6" width="274" height="18" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="10" y="430.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">태그</text>
+<rect x="56" y="418.6" width="51.65" height="18" rx="9.0" fill="#394B59"/>
+<text x="64" y="430.84000000000003" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="normal">드라마 ×</text>
+<rect x="112.65" y="418.6" width="51.65" height="18" rx="9.0" fill="#394B59"/>
+<text x="120.65" y="430.84000000000003" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="normal">코미디 ×</text>
+<rect x="169.3" y="418.6" width="48.199999999999996" height="18" rx="9.0" fill="#1B252C"/>
+<text x="177.3" y="430.84000000000003" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="normal">+ 입력</text>
+<rect x="10.0" y="444.6" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="10.0" y="444.6" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+<g opacity="0.7">
+<circle cx="48.5" cy="468.27750000000003" r="11.858000000000002" fill="#F5F8FA"/>
+<path d="M25.207499999999996,506.39250000000004 Q25.207499999999996,483.947 48.5,483.947 Q71.7925,483.947 71.7925,506.39250000000004 Z" fill="#F5F8FA"/>
+</g>
+<text x="14.0" y="533.15" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">배우 A</text>
+<rect x="91.0" y="444.6" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="91.0" y="444.6" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+<g opacity="0.7">
+<circle cx="129.5" cy="468.27750000000003" r="11.858000000000002" fill="#F5F8FA"/>
+<path d="M106.2075,506.39250000000004 Q106.2075,483.947 129.5,483.947 Q152.79250000000002,483.947 152.79250000000002,506.39250000000004 Z" fill="#F5F8FA"/>
+</g>
+<text x="95.0" y="533.15" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">배우 B</text>
+<rect x="172.0" y="444.6" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="172.0" y="444.6" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+<rect x="253.0" y="444.6" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="253.0" y="444.6" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+<line x1="334" y1="82.0" x2="352" y2="82.0" stroke="#F29D49" stroke-width="1"/>
+<circle cx="362" cy="82.0" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="362" y="86.0" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">1</text>
+<text x="378" y="86.0" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">이미지 - 이미지 파일을 끌어다</text>
+<text x="378" y="99.0" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">놓으면 교체, 더블클릭 = 원본</text>
+<text x="378" y="112.0" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">크기로 보기</text>
+<line x1="334" y1="166.0" x2="352" y2="166.0" stroke="#F29D49" stroke-width="1"/>
+<circle cx="362" cy="166.0" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="362" y="170.0" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">2</text>
+<text x="378" y="170.0" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">파일 이름 · 재생 시간 · fps</text>
+<text x="378" y="183.0" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">· 해상도</text>
+<line x1="334" y1="184.0" x2="352" y2="196.0" stroke="#F29D49" stroke-width="1"/>
+<circle cx="362" cy="196.0" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="362" y="200.0" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">3</text>
+<text x="378" y="200.0" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">이미지 검색 (품번으로 인터넷에서)</text>
+<text x="378" y="213.0" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">· 이미지 변경</text>
+<line x1="334" y1="206.0" x2="352" y2="226.0" stroke="#F29D49" stroke-width="1"/>
+<circle cx="362" cy="226.0" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="362" y="230.0" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">4</text>
+<text x="378" y="230.0" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">품번 - 옆 단추로 복사, 품번으로</text>
+<text x="378" y="243.0" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">제작사 · 레이블 자동 연결</text>
+<line x1="334" y1="271.6" x2="352" y2="271.6" stroke="#F29D49" stroke-width="1"/>
+<circle cx="362" cy="271.6" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="362" y="275.6" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">5</text>
+<text x="378" y="275.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">별점 · 물방울 (누르면 바로</text>
+<text x="378" y="288.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">저장), [저장]</text>
+<line x1="334" y1="293.6" x2="352" y2="301.6" stroke="#F29D49" stroke-width="1"/>
+<circle cx="362" cy="301.6" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="362" y="305.6" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">6</text>
+<text x="378" y="305.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">발매일 (숫자만 쳐도 됨) · 검열</text>
+<text x="378" y="318.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">정보</text>
+<line x1="334" y1="315.6" x2="352" y2="331.6" stroke="#F29D49" stroke-width="1"/>
+<circle cx="362" cy="331.6" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="362" y="335.6" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">7</text>
+<text x="378" y="335.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">배우 칩 - 오른쪽 클릭 = 별칭,</text>
+<text x="378" y="348.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">더블클릭 = 배우로 이동</text>
+<line x1="334" y1="344.6" x2="352" y2="361.6" stroke="#F29D49" stroke-width="1"/>
+<circle cx="362" cy="361.6" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="362" y="365.6" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">8</text>
+<text x="378" y="365.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">제작사 카드 - 더블클릭 = 바꾸기</text>
+<line x1="334" y1="377.6" x2="352" y2="391.6" stroke="#F29D49" stroke-width="1"/>
+<circle cx="362" cy="391.6" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="362" y="395.6" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">9</text>
+<text x="378" y="395.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">레이블 카드 - 품번 관리에서 정해짐</text>
+<line x1="334" y1="404.6" x2="352" y2="421.6" stroke="#F29D49" stroke-width="1"/>
+<circle cx="362" cy="421.6" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="362" y="425.6" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">10</text>
+<text x="378" y="425.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">시리즈 이름 (자유 입력)</text>
+<line x1="334" y1="426.6" x2="352" y2="451.6" stroke="#F29D49" stroke-width="1"/>
+<circle cx="362" cy="451.6" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="362" y="455.6" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">11</text>
+<text x="378" y="455.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">태그 칩 - 입력하면 자동 완성, ⌄</text>
+<text x="378" y="468.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">= 목록</text>
+<line x1="334" y1="490.8" x2="352" y2="490.8" stroke="#F29D49" stroke-width="1"/>
+<circle cx="362" cy="490.8" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="362" y="494.8" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">12</text>
+<text x="378" y="494.8" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">출연 배우 카드 (설정에서</text>
+<text x="378" y="507.8" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">스크린샷으로 바꿀 수 있음)</text>
 </svg><figcaption>영상 상세 화면</figcaption></figure>
 <p>고친 내용은 <b>[저장]</b> 을 누르거나 다른 영상을 고를 때 저장됩니다. 별점과 물방울은 누르는 즉시 저장됩니다.</p>
-<ul><li><b>이미지</b> - [이미지 변경] 으로 파일을 고르거나 탐색기에서 이미지를 끌어다 놓습니다. [이미지 검색] 은 품번으로 인터넷 이미지를 찾습니다. 더블클릭하면 원본 크기로 봅니다.</li><li><b>발매일</b> - <code>19980217</code> 처럼 숫자만 쳐도 됩니다. 오른쪽 콤보는 검열 정보입니다.</li><li><b>배우 · 태그 칩</b> - 글자를 치면 자동 완성 목록이 나옵니다. 칩의 × 로 빼고, ⌄ 로 목록 창에서 고릅니다. 목록에 없는 이름은 새로 추가됩니다.</li><li><b>제작사 · 레이블 카드</b> - 품번으로 자동으로 정해지고, 더블클릭하면 다른 제작사로 바꿉니다.</li><li><b>시리즈</b> - 작품의 시리즈 이름을 자유롭게 적습니다 (검색에 포함).</li><li><b>스크린샷</b> - 오른쪽 클릭 [스크린샷 추출] 로 만든 장면 이미지가 태그 아래에 나옵니다.</li></ul>
+<ul><li><b>이미지</b> - [이미지 변경] 으로 파일을 고르거나 탐색기에서 이미지를 끌어다 놓습니다. [이미지 검색] 은 품번으로 인터넷 이미지를 찾습니다.</li><li><b>제목</b> - 여러 줄로 보입니다.</li><li><b>별점</b> - 별 위에 마우스를 올리면 미리 보이고 누르면 확정, 같은 별을 다시 누르면 0점. 물방울은 누를 때마다 +1, 오른쪽 클릭 [초기화].</li><li><b>발매일</b> - <code>19980217</code> 처럼 숫자만 쳐도 됩니다. 오른쪽 콤보는 검열 정보(해당없음 · 검열됨 · 모자이크파괴 · 무수정 · 무수정-유출).</li><li><b>배우 · 태그 칩</b> - 글자를 치면 자동 완성 목록이 나옵니다. 칩의 × 로 빼고, ⌄ 로 목록 창에서 고릅니다. 목록에 없는 이름은 새로 추가됩니다. 태그 칩에 마우스를 올리면 태그 카드가 팝업으로 나옵니다.</li><li><b>제작사 · 레이블 카드</b> - 로고와 이름. 품번으로 자동으로 정해지고, 제작사 카드를 더블클릭하면 다른 제작사로 바꿉니다.</li><li><b>시리즈</b> - 작품의 시리즈 이름을 자유롭게 적습니다 (검색에 포함).</li><li><b>맨 아래 띠</b> - 출연 배우 카드(더블클릭 = 배우 출연작으로). 설정 [상세 화면] 에서 스크린샷(오른쪽 클릭 [스크린샷 추출] 로 만든 장면)으로 바꿀 수 있습니다.</li></ul>
 </section><section id="input"><h2>정보 입력 (txt · 붙여넣기)</h2>
 <p>영상 정보를 하나하나 치지 않고 한 번에 채우는 방법이 세 가지 있습니다.</p>
 <h3>웹페이지 내용 붙여넣기</h3>
@@ -829,9 +910,288 @@ th{background:var(--panel)}
 <text x="635" y="226" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">트리맵: 칸 크기 = 출연 수 (기준 콤보로 바꿈)</text>
 </svg><figcaption>배우 카드와 트리맵</figcaption></figure>
 <ul><li><b>[격자 | 트리맵]</b> - 트리맵은 배우를 출연 수(기준 콤보로 바꿈)만큼의 칸 크기로 보여 줍니다.</li><li><b>성별 거르기</b> - [선택없음 | 여성만 | 남성만].</li><li><b>정렬</b> - [이름 | 작품수]. 즐겨찾기(♥)한 배우가 항상 먼저 나옵니다. ♥ 는 카드 오른쪽 위에 마우스를 올리고 누릅니다.</li><li><b>오른쪽 상세</b> - 사진 · 이름 · 별점 · 나이 · 국적 · 신체 · 데뷔 · 링크. 별점은 바로 누를 수 있습니다.</li><li><b>오른쪽 클릭</b> - 편집 <kbd>F2</kbd>, 텍스트로 정보 입력, 다른 배우와 합치기, 삭제 <kbd>Del</kbd>.</li><li>빈 곳 오른쪽 클릭 → [새 배우 추가...].</li></ul>
-<h3 id="actor-drill">배우 출연작 화면</h3>
-<p>배우 카드를 더블클릭하면 위에 배우 사진 · 정보, 아래에 출연 영상이 나옵니다. [◀ 배우 목록] 이나 <kbd>Backspace</kbd> 로 돌아갑니다.</p>
-<ul><li><b>[격자 | 연도별]</b> - 연도별은 가로 1~12월 × 세로 연도로 출연작을 발매일에 맞춰 늘어놓습니다.</li><li>출연작 화면의 정렬 · 별점 거르기 · 페이지 개수는 영상 탭과 따로 저장됩니다.</li></ul>
+<p>배우 카드를 더블클릭하면 <a href="#actor-drill">배우 출연작 화면</a>으로 들어갑니다.</p>
+</section><section id="actor-drill"><h2>배우 출연작 화면</h2>
+<p>배우 카드를 더블클릭(또는 <kbd>Space</kbd>)하면 들어가는 화면입니다. 위에는 배우 정보, 아래에는 그 배우가 나온 영상, 오른쪽에는 고른 영상의 상세가 나옵니다.</p>
+<figure><svg viewBox="0 0 900 470" role="img" aria-label="배우 출연작 화면" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
+<rect x="0" y="0" width="900" height="470" rx="4" fill="#202B33"/>
+<rect x="10" y="10" width="92" height="20" rx="3" fill="#394B59"/>
+<text x="56.0" y="23.96" font-size="11" fill="#F5F8FA" text-anchor="middle" font-weight="normal">◀ 배우 목록</text>
+<rect x="106" y="10" width="22" height="20" rx="3" fill="#137CBD"/>
+<text x="117.0" y="23.96" font-size="11" fill="#F5F8FA" text-anchor="middle" font-weight="normal">▦</text>
+<rect x="130" y="10" width="22" height="20" rx="3" fill="#394B59"/>
+<text x="141.0" y="23.96" font-size="11" fill="#F5F8FA" text-anchor="middle" font-weight="normal">▥</text>
+<text x="166" y="24" font-size="11" fill="#F5F8FA" text-anchor="start" font-weight="bold">배우: 배우 A  (영상 40편)</text>
+<rect x="10" y="40" width="120" height="160" rx="3" fill="#3E4F5E"/>
+<g opacity="0.75">
+<circle cx="70" cy="80.5" r="25.200000000000003" fill="#F5F8FA"/>
+<path d="M20.499999999999993,161.5 Q20.499999999999993,113.8 70,113.8 Q119.5,113.8 119.5,161.5 Z" fill="#F5F8FA"/>
+</g>
+<text x="146" y="64" font-size="20" fill="#F5F8FA" text-anchor="start" font-weight="bold">배우 A</text>
+<text x="222" y="64" font-size="16" fill="#DB3737" text-anchor="start" font-weight="normal">♥</text>
+<text x="146" y="88" font-size="15" fill="#F2B824" text-anchor="start" font-weight="normal">★★★★★</text>
+<text x="146" y="112" font-size="10" fill="#738694" text-anchor="start" font-weight="normal">성별</text>
+<text x="186" y="112" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">♀ 여성</text>
+<text x="146" y="128" font-size="10" fill="#738694" text-anchor="start" font-weight="normal">출생</text>
+<text x="186" y="128" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">1998-02-17 (28세)</text>
+<text x="146" y="144" font-size="10" fill="#738694" text-anchor="start" font-weight="normal">국적</text>
+<text x="186" y="144" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">일본</text>
+<text x="146" y="160" font-size="10" fill="#738694" text-anchor="start" font-weight="normal">신체</text>
+<text x="186" y="160" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">162cm B88 W58 H86 (E컵)</text>
+<text x="146" y="176" font-size="10" fill="#738694" text-anchor="start" font-weight="normal">경력</text>
+<text x="186" y="176" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">데뷔 2018-04 (8년)</text>
+<text x="146" y="192" font-size="10" fill="#738694" text-anchor="start" font-weight="normal">링크</text>
+<text x="186" y="192" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">● ● ●</text>
+<rect x="10" y="210" width="590" height="250" rx="2" fill="#1D272E"/>
+<rect x="18" y="218" width="66" height="18" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="24" y="230.24" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">정렬 ▾</text>
+<rect x="90" y="218" width="20" height="18" rx="3" fill="#137CBD"/>
+<text x="100.0" y="230.24" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">▦</text>
+<rect x="112" y="218" width="20" height="18" rx="3" fill="#394B59"/>
+<text x="122.0" y="230.24" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">☰</text>
+<rect x="134" y="218" width="20" height="18" rx="3" fill="#394B59"/>
+<text x="144.0" y="230.24" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">▤</text>
+<rect x="156" y="218" width="20" height="18" rx="3" fill="#394B59"/>
+<text x="166.0" y="230.24" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">▣</text>
+<g transform="translate(20,244) scale(0.98)">
+<rect x="0" y="0" width="136" height="134.5" rx="4" fill="#30404D"/>
+<rect x="0" y="0" width="136" height="76.5" rx="4" fill="#3B5163"/>
+<g opacity="0.35">
+<circle cx="68.0" cy="38.25" r="13.77" fill="none" stroke="#F5F8FA" stroke-width="1.967142857142857"/>
+<path d="M63.869,32.0535 L74.885,38.25 L63.869,44.4465 Z" fill="#F5F8FA"/>
+</g>
+<text x="131" y="71.5" font-size="9" fill="#F5F8FA" text-anchor="end" font-weight="normal">2:03:15</text>
+<text x="6" y="90.5" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">출연작 1</text>
+<text x="6" y="105.5" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-300</text>
+<rect x="72" y="95.5" width="58" height="13" rx="1" fill="#30404D" stroke="#A7B6C2" stroke-width="1"/>
+<text x="75" y="105.5" font-size="8" fill="#A7B6C2" text-anchor="start" font-weight="bold">1080p</text>
+<rect x="110" y="95.5" width="20" height="13" rx="0" fill="#A7B6C2"/>
+<text x="120" y="105.5" font-size="7" fill="#30404D" text-anchor="middle" font-weight="bold">FHD</text>
+<line x1="0" y1="114.5" x2="136" y2="114.5" stroke="#394B59" stroke-width="1"/>
+<g opacity="1">
+<circle cx="12" cy="122.35" r="2.5200000000000005" fill="#A7B6C2"/>
+<path d="M7.05,130.45 Q7.05,125.68 12,125.68 Q16.95,125.68 16.95,130.45 Z" fill="#A7B6C2"/>
+</g>
+<text x="20" y="128.5" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">1</text>
+<path d="M38,121.5 l6,0 l5,5 l-6,6 l-5,-5 Z" fill="#A7B6C2"/>
+<text x="52" y="128.5" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">4</text>
+</g>
+<g transform="translate(165,244) scale(0.98)">
+<rect x="0" y="0" width="136" height="134.5" rx="4" fill="#30404D"/>
+<rect x="0" y="0" width="136" height="76.5" rx="4" fill="#3B5163"/>
+<g opacity="0.35">
+<circle cx="68.0" cy="38.25" r="13.77" fill="none" stroke="#F5F8FA" stroke-width="1.967142857142857"/>
+<path d="M63.869,32.0535 L74.885,38.25 L63.869,44.4465 Z" fill="#F5F8FA"/>
+</g>
+<text x="131" y="71.5" font-size="9" fill="#F5F8FA" text-anchor="end" font-weight="normal">2:03:15</text>
+<text x="6" y="90.5" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">출연작 2</text>
+<text x="6" y="105.5" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-301</text>
+<rect x="72" y="95.5" width="58" height="13" rx="1" fill="#30404D" stroke="#A7B6C2" stroke-width="1"/>
+<text x="75" y="105.5" font-size="8" fill="#A7B6C2" text-anchor="start" font-weight="bold">1080p</text>
+<rect x="110" y="95.5" width="20" height="13" rx="0" fill="#A7B6C2"/>
+<text x="120" y="105.5" font-size="7" fill="#30404D" text-anchor="middle" font-weight="bold">FHD</text>
+<line x1="0" y1="114.5" x2="136" y2="114.5" stroke="#394B59" stroke-width="1"/>
+<g opacity="1">
+<circle cx="12" cy="122.35" r="2.5200000000000005" fill="#A7B6C2"/>
+<path d="M7.05,130.45 Q7.05,125.68 12,125.68 Q16.95,125.68 16.95,130.45 Z" fill="#A7B6C2"/>
+</g>
+<text x="20" y="128.5" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">2</text>
+<path d="M38,121.5 l6,0 l5,5 l-6,6 l-5,-5 Z" fill="#A7B6C2"/>
+<text x="52" y="128.5" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">4</text>
+</g>
+<g transform="translate(310,244) scale(0.98)">
+<rect x="0" y="0" width="136" height="134.5" rx="4" fill="#30404D"/>
+<rect x="0" y="0" width="136" height="76.5" rx="4" fill="#3B5163"/>
+<g opacity="0.35">
+<circle cx="68.0" cy="38.25" r="13.77" fill="none" stroke="#F5F8FA" stroke-width="1.967142857142857"/>
+<path d="M63.869,32.0535 L74.885,38.25 L63.869,44.4465 Z" fill="#F5F8FA"/>
+</g>
+<text x="131" y="71.5" font-size="9" fill="#F5F8FA" text-anchor="end" font-weight="normal">2:03:15</text>
+<text x="6" y="90.5" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">출연작 3</text>
+<text x="6" y="105.5" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-302</text>
+<rect x="72" y="95.5" width="58" height="13" rx="1" fill="#30404D" stroke="#A7B6C2" stroke-width="1"/>
+<text x="75" y="105.5" font-size="8" fill="#A7B6C2" text-anchor="start" font-weight="bold">1080p</text>
+<rect x="110" y="95.5" width="20" height="13" rx="0" fill="#A7B6C2"/>
+<text x="120" y="105.5" font-size="7" fill="#30404D" text-anchor="middle" font-weight="bold">FHD</text>
+<line x1="0" y1="114.5" x2="136" y2="114.5" stroke="#394B59" stroke-width="1"/>
+<g opacity="1">
+<circle cx="12" cy="122.35" r="2.5200000000000005" fill="#A7B6C2"/>
+<path d="M7.05,130.45 Q7.05,125.68 12,125.68 Q16.95,125.68 16.95,130.45 Z" fill="#A7B6C2"/>
+</g>
+<text x="20" y="128.5" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">1</text>
+<path d="M38,121.5 l6,0 l5,5 l-6,6 l-5,-5 Z" fill="#A7B6C2"/>
+<text x="52" y="128.5" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">4</text>
+</g>
+<g transform="translate(455,244) scale(0.98)">
+<rect x="0" y="0" width="136" height="134.5" rx="4" fill="#30404D"/>
+<rect x="0" y="0" width="136" height="76.5" rx="4" fill="#3B5163"/>
+<g opacity="0.35">
+<circle cx="68.0" cy="38.25" r="13.77" fill="none" stroke="#F5F8FA" stroke-width="1.967142857142857"/>
+<path d="M63.869,32.0535 L74.885,38.25 L63.869,44.4465 Z" fill="#F5F8FA"/>
+</g>
+<text x="131" y="71.5" font-size="9" fill="#F5F8FA" text-anchor="end" font-weight="normal">2:03:15</text>
+<text x="6" y="90.5" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">출연작 4</text>
+<text x="6" y="105.5" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-303</text>
+<rect x="72" y="95.5" width="58" height="13" rx="1" fill="#30404D" stroke="#A7B6C2" stroke-width="1"/>
+<text x="75" y="105.5" font-size="8" fill="#A7B6C2" text-anchor="start" font-weight="bold">1080p</text>
+<rect x="110" y="95.5" width="20" height="13" rx="0" fill="#A7B6C2"/>
+<text x="120" y="105.5" font-size="7" fill="#30404D" text-anchor="middle" font-weight="bold">FHD</text>
+<line x1="0" y1="114.5" x2="136" y2="114.5" stroke="#394B59" stroke-width="1"/>
+<g opacity="1">
+<circle cx="12" cy="122.35" r="2.5200000000000005" fill="#A7B6C2"/>
+<path d="M7.05,130.45 Q7.05,125.68 12,125.68 Q16.95,125.68 16.95,130.45 Z" fill="#A7B6C2"/>
+</g>
+<text x="20" y="128.5" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">2</text>
+<path d="M38,121.5 l6,0 l5,5 l-6,6 l-5,-5 Z" fill="#A7B6C2"/>
+<text x="52" y="128.5" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">4</text>
+</g>
+<rect x="610" y="40" width="280" height="420" rx="2" fill="#1D272E"/>
+<g transform="translate(616,46) scale(0.84)">
+<rect x="0" y="0" width="320" height="135.0" rx="3" fill="#3B5163"/>
+<g opacity="0.35">
+<circle cx="160.0" cy="67.5" r="21.6" fill="none" stroke="#F5F8FA" stroke-width="3.085714285714286"/>
+<path d="M153.52,57.78 L170.8,67.5 L153.52,77.22 Z" fill="#F5F8FA"/>
+</g>
+<text x="0" y="151.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">파일</text>
+<text x="40" y="151.0" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="normal">ABC-123.mp4</text>
+<text x="320" y="151.0" font-size="8" fill="#A7B6C2" text-anchor="end" font-weight="normal">123분 | 29.97 | 1080p</text>
+<text x="40" y="167.0" font-size="9" fill="#738694" text-anchor="start" font-weight="normal">ABC-123.jpg</text>
+<rect x="170" y="156.0" width="72" height="14" rx="3" fill="#137CBD"/>
+<text x="206.0" y="165.88" font-size="8" fill="#F5F8FA" text-anchor="middle" font-weight="normal">이미지 검색...</text>
+<rect x="246" y="156.0" width="74" height="14" rx="3" fill="#137CBD"/>
+<text x="283.0" y="165.88" font-size="8" fill="#F5F8FA" text-anchor="middle" font-weight="normal">이미지 변경...</text>
+<text x="0" y="187.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">품번</text>
+<rect x="40" y="175.0" width="110" height="16" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="46" y="186.24" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-123</text>
+<rect x="153" y="175.0" width="16" height="16" rx="3" fill="#394B59"/>
+<text x="161.0" y="186.24" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">⧉</text>
+<text x="0" y="207.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">제목</text>
+<rect x="40" y="195.0" width="280" height="35.2" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="46" y="215.84" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">영상 제목 (여러 줄)</text>
+<text x="0" y="246.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">별점</text>
+<text x="40" y="247.2" font-size="13" fill="#F2B824" text-anchor="start" font-weight="normal">★★★☆☆</text>
+<path d="M132,236.2 q6,8 0,12 q-6,-4 0,-12 Z" fill="#48AFF0"/>
+<text x="142" y="247.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">0</text>
+<rect x="266" y="234.2" width="54" height="16" rx="3" fill="#0F9960"/>
+<text x="293.0" y="245.44" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">저장</text>
+<text x="0" y="266.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">발매일</text>
+<rect x="40" y="254.2" width="90" height="16" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="46" y="265.44" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">2024-05-17</text>
+<rect x="136" y="254.2" width="84" height="16" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="142" y="265.44" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">해당없음 ▾</text>
+<text x="0" y="286.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">배우</text>
+<rect x="40" y="274.2" width="71.6" height="16" rx="8.0" fill="#394B59"/>
+<text x="48" y="285.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">♀ 배우 A ×</text>
+<rect x="116.6" y="274.2" width="71.6" height="16" rx="8.0" fill="#394B59"/>
+<text x="124.6" y="285.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">♀ 배우 B ×</text>
+<text x="0" y="311.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">제작사</text>
+<rect x="40" y="294.2" width="280" height="26" rx="3" fill="#30404D"/>
+<rect x="44" y="298.2" width="32.0" height="18" rx="2" fill="#4A5C6B"/>
+<text x="82.0" y="311.2" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="bold">제작사 이름</text>
+<text x="0" y="340.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">레이블</text>
+<rect x="40" y="323.2" width="280" height="26" rx="3" fill="#2B3A46"/>
+<rect x="44" y="327.2" width="32.0" height="18" rx="2" fill="#4A5C6B"/>
+<text x="82.0" y="340.2" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="bold">레이블 이름</text>
+<text x="0" y="365.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">시리즈</text>
+<rect x="40" y="353.2" width="280" height="16" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="0" y="385.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">태그</text>
+<rect x="40" y="373.2" width="48.8" height="16" rx="8.0" fill="#394B59"/>
+<text x="48" y="384.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">드라마 ×</text>
+<rect x="93.8" y="373.2" width="48.8" height="16" rx="8.0" fill="#394B59"/>
+<text x="101.8" y="384.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">코미디 ×</text>
+<rect x="147.6" y="373.2" width="44.4" height="16" rx="8.0" fill="#1B252C"/>
+<text x="155.6" y="384.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">+ 입력</text>
+<rect x="0.0" y="397.2" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="0.0" y="397.2" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+<g opacity="0.7">
+<circle cx="38.5" cy="420.8775" r="11.858000000000002" fill="#F5F8FA"/>
+<path d="M15.207499999999996,458.9925 Q15.207499999999996,436.54699999999997 38.5,436.54699999999997 Q61.792500000000004,436.54699999999997 61.792500000000004,458.9925 Z" fill="#F5F8FA"/>
+</g>
+<text x="4.0" y="485.75" font-size="7" fill="#F5F8FA" text-anchor="start" font-weight="normal">배우 A</text>
+<rect x="81.0" y="397.2" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="81.0" y="397.2" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+<g opacity="0.7">
+<circle cx="119.5" cy="420.8775" r="11.858000000000002" fill="#F5F8FA"/>
+<path d="M96.2075,458.9925 Q96.2075,436.54699999999997 119.5,436.54699999999997 Q142.79250000000002,436.54699999999997 142.79250000000002,458.9925 Z" fill="#F5F8FA"/>
+</g>
+<text x="85.0" y="485.75" font-size="7" fill="#F5F8FA" text-anchor="start" font-weight="normal">배우 B</text>
+<rect x="162.0" y="397.2" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="162.0" y="397.2" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+<rect x="243.0" y="397.2" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="243.0" y="397.2" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+</g>
+<circle cx="10" cy="10" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="10" y="14" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">1</text>
+<circle cx="106" cy="10" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="106" y="14" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">2</text>
+<circle cx="10" cy="40" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="10" y="44" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">3</text>
+<circle cx="256" cy="58" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="256" y="62" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">4</text>
+<circle cx="10" cy="210" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="10" y="214" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">5</text>
+<circle cx="610" cy="40" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="610" y="44" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">6</text>
+</svg><figcaption>배우 출연작 화면 ([격자] 보기)</figcaption></figure>
+<ol class="callouts"><li><b>[◀ 배우 목록]</b> - 배우 목록으로 돌아갑니다 ({K("Backspace")} 도 됨). 오른쪽 글자는 배우 이름과 출연 영상 수.</li><li><b>[격자 | 연도별]</b> - 출연작 보기 방식.</li><li><b>배우 사진</b> - 더블클릭하면 원본 크기로 봅니다. 사진이 없으면 성별 실루엣.</li><li><b>배우 정보</b> - 배우 탭 상세와 같은 내용(이름 · ♥ · 별점 · 성별 · 출생 · 국적 · 신체 · 경력 · 링크). ♥ 와 별점은 여기서 바로 바꿀 수 있습니다.</li><li><b>출연작</b> - 영상 탭과 같은 격자 · 정렬 · 보기 방식. 정렬 · 페이지 개수는 영상 탭과 따로 기억합니다.</li><li><b>영상 상세</b> - 고른 영상의 <a href="#detail">영상 상세</a>. 이 화면에서는 아래 띠에 스크린샷만 나옵니다 (설정에서 스크린샷을 고른 경우).</li></ol>
+<h3>[연도별] 보기</h3>
+<figure><svg viewBox="0 0 900 230" role="img" aria-label="배우 출연작 연도별 보기" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
+<rect x="0" y="0" width="900" height="230" rx="4" fill="#1D272E"/>
+<rect x="0" y="0" width="900" height="24" rx="0" fill="#394B59"/>
+<text x="114" y="16" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="bold">1월</text>
+<text x="182" y="16" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="bold">2월</text>
+<text x="250" y="16" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="bold">3월</text>
+<text x="318" y="16" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="bold">4월</text>
+<text x="386" y="16" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="bold">5월</text>
+<text x="454" y="16" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="bold">6월</text>
+<text x="522" y="16" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="bold">7월</text>
+<text x="590" y="16" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="bold">8월</text>
+<text x="658" y="16" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="bold">9월</text>
+<text x="726" y="16" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="bold">10월</text>
+<text x="794" y="16" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="bold">11월</text>
+<text x="862" y="16" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="bold">12월</text>
+<text x="40" y="64" font-size="13" fill="#F5F8FA" text-anchor="middle" font-weight="bold">2019</text>
+<line x1="0" y1="92" x2="900" y2="92" stroke="#394B59" stroke-width="1"/>
+<rect x="152" y="36" width="30" height="50" rx="2" fill="#4A3F5C"/>
+<rect x="184" y="36" width="30" height="50" rx="2" fill="#3F5A4B"/>
+<rect x="220" y="36" width="30" height="50" rx="2" fill="#3F5A4B"/>
+<rect x="252" y="36" width="30" height="50" rx="2" fill="#5C4A3B"/>
+<rect x="356" y="36" width="30" height="50" rx="2" fill="#3B5163"/>
+<rect x="424" y="36" width="30" height="50" rx="2" fill="#4A3F5C"/>
+<rect x="456" y="36" width="30" height="50" rx="2" fill="#3F5A4B"/>
+<rect x="492" y="36" width="30" height="50" rx="2" fill="#3F5A4B"/>
+<rect x="560" y="36" width="30" height="50" rx="2" fill="#5C4A3B"/>
+<rect x="592" y="36" width="30" height="50" rx="2" fill="#3B5163"/>
+<rect x="696" y="36" width="30" height="50" rx="2" fill="#4A3F5C"/>
+<rect x="728" y="36" width="30" height="50" rx="2" fill="#3F5A4B"/>
+<rect x="832" y="36" width="30" height="50" rx="2" fill="#5C4A3B"/>
+<text x="40" y="130" font-size="13" fill="#F5F8FA" text-anchor="middle" font-weight="bold">2020</text>
+<line x1="0" y1="158" x2="900" y2="158" stroke="#394B59" stroke-width="1"/>
+<rect x="84" y="102" width="30" height="50" rx="2" fill="#3B5163"/>
+<rect x="152" y="102" width="30" height="50" rx="2" fill="#4A3F5C"/>
+<rect x="184" y="102" width="30" height="50" rx="2" fill="#3F5A4B"/>
+<rect x="356" y="102" width="30" height="50" rx="2" fill="#3B5163"/>
+<rect x="424" y="102" width="30" height="50" rx="2" fill="#4A3F5C"/>
+<rect x="456" y="102" width="30" height="50" rx="2" fill="#3F5A4B"/>
+<rect x="492" y="102" width="30" height="50" rx="2" fill="#3F5A4B"/>
+<rect x="524" y="102" width="30" height="50" rx="2" fill="#5C4A3B"/>
+<rect x="560" y="102" width="30" height="50" rx="2" fill="#5C4A3B"/>
+<rect x="628" y="102" width="30" height="50" rx="2" fill="#3B5163"/>
+<text x="40" y="196" font-size="13" fill="#F5F8FA" text-anchor="middle" font-weight="bold">2021</text>
+<line x1="0" y1="224" x2="900" y2="224" stroke="#394B59" stroke-width="1"/>
+<rect x="84" y="168" width="30" height="50" rx="2" fill="#3B5163"/>
+<rect x="116" y="168" width="30" height="50" rx="2" fill="#4A3F5C"/>
+<rect x="152" y="168" width="30" height="50" rx="2" fill="#4A3F5C"/>
+<rect x="424" y="168" width="30" height="50" rx="2" fill="#4A3F5C"/>
+<rect x="456" y="168" width="30" height="50" rx="2" fill="#3F5A4B"/>
+<rect x="560" y="168" width="30" height="50" rx="2" fill="#5C4A3B"/>
+<rect x="696" y="168" width="30" height="50" rx="2" fill="#4A3F5C"/>
+<rect x="764" y="168" width="30" height="50" rx="2" fill="#3F5A4B"/>
+<rect x="832" y="168" width="30" height="50" rx="2" fill="#5C4A3B"/>
+<rect x="864" y="168" width="30" height="50" rx="2" fill="#3B5163"/>
+</svg><figcaption>[연도별] - 가로 1~12월, 세로 연도</figcaption></figure>
+<p>출연작을 발매일의 연도 · 월 칸에 늘어놓습니다. 영상이 있는 연도만, 오래된 연도부터 위에서 아래로 나옵니다.
+위쪽 월 머리글과 왼쪽 연도는 스크롤해도 그대로 보입니다. 칸의 영상을 더블클릭하면 재생합니다.</p>
 </section><section id="studio"><h2>제작사 탭</h2>
 <p>제작사를 카드로 봅니다. 제작사는 상위 · 하위(예: 그룹 › 회사 › 브랜드)로 묶을 수 있고, 카드 배경색이 레벨을 나타냅니다.
 보기 방식은 <b>[격자 | 리스트 | 계층]</b> 세 가지입니다.</p>
@@ -892,9 +1252,256 @@ th{background:var(--panel)}
 <text x="500" y="168" font-size="11" fill="#A7B6C2" text-anchor="start" font-weight="normal">· 더블클릭 = 제작사 영상 화면</text>
 </svg><figcaption>[계층] 보기</figcaption></figure>
 <ul><li><b>격자</b> - 정렬([이름 | 영상수])과 검색 순서대로.</li><li><b>리스트</b> - 이름 · 영상 수 표. 열 머리글로 정렬.</li><li><b>계층</b> - 상위 → 하위 트리. − / + 로 접고 펼칩니다.</li><li>빈 곳 오른쪽 클릭 → [새 제작사 추가...], 카드 오른쪽 클릭 → 편집 · 삭제.</li></ul>
-<h3 id="studio-drill">제작사 영상 화면</h3>
-<p>제작사 카드를 더블클릭하면 그 제작사의 영상이 나옵니다. 위쪽에는 로고 · 메모 · 링크와 함께 직속 상위(▲) · 하위(└) 제작사 칸이 있고, 더블클릭하면 그 제작사로 이동합니다.</p>
-<p><b>[레이블]</b> 보기는 영상을 레이블(품번 접두어) 묶음으로 나눠 보여 줍니다. 묶음 머리줄을 오른쪽 클릭하면 <a href="#series">품번 관리</a>에서 보기 · 등록할 수 있습니다.</p>
+<p>제작사 카드를 더블클릭하면 <a href="#studio-drill">제작사 영상 화면</a>으로 들어갑니다.</p>
+</section><section id="studio-drill"><h2>제작사 영상 화면</h2>
+<p>제작사 카드를 더블클릭(또는 <kbd>Space</kbd>)하면 들어가는 화면입니다. 위에는 제작사 정보, 아래에는 그 제작사의 영상이 나옵니다.</p>
+<figure><svg viewBox="0 0 900 500" role="img" aria-label="제작사 영상 화면" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
+<rect x="0" y="0" width="900" height="500" rx="4" fill="#202B33"/>
+<rect x="10" y="10" width="92" height="20" rx="3" fill="#394B59"/>
+<text x="56.0" y="23.96" font-size="11" fill="#F5F8FA" text-anchor="middle" font-weight="normal">◀ 제작사 목록</text>
+<text x="112" y="24" font-size="11" fill="#F5F8FA" text-anchor="start" font-weight="bold">제작사: 회사 A  (영상 180편)</text>
+<rect x="10" y="40" width="220" height="124" rx="3" fill="#4A5C6B"/>
+<text x="120" y="108" font-size="18" fill="#A7B6C2" text-anchor="middle" font-weight="bold">LOGO</text>
+<text x="246" y="62" font-size="18" fill="#F5F8FA" text-anchor="start" font-weight="bold">회사 A</text>
+<text x="246" y="84" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">상위 제작사: 그룹 · 영상 180편 · 배우 64명</text>
+<text x="246" y="102" font-size="10" fill="#738694" text-anchor="start" font-weight="normal">메모: 제작사 설명</text>
+<rect x="246" y="116" width="112" height="48" rx="3" fill="#30404D"/>
+<rect x="252" y="122" width="48" height="36" rx="2" fill="#4A5C6B"/>
+<text x="308" y="136" font-size="11" fill="#F29D49" text-anchor="start" font-weight="bold">▲</text>
+<text x="308" y="154" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">그룹</text>
+<rect x="364" y="116" width="112" height="48" rx="3" fill="#2F4A3E"/>
+<rect x="370" y="122" width="48" height="36" rx="2" fill="#4A5C6B"/>
+<text x="426" y="136" font-size="11" fill="#A7B6C2" text-anchor="start" font-weight="bold">└</text>
+<text x="426" y="154" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">브랜드 1</text>
+<rect x="482" y="116" width="112" height="48" rx="3" fill="#2F4A3E"/>
+<rect x="488" y="122" width="48" height="36" rx="2" fill="#4A5C6B"/>
+<text x="544" y="136" font-size="11" fill="#A7B6C2" text-anchor="start" font-weight="bold">└</text>
+<text x="544" y="154" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">브랜드 2</text>
+<rect x="10" y="174" width="590" height="316" rx="2" fill="#1D272E"/>
+<rect x="18" y="182" width="66" height="18" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="24" y="194.24" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">정렬 ▾</text>
+<rect x="90" y="182" width="20" height="18" rx="3" fill="#394B59"/>
+<text x="100.0" y="194.24" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">▦</text>
+<rect x="112" y="182" width="20" height="18" rx="3" fill="#394B59"/>
+<text x="122.0" y="194.24" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">☰</text>
+<rect x="134" y="182" width="20" height="18" rx="3" fill="#394B59"/>
+<text x="144.0" y="194.24" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">▤</text>
+<rect x="156" y="182" width="20" height="18" rx="3" fill="#394B59"/>
+<text x="166.0" y="194.24" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">▣</text>
+<rect x="178" y="182" width="20" height="18" rx="3" fill="#137CBD"/>
+<text x="188.0" y="194.24" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">L</text>
+<text x="206" y="195" font-size="10" fill="#F29D49" text-anchor="start" font-weight="normal">← [레이블] 보기</text>
+<rect x="18" y="208" width="574" height="22" rx="2" fill="#394B59"/>
+<rect x="22" y="211" width="28" height="16" rx="1" fill="#4A5C6B"/>
+<text x="56" y="223" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">레이블 1  ·  ABC  ·  3편</text>
+<g transform="translate(22,234) scale(0.68)">
+<rect x="0" y="0" width="160" height="148.0" rx="4" fill="#30404D"/>
+<rect x="0" y="0" width="160" height="90.0" rx="4" fill="#3B5163"/>
+<g opacity="0.35">
+<circle cx="80.0" cy="45.0" r="16.2" fill="none" stroke="#F5F8FA" stroke-width="2.314285714285714"/>
+<path d="M75.14,37.71 L88.1,45.0 L75.14,52.29 Z" fill="#F5F8FA"/>
+</g>
+<text x="155" y="85.0" font-size="9" fill="#F5F8FA" text-anchor="end" font-weight="normal">2:03:15</text>
+<text x="6" y="104.0" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">영상 1</text>
+<text x="6" y="119.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-101</text>
+<rect x="96" y="109.0" width="58" height="13" rx="1" fill="#30404D" stroke="#A7B6C2" stroke-width="1"/>
+<text x="99" y="119.0" font-size="8" fill="#A7B6C2" text-anchor="start" font-weight="bold">1080p</text>
+<rect x="134" y="109.0" width="20" height="13" rx="0" fill="#A7B6C2"/>
+<text x="144" y="119.0" font-size="7" fill="#30404D" text-anchor="middle" font-weight="bold">FHD</text>
+<line x1="0" y1="128.0" x2="160" y2="128.0" stroke="#394B59" stroke-width="1"/>
+<g opacity="1">
+<circle cx="12" cy="135.85" r="2.5200000000000005" fill="#A7B6C2"/>
+<path d="M7.05,143.95 Q7.05,139.18 12,139.18 Q16.95,139.18 16.95,143.95 Z" fill="#A7B6C2"/>
+</g>
+<text x="20" y="142.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">1</text>
+<path d="M38,135.0 l6,0 l5,5 l-6,6 l-5,-5 Z" fill="#A7B6C2"/>
+<text x="52" y="142.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">3</text>
+</g>
+<g transform="translate(142,234) scale(0.68)">
+<rect x="0" y="0" width="160" height="148.0" rx="4" fill="#30404D"/>
+<rect x="0" y="0" width="160" height="90.0" rx="4" fill="#3B5163"/>
+<g opacity="0.35">
+<circle cx="80.0" cy="45.0" r="16.2" fill="none" stroke="#F5F8FA" stroke-width="2.314285714285714"/>
+<path d="M75.14,37.71 L88.1,45.0 L75.14,52.29 Z" fill="#F5F8FA"/>
+</g>
+<text x="155" y="85.0" font-size="9" fill="#F5F8FA" text-anchor="end" font-weight="normal">2:03:15</text>
+<text x="6" y="104.0" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">영상 2</text>
+<text x="6" y="119.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-102</text>
+<rect x="96" y="109.0" width="58" height="13" rx="1" fill="#30404D" stroke="#A7B6C2" stroke-width="1"/>
+<text x="99" y="119.0" font-size="8" fill="#A7B6C2" text-anchor="start" font-weight="bold">1080p</text>
+<rect x="134" y="109.0" width="20" height="13" rx="0" fill="#A7B6C2"/>
+<text x="144" y="119.0" font-size="7" fill="#30404D" text-anchor="middle" font-weight="bold">FHD</text>
+<line x1="0" y1="128.0" x2="160" y2="128.0" stroke="#394B59" stroke-width="1"/>
+<g opacity="1">
+<circle cx="12" cy="135.85" r="2.5200000000000005" fill="#A7B6C2"/>
+<path d="M7.05,143.95 Q7.05,139.18 12,139.18 Q16.95,139.18 16.95,143.95 Z" fill="#A7B6C2"/>
+</g>
+<text x="20" y="142.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">1</text>
+<path d="M38,135.0 l6,0 l5,5 l-6,6 l-5,-5 Z" fill="#A7B6C2"/>
+<text x="52" y="142.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">3</text>
+</g>
+<g transform="translate(262,234) scale(0.68)">
+<rect x="0" y="0" width="160" height="148.0" rx="4" fill="#30404D"/>
+<rect x="0" y="0" width="160" height="90.0" rx="4" fill="#3B5163"/>
+<g opacity="0.35">
+<circle cx="80.0" cy="45.0" r="16.2" fill="none" stroke="#F5F8FA" stroke-width="2.314285714285714"/>
+<path d="M75.14,37.71 L88.1,45.0 L75.14,52.29 Z" fill="#F5F8FA"/>
+</g>
+<text x="155" y="85.0" font-size="9" fill="#F5F8FA" text-anchor="end" font-weight="normal">2:03:15</text>
+<text x="6" y="104.0" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">영상 3</text>
+<text x="6" y="119.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-103</text>
+<rect x="96" y="109.0" width="58" height="13" rx="1" fill="#30404D" stroke="#A7B6C2" stroke-width="1"/>
+<text x="99" y="119.0" font-size="8" fill="#A7B6C2" text-anchor="start" font-weight="bold">1080p</text>
+<rect x="134" y="109.0" width="20" height="13" rx="0" fill="#A7B6C2"/>
+<text x="144" y="119.0" font-size="7" fill="#30404D" text-anchor="middle" font-weight="bold">FHD</text>
+<line x1="0" y1="128.0" x2="160" y2="128.0" stroke="#394B59" stroke-width="1"/>
+<g opacity="1">
+<circle cx="12" cy="135.85" r="2.5200000000000005" fill="#A7B6C2"/>
+<path d="M7.05,143.95 Q7.05,139.18 12,139.18 Q16.95,139.18 16.95,143.95 Z" fill="#A7B6C2"/>
+</g>
+<text x="20" y="142.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">1</text>
+<path d="M38,135.0 l6,0 l5,5 l-6,6 l-5,-5 Z" fill="#A7B6C2"/>
+<text x="52" y="142.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">3</text>
+</g>
+<rect x="18" y="348" width="574" height="22" rx="2" fill="#394B59"/>
+<rect x="22" y="351" width="28" height="16" rx="1" fill="#4A5C6B"/>
+<text x="56" y="363" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">레이블 2  ·  ABC  ·  2편</text>
+<g transform="translate(22,374) scale(0.68)">
+<rect x="0" y="0" width="160" height="148.0" rx="4" fill="#30404D"/>
+<rect x="0" y="0" width="160" height="90.0" rx="4" fill="#3B5163"/>
+<g opacity="0.35">
+<circle cx="80.0" cy="45.0" r="16.2" fill="none" stroke="#F5F8FA" stroke-width="2.314285714285714"/>
+<path d="M75.14,37.71 L88.1,45.0 L75.14,52.29 Z" fill="#F5F8FA"/>
+</g>
+<text x="155" y="85.0" font-size="9" fill="#F5F8FA" text-anchor="end" font-weight="normal">2:03:15</text>
+<text x="6" y="104.0" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">영상 1</text>
+<text x="6" y="119.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-111</text>
+<rect x="96" y="109.0" width="58" height="13" rx="1" fill="#30404D" stroke="#A7B6C2" stroke-width="1"/>
+<text x="99" y="119.0" font-size="8" fill="#A7B6C2" text-anchor="start" font-weight="bold">1080p</text>
+<rect x="134" y="109.0" width="20" height="13" rx="0" fill="#A7B6C2"/>
+<text x="144" y="119.0" font-size="7" fill="#30404D" text-anchor="middle" font-weight="bold">FHD</text>
+<line x1="0" y1="128.0" x2="160" y2="128.0" stroke="#394B59" stroke-width="1"/>
+<g opacity="1">
+<circle cx="12" cy="135.85" r="2.5200000000000005" fill="#A7B6C2"/>
+<path d="M7.05,143.95 Q7.05,139.18 12,139.18 Q16.95,139.18 16.95,143.95 Z" fill="#A7B6C2"/>
+</g>
+<text x="20" y="142.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">1</text>
+<path d="M38,135.0 l6,0 l5,5 l-6,6 l-5,-5 Z" fill="#A7B6C2"/>
+<text x="52" y="142.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">3</text>
+</g>
+<g transform="translate(142,374) scale(0.68)">
+<rect x="0" y="0" width="160" height="148.0" rx="4" fill="#30404D"/>
+<rect x="0" y="0" width="160" height="90.0" rx="4" fill="#3B5163"/>
+<g opacity="0.35">
+<circle cx="80.0" cy="45.0" r="16.2" fill="none" stroke="#F5F8FA" stroke-width="2.314285714285714"/>
+<path d="M75.14,37.71 L88.1,45.0 L75.14,52.29 Z" fill="#F5F8FA"/>
+</g>
+<text x="155" y="85.0" font-size="9" fill="#F5F8FA" text-anchor="end" font-weight="normal">2:03:15</text>
+<text x="6" y="104.0" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">영상 2</text>
+<text x="6" y="119.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-112</text>
+<rect x="96" y="109.0" width="58" height="13" rx="1" fill="#30404D" stroke="#A7B6C2" stroke-width="1"/>
+<text x="99" y="119.0" font-size="8" fill="#A7B6C2" text-anchor="start" font-weight="bold">1080p</text>
+<rect x="134" y="109.0" width="20" height="13" rx="0" fill="#A7B6C2"/>
+<text x="144" y="119.0" font-size="7" fill="#30404D" text-anchor="middle" font-weight="bold">FHD</text>
+<line x1="0" y1="128.0" x2="160" y2="128.0" stroke="#394B59" stroke-width="1"/>
+<g opacity="1">
+<circle cx="12" cy="135.85" r="2.5200000000000005" fill="#A7B6C2"/>
+<path d="M7.05,143.95 Q7.05,139.18 12,139.18 Q16.95,139.18 16.95,143.95 Z" fill="#A7B6C2"/>
+</g>
+<text x="20" y="142.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">1</text>
+<path d="M38,135.0 l6,0 l5,5 l-6,6 l-5,-5 Z" fill="#A7B6C2"/>
+<text x="52" y="142.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">3</text>
+</g>
+<rect x="610" y="40" width="280" height="450" rx="2" fill="#1D272E"/>
+<g transform="translate(616,46) scale(0.84)">
+<rect x="0" y="0" width="320" height="135.0" rx="3" fill="#3B5163"/>
+<g opacity="0.35">
+<circle cx="160.0" cy="67.5" r="21.6" fill="none" stroke="#F5F8FA" stroke-width="3.085714285714286"/>
+<path d="M153.52,57.78 L170.8,67.5 L153.52,77.22 Z" fill="#F5F8FA"/>
+</g>
+<text x="0" y="151.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">파일</text>
+<text x="40" y="151.0" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="normal">ABC-123.mp4</text>
+<text x="320" y="151.0" font-size="8" fill="#A7B6C2" text-anchor="end" font-weight="normal">123분 | 29.97 | 1080p</text>
+<text x="40" y="167.0" font-size="9" fill="#738694" text-anchor="start" font-weight="normal">ABC-123.jpg</text>
+<rect x="170" y="156.0" width="72" height="14" rx="3" fill="#137CBD"/>
+<text x="206.0" y="165.88" font-size="8" fill="#F5F8FA" text-anchor="middle" font-weight="normal">이미지 검색...</text>
+<rect x="246" y="156.0" width="74" height="14" rx="3" fill="#137CBD"/>
+<text x="283.0" y="165.88" font-size="8" fill="#F5F8FA" text-anchor="middle" font-weight="normal">이미지 변경...</text>
+<text x="0" y="187.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">품번</text>
+<rect x="40" y="175.0" width="110" height="16" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="46" y="186.24" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-123</text>
+<rect x="153" y="175.0" width="16" height="16" rx="3" fill="#394B59"/>
+<text x="161.0" y="186.24" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">⧉</text>
+<text x="0" y="207.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">제목</text>
+<rect x="40" y="195.0" width="280" height="35.2" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="46" y="215.84" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">영상 제목 (여러 줄)</text>
+<text x="0" y="246.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">별점</text>
+<text x="40" y="247.2" font-size="13" fill="#F2B824" text-anchor="start" font-weight="normal">★★★☆☆</text>
+<path d="M132,236.2 q6,8 0,12 q-6,-4 0,-12 Z" fill="#48AFF0"/>
+<text x="142" y="247.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">0</text>
+<rect x="266" y="234.2" width="54" height="16" rx="3" fill="#0F9960"/>
+<text x="293.0" y="245.44" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">저장</text>
+<text x="0" y="266.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">발매일</text>
+<rect x="40" y="254.2" width="90" height="16" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="46" y="265.44" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">2024-05-17</text>
+<rect x="136" y="254.2" width="84" height="16" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="142" y="265.44" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">해당없음 ▾</text>
+<text x="0" y="286.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">배우</text>
+<rect x="40" y="274.2" width="71.6" height="16" rx="8.0" fill="#394B59"/>
+<text x="48" y="285.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">♀ 배우 A ×</text>
+<rect x="116.6" y="274.2" width="71.6" height="16" rx="8.0" fill="#394B59"/>
+<text x="124.6" y="285.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">♀ 배우 B ×</text>
+<text x="0" y="311.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">제작사</text>
+<rect x="40" y="294.2" width="280" height="26" rx="3" fill="#30404D"/>
+<rect x="44" y="298.2" width="32.0" height="18" rx="2" fill="#4A5C6B"/>
+<text x="82.0" y="311.2" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="bold">제작사 이름</text>
+<text x="0" y="340.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">레이블</text>
+<rect x="40" y="323.2" width="280" height="26" rx="3" fill="#2B3A46"/>
+<rect x="44" y="327.2" width="32.0" height="18" rx="2" fill="#4A5C6B"/>
+<text x="82.0" y="340.2" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="bold">레이블 이름</text>
+<text x="0" y="365.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">시리즈</text>
+<rect x="40" y="353.2" width="280" height="16" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="0" y="385.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">태그</text>
+<rect x="40" y="373.2" width="48.8" height="16" rx="8.0" fill="#394B59"/>
+<text x="48" y="384.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">드라마 ×</text>
+<rect x="93.8" y="373.2" width="48.8" height="16" rx="8.0" fill="#394B59"/>
+<text x="101.8" y="384.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">코미디 ×</text>
+<rect x="147.6" y="373.2" width="44.4" height="16" rx="8.0" fill="#1B252C"/>
+<text x="155.6" y="384.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">+ 입력</text>
+<rect x="0.0" y="397.2" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="0.0" y="397.2" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+<g opacity="0.7">
+<circle cx="38.5" cy="420.8775" r="11.858000000000002" fill="#F5F8FA"/>
+<path d="M15.207499999999996,458.9925 Q15.207499999999996,436.54699999999997 38.5,436.54699999999997 Q61.792500000000004,436.54699999999997 61.792500000000004,458.9925 Z" fill="#F5F8FA"/>
+</g>
+<text x="4.0" y="485.75" font-size="7" fill="#F5F8FA" text-anchor="start" font-weight="normal">배우 A</text>
+<rect x="81.0" y="397.2" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="81.0" y="397.2" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+<g opacity="0.7">
+<circle cx="119.5" cy="420.8775" r="11.858000000000002" fill="#F5F8FA"/>
+<path d="M96.2075,458.9925 Q96.2075,436.54699999999997 119.5,436.54699999999997 Q142.79250000000002,436.54699999999997 142.79250000000002,458.9925 Z" fill="#F5F8FA"/>
+</g>
+<text x="85.0" y="485.75" font-size="7" fill="#F5F8FA" text-anchor="start" font-weight="normal">배우 B</text>
+<rect x="162.0" y="397.2" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="162.0" y="397.2" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+<rect x="243.0" y="397.2" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="243.0" y="397.2" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+</g>
+<circle cx="10" cy="10" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="10" y="14" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">1</text>
+<circle cx="10" cy="40" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="10" y="44" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">2</text>
+<circle cx="246" cy="112" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="246" y="116" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">3</text>
+<circle cx="90" cy="178" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="90" y="182" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">4</text>
+<circle cx="18" cy="206" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="18" y="210" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">5</text>
+<circle cx="610" cy="40" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="610" y="44" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">6</text>
+</svg><figcaption>제작사 영상 화면 ([레이블] 보기)</figcaption></figure>
+<ol class="callouts"><li><b>[◀ 제작사 목록]</b> - 제작사 목록으로 돌아갑니다 ({K("Backspace")} 도 됨). 오른쪽 글자는 제작사 이름과 영상 수.</li><li><b>로고 · 정보</b> - 로고, 이름, 상위 제작사 · 영상 수, 메모, 링크.</li><li><b>상위 · 하위 제작사 칸</b> - ▲ 는 바로 위 상위 제작사, └ 는 바로 아래 하위 제작사(영상이 많은 순). 칸 배경색은 제작사 레벨 색이고, 더블클릭하면 그 제작사의 영상 화면으로 넘어갑니다.</li><li><b>보기 방식</b> - 영상 탭의 [격자] [리스트] [패키지] [월 모드] 에 더해 <b>[레이블]</b> 보기가 있습니다.</li><li><b>[레이블] 보기</b> - 영상을 레이블 묶음으로 나눕니다. 묶음 순서는 <a href="#series">품번 관리</a>의 레이블 순서이고, 머리줄을 오른쪽 클릭하면 [품번 관리에서 보기] · [품번 관리에 등록] 을 고를 수 있습니다.</li><li><b>영상 상세</b> - 고른 영상의 <a href="#detail">영상 상세</a>. 아래 띠에는 그 영상의 출연 배우 카드가 나옵니다.</li></ol>
+<p>태그 카드나 컬렉션 카드를 더블클릭했을 때도 같은 모양의 영상 화면으로 들어갑니다 (태그는 위쪽 정보 없이, 컬렉션은 커버 · 메모와 함께).</p>
 </section><section id="tag"><h2>태그 탭</h2>
 <ul><li><b>정렬</b> - 위쪽 콤보 [이름 | 영상수] 와 [▲▼]. 바꾸면 맨 위부터 다시 보입니다.</li><li><b>즐겨찾기</b> - 카드 오른쪽 위 하트. 즐겨찾기한 태그가 먼저 나옵니다.</li><li><b>병합</b> - 카드 오른쪽 클릭 [다른 태그와 병합...] → 영상의 태그가 고른 태그로 바뀌고 원래 태그는 지워집니다.</li><li><b>여러 개 삭제</b> - 카드를 체크한 뒤 <kbd>Del</kbd>.</li><li>카드를 더블클릭하면 그 태그가 붙은 영상 화면(오른쪽에 영상 상세)으로 들어갑니다.</li><li>카드 이름은 "한글 이름 (영어, 일본어)" 로 표시됩니다 - <a href="#manage-tag">태그 관리</a>에서 입력.</li></ul>
 </section><section id="collection"><h2>컬렉션 탭</h2>
@@ -1094,7 +1701,7 @@ th{background:var(--panel)}
 <p class="note"><b>주의</b> 파일 · 폴더 이름을 실제로 바꾸는 기능입니다. 고치기 전에 목록을 잘 확인하세요.</p>
 </section><section id="settings"><h2>설정</h2>
 <p>오른쪽 위 톱니바퀴. 탭 네 개로 나뉩니다.</p>
-<ul><li><b>표시</b> - 카드에 해상도 · 재생 시간 표시, SFW(배우 · 영상 이미지를 모자이크로), 분할 영상 합쳐서 보기, 별점 단위(1점 / 0.5점).</li><li><b>상세 화면</b> - 상세 화면 위치(왼쪽 / 오른쪽), 스크린샷 가로 배치 수.</li><li><b>테마</b> - 색상표(Stash · Dark · Midnight). 미리보기로 확인하고, 다시 시작하면 적용됩니다.</li><li><b>DB 관리</b> - DB 삭제(영상 / 배우 / 제작사 / 태그), 텍스트 내보내기 · 일괄 등록, 미리보기 영상 일괄 만들기 · 재생성 · 모두 삭제.</li></ul>
+<ul><li><b>표시</b> - 카드에 해상도 · 재생 시간 표시, SFW(배우 · 영상 이미지를 모자이크로), 분할 영상 합쳐서 보기, 별점 단위(1점 / 0.5점).</li><li><b>상세 화면</b> - 상세 화면 위치(왼쪽 / 오른쪽), 영상 상세 맨 아래 띠(출연 배우 카드 / 스크린샷), 스크린샷 가로 배치 수.</li><li><b>테마</b> - 색상표(Stash · Dark · Midnight). 미리보기로 확인하고, 다시 시작하면 적용됩니다.</li><li><b>DB 관리</b> - DB 삭제(영상 / 배우 / 제작사 / 태그), 텍스트 내보내기 · 일괄 등록, 미리보기 영상 일괄 만들기 · 재생성 · 모두 삭제.</li></ul>
 </section><section id="data"><h2>데이터와 백업</h2>
 <ul><li>DB 는 실행 파일 폴더의 <code>library.vmdb</code>(정보)와 <code>images.vmdb</code>(배우 사진 · 제작사 이미지) 두 파일입니다. 두 파일만 옮기면 다른 PC 에서도 그대로 쓸 수 있습니다. 아래 [DB 폴더 열기] 로 폴더를 엽니다.</li><li>실행 중에는 작업용 사본에 저장하고, <b>[DB 반영]</b> 이나 종료할 때 원본에 반영합니다.</li><li>프로그램을 켤 때마다 DB 폴더의 <code>backup</code> 에 자동 백업합니다 (파일마다 최근 10개). 되돌리려면 프로그램을 끄고 백업 파일을 원래 이름으로 바꿔 덮어씁니다.</li><li>프로그램 버전이 바뀌어 DB 형식을 고칠 때는 <code>DbBackup</code> 폴더에 원본을 먼저 백업합니다.</li><li>이동식 디스크 영상의 커버는 캐시에 보관해서 디스크를 빼도 카드 이미지가 보입니다.</li></ul>
 </section><section id="keys"><h2>단축키</h2>
