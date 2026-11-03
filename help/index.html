@@ -41,10 +41,15 @@ table{border-collapse:collapse;width:100%}
 th,td{text-align:left;padding:7px 12px;border-bottom:1px solid var(--card)}
 th{background:var(--panel)}
 .hint{color:var(--sub);font-size:13px}
+figure.anim{cursor:pointer;outline:1px solid rgba(242,157,73,.35)}
+figure.anim.paused{outline-color:var(--sub)}
+figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재생)';color:#F29D49}
+.badge{display:inline-block;background:#F29D49;color:#10161A;font-weight:bold;font-size:11px;border-radius:3px;padding:0 6px;margin-right:4px}
+@media (prefers-reduced-motion: reduce){figure.anim figcaption::before{content:'시스템 설정이 움직임 줄이기면 처음에 멈춰 있습니다 - 눌러서 재생  ';color:var(--sub)}}
 </style>
 </head>
 <body>
-<nav><div class="brand">RuliManager<small>설명서 · v0.83</small></div><a class="lv1" href="#start">시작하기</a><a class="lv1" href="#layout">화면 구성</a><a class="lv1" href="#video">영상 탭</a><a class="lv1" href="#detail">영상 상세</a><a class="lv1" href="#input">정보 입력 (txt · 붙여넣기)</a><a class="lv1" href="#preview">미리보기 영상</a><a class="lv1" href="#actor">배우 탭</a><a class="lv2" href="#actor-drill">배우 출연작 화면</a><a class="lv1" href="#studio">제작사 탭</a><a class="lv2" href="#studio-drill">제작사 영상 화면</a><a class="lv1" href="#tag">태그 탭</a><a class="lv1" href="#collection">컬렉션 탭</a><a class="lv1" href="#series">품번 관리</a><a class="lv2" href="#manage-actor">배우 관리</a><a class="lv2" href="#manage-studio">제작사 관리</a><a class="lv2" href="#manage-tag">태그 관리</a><a class="lv2" href="#manage-file">파일 관리</a><a class="lv1" href="#settings">설정</a><a class="lv1" href="#data">데이터와 백업</a><a class="lv1" href="#keys">단축키</a></nav>
+<nav><div class="brand">RuliManager<small>설명서 · v0.83</small></div><a class="lv1" href="#start">시작하기</a><a class="lv1" href="#layout">화면 구성</a><a class="lv1" href="#video">영상 탭</a><a class="lv1" href="#detail">영상 상세</a><a class="lv1" href="#input">정보 입력 (txt · 붙여넣기)</a><a class="lv1" href="#preview">미리보기 영상</a><a class="lv1" href="#actor">배우 탭</a><a class="lv2" href="#actor-drill">배우 출연작 화면</a><a class="lv1" href="#studio">제작사 탭</a><a class="lv2" href="#studio-drill">제작사 영상 화면</a><a class="lv1" href="#tag">태그 탭</a><a class="lv1" href="#collection">컬렉션 탭</a><a class="lv1" href="#series">품번 관리</a><a class="lv2" href="#manage-actor">배우 관리</a><a class="lv2" href="#manage-studio">제작사 관리</a><a class="lv2" href="#manage-tag">태그 관리</a><a class="lv2" href="#manage-file">파일 관리</a><a class="lv2" href="#video-check">영상 검사</a><a class="lv1" href="#settings">설정</a><a class="lv1" href="#data">데이터와 백업</a><a class="lv1" href="#keys">단축키</a></nav>
 <main>
 <h1>RuliManager 설명서</h1>
 <p class="hint">v0.83 기준 · 그림은 실제 화면을 단순하게 그린 것이라 세부 모양은 다를 수 있습니다 · 어느 화면에서든 <kbd>F1</kbd> 을 누르면 그 화면의 장이 열립니다.</p>
@@ -613,6 +618,96 @@ th{background:var(--panel)}
 <line x1="802" y1="141" x2="832" y2="141" stroke="#F5F8FA" stroke-width="2"/>
 <text x="766" y="172" font-size="13" fill="#F5F8FA" text-anchor="middle" font-weight="bold">월 모드</text>
 </svg><figcaption>[격자] [리스트] [패키지] [월 모드]</figcaption></figure>
+<figure class="anim" title="누르면 멈춤 / 다시 재생"><svg viewBox="0 0 760 230" role="img" aria-label="카드에 마우스를 올리면 미리보기 재생" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
+<rect x="40" y="20" width="220" height="181.75" rx="4" fill="#30404D"/>
+<rect x="40" y="20" width="220" height="123.75" rx="4" fill="#3B5163"/>
+<g opacity="0.35">
+<circle cx="150.0" cy="81.875" r="22.275" fill="none" stroke="#F5F8FA" stroke-width="3.182142857142857"/>
+<path d="M143.3175,71.85125 L161.1375,81.875 L143.3175,91.89875 Z" fill="#F5F8FA"/>
+</g>
+<text x="255" y="138.75" font-size="9" fill="#F5F8FA" text-anchor="end" font-weight="normal">2:03:15</text>
+<text x="46" y="157.75" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">영상 제목</text>
+<text x="46" y="172.75" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-123</text>
+<rect x="196" y="162.75" width="58" height="13" rx="1" fill="#30404D" stroke="#A7B6C2" stroke-width="1"/>
+<text x="199" y="172.75" font-size="8" fill="#A7B6C2" text-anchor="start" font-weight="bold">1080p</text>
+<rect x="234" y="162.75" width="20" height="13" rx="0" fill="#A7B6C2"/>
+<text x="244" y="172.75" font-size="7" fill="#30404D" text-anchor="middle" font-weight="bold">FHD</text>
+<line x1="40" y1="181.75" x2="260" y2="181.75" stroke="#394B59" stroke-width="1"/>
+<g opacity="1">
+<circle cx="52" cy="189.6" r="2.5200000000000005" fill="#A7B6C2"/>
+<path d="M47.05,197.7 Q47.05,192.93 52,192.93 Q56.95,192.93 56.95,197.7 Z" fill="#A7B6C2"/>
+</g>
+<text x="60" y="195.75" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">2</text>
+<path d="M78,188.75 l6,0 l5,5 l-6,6 l-5,-5 Z" fill="#A7B6C2"/>
+<text x="92" y="195.75" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">5</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.22;0.25;0.85;0.88;1" dur="7s" repeatCount="indefinite"/>
+<clipPath id="clipHv"><rect x="40" y="20" width="220" height="123.75" rx="4"/></clipPath>
+<g clip-path="url(#clipHv)">
+<g><animateTransform attributeName="transform" type="translate" values="0 0;-220 0" keyTimes="0;1" dur="2.4s" repeatCount="indefinite"/>
+<rect x="40.0" y="20" width="56.0" height="123.75" rx="0" fill="#5C7A99"/>
+<g opacity="0.5">
+<circle cx="67.5" cy="73.875" r="11.200000000000001" fill="#F5F8FA"/>
+<path d="M45.5,109.875 Q45.5,88.675 67.5,88.675 Q89.5,88.675 89.5,109.875 Z" fill="#F5F8FA"/>
+</g>
+<rect x="95.0" y="20" width="56.0" height="123.75" rx="0" fill="#7A5C99"/>
+<g opacity="0.5">
+<circle cx="122.5" cy="73.875" r="11.200000000000001" fill="#F5F8FA"/>
+<path d="M100.5,109.875 Q100.5,88.675 122.5,88.675 Q144.5,88.675 144.5,109.875 Z" fill="#F5F8FA"/>
+</g>
+<rect x="150.0" y="20" width="56.0" height="123.75" rx="0" fill="#5C997A"/>
+<g opacity="0.5">
+<circle cx="177.5" cy="73.875" r="11.200000000000001" fill="#F5F8FA"/>
+<path d="M155.5,109.875 Q155.5,88.675 177.5,88.675 Q199.5,88.675 199.5,109.875 Z" fill="#F5F8FA"/>
+</g>
+<rect x="205.0" y="20" width="56.0" height="123.75" rx="0" fill="#99805C"/>
+<g opacity="0.5">
+<circle cx="232.5" cy="73.875" r="11.200000000000001" fill="#F5F8FA"/>
+<path d="M210.5,109.875 Q210.5,88.675 232.5,88.675 Q254.5,88.675 254.5,109.875 Z" fill="#F5F8FA"/>
+</g>
+<rect x="260.0" y="20" width="56.0" height="123.75" rx="0" fill="#5C7A99"/>
+<g opacity="0.5">
+<circle cx="287.5" cy="73.875" r="11.200000000000001" fill="#F5F8FA"/>
+<path d="M265.5,109.875 Q265.5,88.675 287.5,88.675 Q309.5,88.675 309.5,109.875 Z" fill="#F5F8FA"/>
+</g>
+<rect x="315.0" y="20" width="56.0" height="123.75" rx="0" fill="#7A5C99"/>
+<g opacity="0.5">
+<circle cx="342.5" cy="73.875" r="11.200000000000001" fill="#F5F8FA"/>
+<path d="M320.5,109.875 Q320.5,88.675 342.5,88.675 Q364.5,88.675 364.5,109.875 Z" fill="#F5F8FA"/>
+</g>
+<rect x="370.0" y="20" width="56.0" height="123.75" rx="0" fill="#5C997A"/>
+<g opacity="0.5">
+<circle cx="397.5" cy="73.875" r="11.200000000000001" fill="#F5F8FA"/>
+<path d="M375.5,109.875 Q375.5,88.675 397.5,88.675 Q419.5,88.675 419.5,109.875 Z" fill="#F5F8FA"/>
+</g>
+<rect x="425.0" y="20" width="56.0" height="123.75" rx="0" fill="#99805C"/>
+<g opacity="0.5">
+<circle cx="452.5" cy="73.875" r="11.200000000000001" fill="#F5F8FA"/>
+<path d="M430.5,109.875 Q430.5,88.675 452.5,88.675 Q474.5,88.675 474.5,109.875 Z" fill="#F5F8FA"/>
+</g>
+</g>
+<rect x="40" y="139.75" width="220" height="4" rx="0" fill="#000000" opacity="0.4"/>
+<rect x="40" y="139.75" width="0" height="4" fill="#137CBD"><animate attributeName="width" values="0;0;220;220" keyTimes="0;0.25;0.85;1" dur="7s" repeatCount="indefinite"/></rect>
+</g></g>
+<g><animateTransform attributeName="transform" type="translate" values="320 180;150 80;150 80;320 190;320 180" keyTimes="0;0.2;0.85;0.95;1" dur="7s" repeatCount="indefinite"/>
+<path d="M0,0 L0,17 L4.5,13 L7.5,20 L10.5,18.8 L7.5,12 L13,12 Z" fill="#FFFFFF" stroke="#10161A" stroke-width="1.3"/>
+</g>
+<text x="360" y="60" font-size="12" fill="#738694" text-anchor="start" font-weight="normal">1. 카드 이미지에 마우스를 올림</text>
+<g opacity="1"><animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.22;0.23;1" dur="7s" repeatCount="indefinite"/>
+<rect x="352" y="45" width="300" height="22" rx="3" fill="rgba(242,157,73,0.15)"/>
+<text x="360" y="60" font-size="12" fill="#F5F8FA" text-anchor="start" font-weight="bold">1. 카드 이미지에 마우스를 올림</text>
+</g>
+<text x="360" y="84" font-size="12" fill="#738694" text-anchor="start" font-weight="normal">2. 미리보기 영상이 그 자리에서 재생</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.24;0.25;0.85;0.86;1" dur="7s" repeatCount="indefinite"/>
+<rect x="352" y="69" width="300" height="22" rx="3" fill="rgba(242,157,73,0.15)"/>
+<text x="360" y="84" font-size="12" fill="#F5F8FA" text-anchor="start" font-weight="bold">2. 미리보기 영상이 그 자리에서 재생</text>
+</g>
+<text x="360" y="108" font-size="12" fill="#738694" text-anchor="start" font-weight="normal">3. 마우스를 빼면 멈춤</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.85;0.86;1" dur="7s" repeatCount="indefinite"/>
+<rect x="352" y="93" width="300" height="22" rx="3" fill="rgba(242,157,73,0.15)"/>
+<text x="360" y="108" font-size="12" fill="#F5F8FA" text-anchor="start" font-weight="bold">3. 마우스를 빼면 멈춤</text>
+</g>
+<text x="360" y="150" font-size="10" fill="#738694" text-anchor="start" font-weight="normal">미리보기 영상은 오른쪽 클릭 [미리보기 만들기] 로 만든 것만</text>
+</svg><figcaption><span class="badge">움직이는 그림</span> 카드에 마우스를 올리면 미리보기 재생</figcaption></figure>
 <ul><li><b>격자</b> - 기본 카드. 카드 이미지에 마우스를 올리면 미리보기 영상(만들어 둔 경우)이 그 자리에서 재생됩니다.</li><li><b>리스트</b> - 표 형태. 열 머리글을 누르면 정렬됩니다.</li><li><b>패키지</b> - 세로 커버만 촘촘히. 마우스를 올려 두면 격자 카드가 팝업으로 나옵니다.</li><li><b>월 모드</b> - 화면에 보이는 칸이 모두 동시에 미리보기를 재생합니다. 프로그램이 뒤로 가거나 최소화되면 멈춥니다.</li></ul>
 <h3>그 밖의 도구</h3>
 <ul><li><b>확대 슬라이더</b> - 카드 크기. 끌기 · 클릭 · 휠 · ← → 로 바꾸고 탭마다 따로 기억합니다.</li><li><b>장르(태그) 칩</b> - 칩을 누르면 그 태그가 있는 영상만. [장르숨김] 은 칩 줄을 숨깁니다.</li><li><b>페이지</b> - 한 페이지 개수(전체 / 50 / 100 / 250 / 500 / 1000)는 탭마다 따로 저장됩니다.</li><li><b>[가로 | 세로]</b> - 카드 이미지 방향.</li><li><b>오른쪽 클릭 메뉴</b> - 재생, 이 영상 새로고침, 탐색기에서 보기, 텍스트로 정보 입력, 웹페이지 내용 붙여넣기, 스크린샷 추출, 미리보기 만들기, 컬렉션에 추가, DB 에서 삭제.</li></ul>
@@ -659,6 +754,60 @@ th{background:var(--panel)}
 <text x="300" y="176" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">흰 테두리 = 마우스 위치 · 파란 줄 = 고른 파트</text>
 <text x="300" y="196" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">재생 시간 = 파트 시간의 합</text>
 </svg><figcaption>분할 영상 합쳐 보기</figcaption></figure>
+<figure class="anim" title="누르면 멈춤 / 다시 재생"><svg viewBox="0 0 760 240" role="img" aria-label="분할 영상 파트 고르기" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
+<rect x="40" y="20" width="240" height="193.0" rx="4" fill="#30404D"/>
+<rect x="40" y="20" width="240" height="135.0" rx="4" fill="#3B5163"/>
+<g opacity="0.35">
+<circle cx="160.0" cy="87.5" r="24.3" fill="none" stroke="#F5F8FA" stroke-width="3.4714285714285715"/>
+<path d="M152.71,76.565 L172.15,87.5 L152.71,98.435 Z" fill="#F5F8FA"/>
+</g>
+<text x="275" y="150.0" font-size="9" fill="#F5F8FA" text-anchor="end" font-weight="normal">3:12:40</text>
+<text x="46" y="169.0" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">영상 제목 (1/3)</text>
+<text x="46" y="184.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-123</text>
+<rect x="216" y="174.0" width="58" height="13" rx="1" fill="#30404D" stroke="#A7B6C2" stroke-width="1"/>
+<text x="219" y="184.0" font-size="8" fill="#A7B6C2" text-anchor="start" font-weight="bold">1080p</text>
+<rect x="254" y="174.0" width="20" height="13" rx="0" fill="#A7B6C2"/>
+<text x="264" y="184.0" font-size="7" fill="#30404D" text-anchor="middle" font-weight="bold">FHD</text>
+<line x1="40" y1="193.0" x2="280" y2="193.0" stroke="#394B59" stroke-width="1"/>
+<g opacity="1">
+<circle cx="52" cy="200.85" r="2.5200000000000005" fill="#A7B6C2"/>
+<path d="M47.05,208.95 Q47.05,204.18 52,204.18 Q56.95,204.18 56.95,208.95 Z" fill="#A7B6C2"/>
+</g>
+<text x="60" y="207.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">1</text>
+<path d="M78,200.0 l6,0 l5,5 l-6,6 l-5,-5 Z" fill="#A7B6C2"/>
+<text x="92" y="207.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">4</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.09;0.12;0.92;0.95;1" dur="8s" repeatCount="indefinite"/>
+<text x="80.0" y="96.5" font-size="26" fill="#F5F8FA" text-anchor="middle" font-weight="bold">1</text>
+<line x1="120.0" y1="20" x2="120.0" y2="155.0" stroke="#F5F8FA" stroke-width="1.5"/>
+<text x="160.0" y="96.5" font-size="26" fill="#F5F8FA" text-anchor="middle" font-weight="bold">2</text>
+<line x1="200.0" y1="20" x2="200.0" y2="155.0" stroke="#F5F8FA" stroke-width="1.5"/>
+<text x="240.0" y="96.5" font-size="26" fill="#F5F8FA" text-anchor="middle" font-weight="bold">3</text>
+<g><animateTransform attributeName="transform" type="translate" values="0 0;0 0;80.0 0;160.0 0;80.0 0;80.0 0" keyTimes="0;0.12;0.35;0.55;0.72;1" dur="8s" repeatCount="indefinite" calcMode="discrete"/>
+<rect x="40" y="20" width="80.0" height="135.0" rx="0" fill="none" stroke="#F5F8FA" stroke-width="2.5"/>
+</g></g>
+<g><animateTransform attributeName="transform" type="translate" values="0 0;0 0;80.0 0;80.0 0" keyTimes="0;0.78;0.785;1" dur="8s" repeatCount="indefinite" calcMode="discrete"/>
+<rect x="45" y="149.0" width="70.0" height="3" rx="1" fill="#137CBD"/>
+</g>
+<g><animateTransform attributeName="transform" type="translate" values="330 200;80.0 107.5;80.0 107.5;160.0 107.5;240.0 107.5;160.0 107.5;160.0 107.5;330 200;330 200" keyTimes="0;0.12;0.3;0.4;0.55;0.72;0.92;0.98;1" dur="8s" repeatCount="indefinite"/>
+<path d="M0,0 L0,17 L4.5,13 L7.5,20 L10.5,18.8 L7.5,12 L13,12 Z" fill="#FFFFFF" stroke="#10161A" stroke-width="1.3"/>
+</g>
+<circle cx="160.0" cy="107.5" r="4" fill="none" stroke="#F29D49" stroke-width="2.5" opacity="0"><animate attributeName="r" values="4;4;18;18" keyTimes="0;0.78;0.84;1" dur="8s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;0;1;0;0" keyTimes="0;0.78;0.785;0.85;1" dur="8s" repeatCount="indefinite"/></circle>
+<text x="340" y="60" font-size="12" fill="#738694" text-anchor="start" font-weight="normal">1. 이미지 위를 좌우로 움직이면 파트 칸이 나옴</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.11;0.12;0.7;0.71;1" dur="8s" repeatCount="indefinite"/>
+<rect x="332" y="45" width="300" height="22" rx="3" fill="rgba(242,157,73,0.15)"/>
+<text x="340" y="60" font-size="12" fill="#F5F8FA" text-anchor="start" font-weight="bold">1. 이미지 위를 좌우로 움직이면 파트 칸이 나옴</text>
+</g>
+<text x="340" y="84" font-size="12" fill="#738694" text-anchor="start" font-weight="normal">2. 원하는 파트 칸을 누르면 그 파트를 고름</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.75;0.76;0.9;0.91;1" dur="8s" repeatCount="indefinite"/>
+<rect x="332" y="69" width="300" height="22" rx="3" fill="rgba(242,157,73,0.15)"/>
+<text x="340" y="84" font-size="12" fill="#F5F8FA" text-anchor="start" font-weight="bold">2. 원하는 파트 칸을 누르면 그 파트를 고름</text>
+</g>
+<text x="340" y="108" font-size="12" fill="#738694" text-anchor="start" font-weight="normal">3. 파란 줄 = 고른 파트 (더블클릭 = 그 파트 재생)</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.89;0.9;1" dur="8s" repeatCount="indefinite"/>
+<rect x="332" y="93" width="300" height="22" rx="3" fill="rgba(242,157,73,0.15)"/>
+<text x="340" y="108" font-size="12" fill="#F5F8FA" text-anchor="start" font-weight="bold">3. 파란 줄 = 고른 파트 (더블클릭 = 그 파트 재생)</text>
+</g>
+</svg><figcaption><span class="badge">움직이는 그림</span> 파트 칸에서 원하는 파트 고르기</figcaption></figure>
 <p><code>ABC-123_1.mp4</code>, <code>ABC-123_2.mp4</code> 처럼 이름 끝의 <code>_숫자</code> 만 다른 파일은 한 작품의 파트로 봅니다.
 설정에서 <b>분할 영상 합쳐서 보기</b> 를 켜면 첫 파트 카드 하나만 보이고, 카드 이미지를 파트 수만큼 나눠서 원하는 파트를 고르고 재생합니다.</p>
 <p class="note"><b>주의</b> 연결되지 않은 이동식 디스크의 영상은 보기 전용입니다. 재생 · 수정은 디스크를 연결한 뒤에 할 수 있습니다.</p>
@@ -799,17 +948,111 @@ th{background:var(--panel)}
 </svg><figcaption>영상 상세 화면</figcaption></figure>
 <p>고친 내용은 <b>[저장]</b> 을 누르거나 다른 영상을 고를 때 저장됩니다. 별점과 물방울은 누르는 즉시 저장됩니다.</p>
 <ul><li><b>이미지</b> - [이미지 변경] 으로 파일을 고르거나 탐색기에서 이미지를 끌어다 놓습니다. [이미지 검색] 은 품번으로 인터넷 이미지를 찾습니다.</li><li><b>제목</b> - 여러 줄로 보입니다.</li><li><b>별점</b> - 별 위에 마우스를 올리면 미리 보이고 누르면 확정, 같은 별을 다시 누르면 0점. 물방울은 누를 때마다 +1, 오른쪽 클릭 [초기화].</li><li><b>발매일</b> - <code>19980217</code> 처럼 숫자만 쳐도 됩니다. 오른쪽 콤보는 검열 정보(해당없음 · 검열됨 · 모자이크파괴 · 무수정 · 무수정-유출).</li><li><b>배우 · 태그 칩</b> - 글자를 치면 자동 완성 목록이 나옵니다. 칩의 × 로 빼고, ⌄ 로 목록 창에서 고릅니다. 목록에 없는 이름은 새로 추가됩니다. 태그 칩에 마우스를 올리면 태그 카드가 팝업으로 나옵니다.</li><li><b>제작사 · 레이블 카드</b> - 로고와 이름. 품번으로 자동으로 정해지고, 제작사 카드를 더블클릭하면 다른 제작사로 바꿉니다.</li><li><b>시리즈</b> - 작품의 시리즈 이름을 자유롭게 적습니다 (검색에 포함).</li><li><b>맨 아래 띠</b> - 출연 배우 카드(더블클릭 = 배우 출연작으로). 설정 [상세 화면] 에서 스크린샷(오른쪽 클릭 [스크린샷 추출] 로 만든 장면)으로 바꿀 수 있습니다.</li></ul>
+<figure class="anim" title="누르면 멈춤 / 다시 재생"><svg viewBox="0 0 760 150" role="img" aria-label="별점 · 물방울 누르기" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
+<text x="40" y="66" font-size="13" fill="#A7B6C2" text-anchor="start" font-weight="normal">별점</text>
+<text x="90" y="70" font-size="24" fill="#F2B824" text-anchor="start" font-weight="normal">☆</text>
+<text x="116" y="70" font-size="24" fill="#F2B824" text-anchor="start" font-weight="normal">☆</text>
+<text x="142" y="70" font-size="24" fill="#F2B824" text-anchor="start" font-weight="normal">☆</text>
+<text x="168" y="70" font-size="24" fill="#F2B824" text-anchor="start" font-weight="normal">☆</text>
+<text x="194" y="70" font-size="24" fill="#F2B824" text-anchor="start" font-weight="normal">☆</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.08;0.09;0.94;0.95;1" dur="8s" repeatCount="indefinite"/>
+<text x="90" y="70" font-size="24" fill="#F2B824" text-anchor="start" font-weight="normal">★</text>
+</g>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.16;0.17;0.94;0.95;1" dur="8s" repeatCount="indefinite"/>
+<text x="116" y="70" font-size="24" fill="#F2B824" text-anchor="start" font-weight="normal">★</text>
+</g>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.24;0.25;0.94;0.95;1" dur="8s" repeatCount="indefinite"/>
+<text x="142" y="70" font-size="24" fill="#F2B824" text-anchor="start" font-weight="normal">★</text>
+</g>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.32;0.33;0.94;0.95;1" dur="8s" repeatCount="indefinite"/>
+<text x="168" y="70" font-size="24" fill="#F2B824" text-anchor="start" font-weight="normal">★</text>
+</g>
+<g opacity="0"><animate attributeName="opacity" values="0;0;0.5;0;0" keyTimes="0;0.38;0.39;0.42;1" dur="8s" repeatCount="indefinite"/>
+<text x="194" y="70" font-size="24" fill="#F2B824" text-anchor="start" font-weight="normal">★</text>
+</g>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.49;0.5;0.92;0.93;1" dur="8s" repeatCount="indefinite"/>
+<text x="230" y="66" font-size="12" fill="#0F9960" text-anchor="start" font-weight="bold">4  저장됨</text>
+</g>
+<path d="M330,50 q8,11 0,17 q-8,-6 0,-17 Z" fill="#48AFF0"/>
+<g opacity="1"><animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.66;0.661;1" dur="8s" repeatCount="indefinite"/>
+<text x="344" y="66" font-size="13" fill="#A7B6C2" text-anchor="start" font-weight="normal">0</text>
+</g>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.669;0.67;1" dur="8s" repeatCount="indefinite"/>
+<text x="344" y="66" font-size="13" fill="#F5F8FA" text-anchor="start" font-weight="bold">1</text>
+</g>
+<g><animateTransform attributeName="transform" type="translate" values="95 90;96 60;174 60;200 60;174 60;174 60;330 58;330 58;95 90" keyTimes="0;0.08;0.32;0.38;0.44;0.55;0.62;0.9;1" dur="8s" repeatCount="indefinite"/>
+<path d="M0,0 L0,17 L4.5,13 L7.5,20 L10.5,18.8 L7.5,12 L13,12 Z" fill="#FFFFFF" stroke="#10161A" stroke-width="1.3"/>
+</g>
+<circle cx="178" cy="56" r="4" fill="none" stroke="#F29D49" stroke-width="2.5" opacity="0"><animate attributeName="r" values="4;4;18;18" keyTimes="0;0.48;0.54;1" dur="8s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;0;1;0;0" keyTimes="0;0.48;0.485;0.55;1" dur="8s" repeatCount="indefinite"/></circle>
+<circle cx="332" cy="56" r="4" fill="none" stroke="#F29D49" stroke-width="2.5" opacity="0"><animate attributeName="r" values="4;4;18;18" keyTimes="0;0.665;0.725;1" dur="8s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;0;1;0;0" keyTimes="0;0.665;0.67;0.735;1" dur="8s" repeatCount="indefinite"/></circle>
+<text x="440" y="40" font-size="12" fill="#738694" text-anchor="start" font-weight="normal">1. 별 위로 움직이면 미리 채워짐</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.04;0.05;0.46;0.47;1" dur="8s" repeatCount="indefinite"/>
+<rect x="432" y="25" width="300" height="22" rx="3" fill="rgba(242,157,73,0.15)"/>
+<text x="440" y="40" font-size="12" fill="#F5F8FA" text-anchor="start" font-weight="bold">1. 별 위로 움직이면 미리 채워짐</text>
+</g>
+<text x="440" y="64" font-size="12" fill="#738694" text-anchor="start" font-weight="normal">2. 누르면 바로 저장 (같은 별 다시 = 0점)</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.46;0.47;0.6;0.61;1" dur="8s" repeatCount="indefinite"/>
+<rect x="432" y="49" width="300" height="22" rx="3" fill="rgba(242,157,73,0.15)"/>
+<text x="440" y="64" font-size="12" fill="#F5F8FA" text-anchor="start" font-weight="bold">2. 누르면 바로 저장 (같은 별 다시 = 0점)</text>
+</g>
+<text x="440" y="88" font-size="12" fill="#738694" text-anchor="start" font-weight="normal">3. 물방울은 누를 때마다 +1</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.61;0.62;0.92;0.93;1" dur="8s" repeatCount="indefinite"/>
+<rect x="432" y="73" width="300" height="22" rx="3" fill="rgba(242,157,73,0.15)"/>
+<text x="440" y="88" font-size="12" fill="#F5F8FA" text-anchor="start" font-weight="bold">3. 물방울은 누를 때마다 +1</text>
+</g>
+</svg><figcaption><span class="badge">움직이는 그림</span> 별점 · 물방울은 누르는 즉시 저장</figcaption></figure>
+<figure class="anim" title="누르면 멈춤 / 다시 재생"><svg viewBox="0 0 760 190" role="img" aria-label="태그 칩에 마우스를 올리면 태그 카드" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
+<text x="40" y="153" font-size="12" fill="#A7B6C2" text-anchor="start" font-weight="normal">태그</text>
+<rect x="84" y="140" width="57.349999999999994" height="20" rx="10.0" fill="#394B59"/>
+<text x="92" y="153.96" font-size="11" fill="#F5F8FA" text-anchor="start" font-weight="normal">드라마 ×</text>
+<rect x="146.35" y="140" width="57.349999999999994" height="20" rx="10.0" fill="#394B59"/>
+<text x="154.35" y="153.96" font-size="11" fill="#F5F8FA" text-anchor="start" font-weight="normal">코미디 ×</text>
+<rect x="208.7" y="140" width="46.9" height="20" rx="10.0" fill="#394B59"/>
+<text x="216.7" y="153.96" font-size="11" fill="#F5F8FA" text-anchor="start" font-weight="normal">VR ×</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.27;0.3;0.8;0.83;1" dur="6s" repeatCount="indefinite"/>
+<rect x="116.35" y="18" width="140" height="110" rx="5" fill="#30404D" stroke="#394B59" stroke-width="1"/>
+<path d="M136.35,40 l22,0 l14,14 l-17,17 l-14,-14 Z" fill="#F5F8FA"/>
+<circle cx="144.35" cy="48" r="3" fill="#30404D"/>
+<text x="182.35" y="58" font-size="13" fill="#F5F8FA" text-anchor="start" font-weight="bold">코미디</text>
+<text x="182.35" y="76" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">(Comedy, コメディ)</text>
+<line x1="116.35" y1="98" x2="256.35" y2="98" stroke="#394B59" stroke-width="1"/>
+<g opacity="1">
+<circle cx="174.35" cy="113" r="6" fill="none" stroke="#A7B6C2" stroke-width="1.5"/>
+<path d="M172.54999999999998,110.3 L177.35,113 L172.54999999999998,115.7 Z" fill="#A7B6C2"/>
+</g>
+<text x="186.35" y="117" font-size="11" fill="#A7B6C2" text-anchor="start" font-weight="normal">42</text>
+<text x="244.35" y="40" font-size="12" fill="#DB3737" text-anchor="end" font-weight="normal">♥</text>
+</g>
+<g><animateTransform attributeName="transform" type="translate" values="166.35 190;166.35 148;166.35 148;166.35 190;166.35 190" keyTimes="0;0.15;0.8;0.9;1" dur="6s" repeatCount="indefinite"/>
+<path d="M0,0 L0,17 L4.5,13 L7.5,20 L10.5,18.8 L7.5,12 L13,12 Z" fill="#FFFFFF" stroke="#10161A" stroke-width="1.3"/>
+</g>
+<text x="360" y="60" font-size="12" fill="#738694" text-anchor="start" font-weight="normal">1. 태그 칩 위에 마우스를 잠깐 올려 둠</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.14;0.15;0.3;0.31;1" dur="6s" repeatCount="indefinite"/>
+<rect x="352" y="45" width="300" height="22" rx="3" fill="rgba(242,157,73,0.15)"/>
+<text x="360" y="60" font-size="12" fill="#F5F8FA" text-anchor="start" font-weight="bold">1. 태그 칩 위에 마우스를 잠깐 올려 둠</text>
+</g>
+<text x="360" y="84" font-size="12" fill="#738694" text-anchor="start" font-weight="normal">2. 태그 탭 카드와 같은 모양으로 팝업</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.29;0.3;0.8;0.81;1" dur="6s" repeatCount="indefinite"/>
+<rect x="352" y="69" width="300" height="22" rx="3" fill="rgba(242,157,73,0.15)"/>
+<text x="360" y="84" font-size="12" fill="#F5F8FA" text-anchor="start" font-weight="bold">2. 태그 탭 카드와 같은 모양으로 팝업</text>
+</g>
+<text x="360" y="108" font-size="12" fill="#738694" text-anchor="start" font-weight="normal">3. 마우스를 빼면 사라짐</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.79;0.8;1" dur="6s" repeatCount="indefinite"/>
+<rect x="352" y="93" width="300" height="22" rx="3" fill="rgba(242,157,73,0.15)"/>
+<text x="360" y="108" font-size="12" fill="#F5F8FA" text-anchor="start" font-weight="bold">3. 마우스를 빼면 사라짐</text>
+</g>
+</svg><figcaption><span class="badge">움직이는 그림</span> 태그 칩 위에 마우스 → 태그 카드 팝업</figcaption></figure>
 </section><section id="input"><h2>정보 입력 (txt · 붙여넣기)</h2>
 <p>영상 정보를 하나하나 치지 않고 한 번에 채우는 방법이 세 가지 있습니다.</p>
 <h3>웹페이지 내용 붙여넣기</h3>
-<figure><svg viewBox="0 0 880 200" role="img" aria-label="웹페이지 내용 붙여넣기 흐름" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
+<figure class="anim" title="누르면 멈춤 / 다시 재생"><svg viewBox="0 0 880 210" role="img" aria-label="웹페이지 내용 붙여넣기 흐름" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
 <rect x="10" y="20" width="190" height="150" rx="6" fill="#30404D" stroke="#394B59" stroke-width="1"/>
 <rect x="10" y="20" width="190" height="30" rx="6" fill="#137CBD"/>
 <rect x="10" y="40" width="190" height="10" rx="0" fill="#137CBD"/>
 <text x="105" y="40" font-size="13" fill="#F5F8FA" text-anchor="middle" font-weight="bold">① 작품 사이트</text>
 <text x="105" y="80" font-size="11" fill="#A7B6C2" text-anchor="middle" font-weight="normal">화면을 드래그해서</text>
 <text x="105" y="100" font-size="11" fill="#A7B6C2" text-anchor="middle" font-weight="normal">복사 (Ctrl+C)</text>
-<path d="M206,95 l18,0 m-6,-6 l6,6 l-6,6" fill="none" stroke="#F29D49" stroke-width="2.5"/>
+<path d="M206,95 l18,0 m-6,-6 l6,6 l-6,6" fill="none" stroke="#394B59" stroke-width="2.5"/>
 <rect x="230" y="20" width="190" height="150" rx="6" fill="#30404D" stroke="#394B59" stroke-width="1"/>
 <rect x="230" y="20" width="190" height="30" rx="6" fill="#137CBD"/>
 <rect x="230" y="40" width="190" height="10" rx="0" fill="#137CBD"/>
@@ -817,7 +1060,7 @@ th{background:var(--panel)}
 <text x="325" y="80" font-size="11" fill="#A7B6C2" text-anchor="middle" font-weight="normal">영상 오른쪽 클릭 →</text>
 <text x="325" y="100" font-size="11" fill="#A7B6C2" text-anchor="middle" font-weight="normal">[웹페이지 내용 붙여넣기]</text>
 <text x="325" y="120" font-size="11" fill="#A7B6C2" text-anchor="middle" font-weight="normal">→ Ctrl+V</text>
-<path d="M426,95 l18,0 m-6,-6 l6,6 l-6,6" fill="none" stroke="#F29D49" stroke-width="2.5"/>
+<path d="M426,95 l18,0 m-6,-6 l6,6 l-6,6" fill="none" stroke="#394B59" stroke-width="2.5"/>
 <rect x="450" y="20" width="190" height="150" rx="6" fill="#30404D" stroke="#394B59" stroke-width="1"/>
 <rect x="450" y="20" width="190" height="30" rx="6" fill="#137CBD"/>
 <rect x="450" y="40" width="190" height="10" rx="0" fill="#137CBD"/>
@@ -825,7 +1068,7 @@ th{background:var(--panel)}
 <text x="545" y="80" font-size="11" fill="#A7B6C2" text-anchor="middle" font-weight="normal">처음 보는 제작사 · 레이블</text>
 <text x="545" y="100" font-size="11" fill="#A7B6C2" text-anchor="middle" font-weight="normal">· 태그를 기존 항목에</text>
 <text x="545" y="120" font-size="11" fill="#A7B6C2" text-anchor="middle" font-weight="normal">연결하거나 새로 추가</text>
-<path d="M646,95 l18,0 m-6,-6 l6,6 l-6,6" fill="none" stroke="#F29D49" stroke-width="2.5"/>
+<path d="M646,95 l18,0 m-6,-6 l6,6 l-6,6" fill="none" stroke="#394B59" stroke-width="2.5"/>
 <rect x="670" y="20" width="190" height="150" rx="6" fill="#30404D" stroke="#394B59" stroke-width="1"/>
 <rect x="670" y="20" width="190" height="30" rx="6" fill="#0F9960"/>
 <rect x="670" y="40" width="190" height="10" rx="0" fill="#0F9960"/>
@@ -833,8 +1076,17 @@ th{background:var(--panel)}
 <text x="765" y="80" font-size="11" fill="#A7B6C2" text-anchor="middle" font-weight="normal">품번 · 제목 · 발매일 ·</text>
 <text x="765" y="100" font-size="11" fill="#A7B6C2" text-anchor="middle" font-weight="normal">배우 · 제작사 · 태그가</text>
 <text x="765" y="120" font-size="11" fill="#A7B6C2" text-anchor="middle" font-weight="normal">채워짐 → 저장</text>
-<text x="440" y="192" font-size="11" fill="#738694" text-anchor="middle" font-weight="normal">.txt 파일을 영상 카드에 끌어다 놓아도 ② 와 같이 처리됩니다</text>
-</svg><figcaption>작품 사이트 내용으로 정보 채우기</figcaption></figure>
+<g><animateTransform attributeName="transform" type="translate" values="0 0;220 0;440 0;660 0;660 0" keyTimes="0;0.25;0.5;0.75;1" dur="10s" repeatCount="indefinite" calcMode="discrete"/>
+<rect x="7" y="17" width="196" height="156" rx="8" fill="none" stroke="#F29D49" stroke-width="3"/>
+</g>
+<g><animateTransform attributeName="transform" type="translate" values="0 0;0 0;220 0;220 0;440 0;440 0;660 0;660 0" keyTimes="0;0.18;0.25;0.43;0.5;0.68;0.75;1" dur="10s" repeatCount="indefinite"/>
+<rect x="160" y="140" width="22" height="26" rx="2" fill="#F5F8FA" opacity="0.9"/>
+<line x1="164" y1="147" x2="178" y2="147" stroke="#394B59" stroke-width="2"/>
+<line x1="164" y1="153" x2="178" y2="153" stroke="#394B59" stroke-width="2"/>
+<line x1="164" y1="159" x2="178" y2="159" stroke="#394B59" stroke-width="2"/>
+</g>
+<text x="440" y="200" font-size="11" fill="#738694" text-anchor="middle" font-weight="normal">.txt 파일을 영상 카드에 끌어다 놓아도 ② 와 같이 처리됩니다</text>
+</svg><figcaption><span class="badge">움직이는 그림</span> 작품 사이트 내용으로 정보 채우기</figcaption></figure>
 <p>작품 사이트 화면을 드래그해서 복사한 뒤, 영상 오른쪽 클릭 <b>[웹페이지 내용 붙여넣기...]</b> 창에 붙여넣으면 품번 · 제목 · 발매일 · 배우 · 제작사 · 레이블 · 태그를 찾아 채웁니다.
 처음 보는 태그나 제작사가 있으면 기존 항목에 연결할지, 새로 추가할지 묻습니다. [공백라인 제거] 로 빈 줄을 정리할 수 있습니다.</p>
 <h3>텍스트로 정보 입력</h3>
@@ -913,6 +1165,170 @@ th{background:var(--panel)}
 <p>배우 카드를 더블클릭하면 <a href="#actor-drill">배우 출연작 화면</a>으로 들어갑니다.</p>
 </section><section id="actor-drill"><h2>배우 출연작 화면</h2>
 <p>배우 카드를 더블클릭(또는 <kbd>Space</kbd>)하면 들어가는 화면입니다. 위에는 배우 정보, 아래에는 그 배우가 나온 영상, 오른쪽에는 고른 영상의 상세가 나옵니다.</p>
+<figure class="anim" title="누르면 멈춤 / 다시 재생"><svg viewBox="0 0 760 280" role="img" aria-label="배우 카드 더블클릭 → 출연작 화면" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
+<clipPath id="clipDr"><rect x="10" y="10" width="440" height="260" rx="4"/></clipPath>
+<rect x="10" y="10" width="440" height="260" rx="4" fill="#1D272E"/>
+<g clip-path="url(#clipDr)">
+<g><animate attributeName="opacity" values="1;1;0;0;1;1" keyTimes="0;0.33;0.4;0.82;0.88;1" dur="9s" repeatCount="indefinite"/>
+<rect x="30" y="30" width="120" height="200" rx="4" fill="#30404D"/>
+<rect x="30" y="30" width="120" height="150" rx="4" fill="#3E4F5E"/>
+<g opacity="0.75">
+<circle cx="90" cy="75.5" r="19.6" fill="#F5F8FA"/>
+<path d="M51.5,138.5 Q51.5,101.4 90,101.4 Q128.5,101.4 128.5,138.5 Z" fill="#F5F8FA"/>
+</g>
+<text x="38" y="200" font-size="12" fill="#FF66A1" text-anchor="start" font-weight="bold">♀</text>
+<text x="52" y="200" font-size="11" fill="#F5F8FA" text-anchor="start" font-weight="bold">배우 A</text>
+<text x="142" y="218" font-size="9" fill="#A7B6C2" text-anchor="end" font-weight="normal">▶ 40</text>
+<rect x="170" y="30" width="120" height="200" rx="4" fill="#30404D"/>
+<rect x="170" y="30" width="120" height="150" rx="4" fill="#3E4F5E"/>
+<g opacity="0.75">
+<circle cx="230" cy="75.5" r="19.6" fill="#F5F8FA"/>
+<path d="M191.5,138.5 Q191.5,101.4 230,101.4 Q268.5,101.4 268.5,138.5 Z" fill="#F5F8FA"/>
+</g>
+<text x="178" y="200" font-size="12" fill="#FF66A1" text-anchor="start" font-weight="bold">♀</text>
+<text x="192" y="200" font-size="11" fill="#F5F8FA" text-anchor="start" font-weight="bold">배우 B</text>
+<text x="282" y="218" font-size="9" fill="#A7B6C2" text-anchor="end" font-weight="normal">▶ 29</text>
+<rect x="310" y="30" width="120" height="200" rx="4" fill="#30404D"/>
+<rect x="310" y="30" width="120" height="150" rx="4" fill="#3E4F5E"/>
+<g opacity="0.75">
+<circle cx="370" cy="75.5" r="19.6" fill="#F5F8FA"/>
+<path d="M331.5,138.5 Q331.5,101.4 370,101.4 Q408.5,101.4 408.5,138.5 Z" fill="#F5F8FA"/>
+</g>
+<text x="318" y="200" font-size="12" fill="#FF66A1" text-anchor="start" font-weight="bold">♀</text>
+<text x="332" y="200" font-size="11" fill="#F5F8FA" text-anchor="start" font-weight="bold">배우 C</text>
+<text x="422" y="218" font-size="9" fill="#A7B6C2" text-anchor="end" font-weight="normal">▶ 18</text>
+</g>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.36;0.42;0.82;0.86;1" dur="9s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="440 0;440 0;0 0;0 0;0 0" keyTimes="0;0.36;0.45;0.85;1" dur="9s" repeatCount="indefinite"/>
+<rect x="20" y="20" width="92" height="20" rx="3" fill="#394B59"/>
+<text x="66.0" y="33.96" font-size="11" fill="#F5F8FA" text-anchor="middle" font-weight="normal">◀ 배우 목록</text>
+<text x="122" y="34" font-size="11" fill="#F5F8FA" text-anchor="start" font-weight="bold">배우: 배우 B  (영상 29편)</text>
+<rect x="20" y="48" width="90" height="120" rx="3" fill="#3E4F5E"/>
+<g opacity="0.75">
+<circle cx="65" cy="79.6" r="17.92" fill="#F5F8FA"/>
+<path d="M29.799999999999997,137.2 Q29.799999999999997,103.28 65,103.28 Q100.2,103.28 100.2,137.2 Z" fill="#F5F8FA"/>
+</g>
+<text x="124" y="70" font-size="18" fill="#F5F8FA" text-anchor="start" font-weight="bold">배우 B</text>
+<text x="124" y="92" font-size="14" fill="#F2B824" text-anchor="start" font-weight="normal">★★★★☆</text>
+<text x="124" y="114" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">♀ 여성 · 27세</text>
+<text x="124" y="130" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">일본 · 160cm</text>
+<text x="124" y="146" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">데뷔 2019</text>
+<g transform="translate(20,178) scale(0.7)">
+<rect x="0" y="0" width="140" height="136.75" rx="4" fill="#30404D"/>
+<rect x="0" y="0" width="140" height="78.75" rx="4" fill="#3B5163"/>
+<g opacity="0.35">
+<circle cx="70.0" cy="39.375" r="14.174999999999999" fill="none" stroke="#F5F8FA" stroke-width="2.025"/>
+<path d="M65.7475,32.99625 L77.0875,39.375 L65.7475,45.75375 Z" fill="#F5F8FA"/>
+</g>
+<text x="135" y="73.75" font-size="9" fill="#F5F8FA" text-anchor="end" font-weight="normal">2:03:15</text>
+<text x="6" y="92.75" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">출연작 1</text>
+<text x="6" y="107.75" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-300</text>
+<rect x="76" y="97.75" width="58" height="13" rx="1" fill="#30404D" stroke="#A7B6C2" stroke-width="1"/>
+<text x="79" y="107.75" font-size="8" fill="#A7B6C2" text-anchor="start" font-weight="bold">1080p</text>
+<rect x="114" y="97.75" width="20" height="13" rx="0" fill="#A7B6C2"/>
+<text x="124" y="107.75" font-size="7" fill="#30404D" text-anchor="middle" font-weight="bold">FHD</text>
+<line x1="0" y1="116.75" x2="140" y2="116.75" stroke="#394B59" stroke-width="1"/>
+<g opacity="1">
+<circle cx="12" cy="124.6" r="2.5200000000000005" fill="#A7B6C2"/>
+<path d="M7.05,132.7 Q7.05,127.93 12,127.93 Q16.95,127.93 16.95,132.7 Z" fill="#A7B6C2"/>
+</g>
+<text x="20" y="130.75" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">1</text>
+<path d="M38,123.75 l6,0 l5,5 l-6,6 l-5,-5 Z" fill="#A7B6C2"/>
+<text x="52" y="130.75" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">3</text>
+</g>
+<g transform="translate(126,178) scale(0.7)">
+<rect x="0" y="0" width="140" height="136.75" rx="4" fill="#30404D"/>
+<rect x="0" y="0" width="140" height="78.75" rx="4" fill="#3B5163"/>
+<g opacity="0.35">
+<circle cx="70.0" cy="39.375" r="14.174999999999999" fill="none" stroke="#F5F8FA" stroke-width="2.025"/>
+<path d="M65.7475,32.99625 L77.0875,39.375 L65.7475,45.75375 Z" fill="#F5F8FA"/>
+</g>
+<text x="135" y="73.75" font-size="9" fill="#F5F8FA" text-anchor="end" font-weight="normal">2:03:15</text>
+<text x="6" y="92.75" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">출연작 2</text>
+<text x="6" y="107.75" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-301</text>
+<rect x="76" y="97.75" width="58" height="13" rx="1" fill="#30404D" stroke="#A7B6C2" stroke-width="1"/>
+<text x="79" y="107.75" font-size="8" fill="#A7B6C2" text-anchor="start" font-weight="bold">1080p</text>
+<rect x="114" y="97.75" width="20" height="13" rx="0" fill="#A7B6C2"/>
+<text x="124" y="107.75" font-size="7" fill="#30404D" text-anchor="middle" font-weight="bold">FHD</text>
+<line x1="0" y1="116.75" x2="140" y2="116.75" stroke="#394B59" stroke-width="1"/>
+<g opacity="1">
+<circle cx="12" cy="124.6" r="2.5200000000000005" fill="#A7B6C2"/>
+<path d="M7.05,132.7 Q7.05,127.93 12,127.93 Q16.95,127.93 16.95,132.7 Z" fill="#A7B6C2"/>
+</g>
+<text x="20" y="130.75" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">1</text>
+<path d="M38,123.75 l6,0 l5,5 l-6,6 l-5,-5 Z" fill="#A7B6C2"/>
+<text x="52" y="130.75" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">3</text>
+</g>
+<g transform="translate(232,178) scale(0.7)">
+<rect x="0" y="0" width="140" height="136.75" rx="4" fill="#30404D"/>
+<rect x="0" y="0" width="140" height="78.75" rx="4" fill="#3B5163"/>
+<g opacity="0.35">
+<circle cx="70.0" cy="39.375" r="14.174999999999999" fill="none" stroke="#F5F8FA" stroke-width="2.025"/>
+<path d="M65.7475,32.99625 L77.0875,39.375 L65.7475,45.75375 Z" fill="#F5F8FA"/>
+</g>
+<text x="135" y="73.75" font-size="9" fill="#F5F8FA" text-anchor="end" font-weight="normal">2:03:15</text>
+<text x="6" y="92.75" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">출연작 3</text>
+<text x="6" y="107.75" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-302</text>
+<rect x="76" y="97.75" width="58" height="13" rx="1" fill="#30404D" stroke="#A7B6C2" stroke-width="1"/>
+<text x="79" y="107.75" font-size="8" fill="#A7B6C2" text-anchor="start" font-weight="bold">1080p</text>
+<rect x="114" y="97.75" width="20" height="13" rx="0" fill="#A7B6C2"/>
+<text x="124" y="107.75" font-size="7" fill="#30404D" text-anchor="middle" font-weight="bold">FHD</text>
+<line x1="0" y1="116.75" x2="140" y2="116.75" stroke="#394B59" stroke-width="1"/>
+<g opacity="1">
+<circle cx="12" cy="124.6" r="2.5200000000000005" fill="#A7B6C2"/>
+<path d="M7.05,132.7 Q7.05,127.93 12,127.93 Q16.95,127.93 16.95,132.7 Z" fill="#A7B6C2"/>
+</g>
+<text x="20" y="130.75" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">1</text>
+<path d="M38,123.75 l6,0 l5,5 l-6,6 l-5,-5 Z" fill="#A7B6C2"/>
+<text x="52" y="130.75" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">3</text>
+</g>
+<g transform="translate(338,178) scale(0.7)">
+<rect x="0" y="0" width="140" height="136.75" rx="4" fill="#30404D"/>
+<rect x="0" y="0" width="140" height="78.75" rx="4" fill="#3B5163"/>
+<g opacity="0.35">
+<circle cx="70.0" cy="39.375" r="14.174999999999999" fill="none" stroke="#F5F8FA" stroke-width="2.025"/>
+<path d="M65.7475,32.99625 L77.0875,39.375 L65.7475,45.75375 Z" fill="#F5F8FA"/>
+</g>
+<text x="135" y="73.75" font-size="9" fill="#F5F8FA" text-anchor="end" font-weight="normal">2:03:15</text>
+<text x="6" y="92.75" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">출연작 4</text>
+<text x="6" y="107.75" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-303</text>
+<rect x="76" y="97.75" width="58" height="13" rx="1" fill="#30404D" stroke="#A7B6C2" stroke-width="1"/>
+<text x="79" y="107.75" font-size="8" fill="#A7B6C2" text-anchor="start" font-weight="bold">1080p</text>
+<rect x="114" y="97.75" width="20" height="13" rx="0" fill="#A7B6C2"/>
+<text x="124" y="107.75" font-size="7" fill="#30404D" text-anchor="middle" font-weight="bold">FHD</text>
+<line x1="0" y1="116.75" x2="140" y2="116.75" stroke="#394B59" stroke-width="1"/>
+<g opacity="1">
+<circle cx="12" cy="124.6" r="2.5200000000000005" fill="#A7B6C2"/>
+<path d="M7.05,132.7 Q7.05,127.93 12,127.93 Q16.95,127.93 16.95,132.7 Z" fill="#A7B6C2"/>
+</g>
+<text x="20" y="130.75" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">1</text>
+<path d="M38,123.75 l6,0 l5,5 l-6,6 l-5,-5 Z" fill="#A7B6C2"/>
+<text x="52" y="130.75" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">3</text>
+</g>
+</g>
+</g>
+<g><animateTransform attributeName="transform" type="translate" values="420 250;230 110;230 110;60 32;60 32;420 250;420 250" keyTimes="0;0.2;0.42;0.66;0.84;0.95;1" dur="9s" repeatCount="indefinite"/>
+<path d="M0,0 L0,17 L4.5,13 L7.5,20 L10.5,18.8 L7.5,12 L13,12 Z" fill="#FFFFFF" stroke="#10161A" stroke-width="1.3"/>
+</g>
+<circle cx="232" cy="112" r="4" fill="none" stroke="#F29D49" stroke-width="2.5" opacity="0"><animate attributeName="r" values="4;4;18;18" keyTimes="0;0.28;0.34;1" dur="9s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;0;1;0;0" keyTimes="0;0.28;0.285;0.35;1" dur="9s" repeatCount="indefinite"/></circle>
+<circle cx="232" cy="112" r="4" fill="none" stroke="#F29D49" stroke-width="2.5" opacity="0"><animate attributeName="r" values="4;4;18;18" keyTimes="0;0.32;0.38;1" dur="9s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;0;1;0;0" keyTimes="0;0.32;0.325;0.39;1" dur="9s" repeatCount="indefinite"/></circle>
+<circle cx="62" cy="34" r="4" fill="none" stroke="#F29D49" stroke-width="2.5" opacity="0"><animate attributeName="r" values="4;4;18;18" keyTimes="0;0.78;0.84;1" dur="9s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;0;1;0;0" keyTimes="0;0.78;0.785;0.85;1" dur="9s" repeatCount="indefinite"/></circle>
+<text x="480" y="60" font-size="11" fill="#738694" text-anchor="start" font-weight="normal">1. 배우 카드를 더블클릭 (또는 Space)</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.19;0.2;0.34;0.35;1" dur="9s" repeatCount="indefinite"/>
+<rect x="472" y="46" width="300" height="21" rx="3" fill="rgba(242,157,73,0.15)"/>
+<text x="480" y="60" font-size="11" fill="#F5F8FA" text-anchor="start" font-weight="bold">1. 배우 카드를 더블클릭 (또는 Space)</text>
+</g>
+<text x="480" y="84" font-size="11" fill="#738694" text-anchor="start" font-weight="normal">2. 배우 정보 + 출연작 화면으로</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.35;0.36;0.75;0.76;1" dur="9s" repeatCount="indefinite"/>
+<rect x="472" y="70" width="300" height="21" rx="3" fill="rgba(242,157,73,0.15)"/>
+<text x="480" y="84" font-size="11" fill="#F5F8FA" text-anchor="start" font-weight="bold">2. 배우 정보 + 출연작 화면으로</text>
+</g>
+<text x="480" y="108" font-size="11" fill="#738694" text-anchor="start" font-weight="normal">3. [◀ 배우 목록] 이나 Backspace 로 돌아감</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.75;0.76;1" dur="9s" repeatCount="indefinite"/>
+<rect x="472" y="94" width="300" height="21" rx="3" fill="rgba(242,157,73,0.15)"/>
+<text x="480" y="108" font-size="11" fill="#F5F8FA" text-anchor="start" font-weight="bold">3. [◀ 배우 목록] 이나 Backspace 로 돌아감</text>
+</g>
+<text x="480" y="150" font-size="10" fill="#738694" text-anchor="start" font-weight="normal">제작사 · 태그 · 컬렉션 카드도 같은 방식</text>
+</svg><figcaption><span class="badge">움직이는 그림</span> 배우 카드 더블클릭으로 들어가고 [◀ 배우 목록] 으로 돌아오기</figcaption></figure>
 <figure><svg viewBox="0 0 900 470" role="img" aria-label="배우 출연작 화면" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
 <rect x="0" y="0" width="900" height="470" rx="4" fill="#202B33"/>
 <rect x="10" y="10" width="92" height="20" rx="3" fill="#394B59"/>
@@ -1251,6 +1667,57 @@ th{background:var(--panel)}
 <text x="500" y="146" font-size="11" fill="#A7B6C2" text-anchor="start" font-weight="normal">· ← → 읽는 순서, ↑ 상위로, ↓ 첫 하위로</text>
 <text x="500" y="168" font-size="11" fill="#A7B6C2" text-anchor="start" font-weight="normal">· 더블클릭 = 제작사 영상 화면</text>
 </svg><figcaption>[계층] 보기</figcaption></figure>
+<figure class="anim" title="누르면 멈춤 / 다시 재생"><svg viewBox="0 0 760 230" role="img" aria-label="제작사 계층 접기 · 펼치기" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
+<rect x="150" y="10" width="110" height="54" rx="4" fill="#2D4458"/>
+<rect x="178" y="15" width="54" height="24" rx="2" fill="#4A5C6B"/>
+<text x="158" y="55" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">회사 A</text>
+<text x="252" y="55" font-size="9" fill="#A7B6C2" text-anchor="end" font-weight="normal">▶ 180</text>
+<g><animate attributeName="opacity" values="1;1;0;0;1;1" keyTimes="0;0.3;0.36;0.7;0.76;1" dur="8s" repeatCount="indefinite"/>
+<line x1="205" y1="81" x2="205" y2="94" stroke="#A7B6C2" stroke-width="1.5"/>
+<line x1="65" y1="94" x2="345" y2="94" stroke="#A7B6C2" stroke-width="1.5"/>
+<line x1="65" y1="94" x2="65" y2="104" stroke="#A7B6C2" stroke-width="1.5"/>
+<rect x="10" y="104" width="110" height="54" rx="4" fill="#2F4A3E"/>
+<rect x="38" y="109" width="54" height="24" rx="2" fill="#4A5C6B"/>
+<text x="18" y="149" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">브랜드 1</text>
+<text x="112" y="149" font-size="9" fill="#A7B6C2" text-anchor="end" font-weight="normal">▶ 120</text>
+<line x1="205" y1="94" x2="205" y2="104" stroke="#A7B6C2" stroke-width="1.5"/>
+<rect x="150" y="104" width="110" height="54" rx="4" fill="#2F4A3E"/>
+<rect x="178" y="109" width="54" height="24" rx="2" fill="#4A5C6B"/>
+<text x="158" y="149" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">브랜드 2</text>
+<text x="252" y="149" font-size="9" fill="#A7B6C2" text-anchor="end" font-weight="normal">▶ 40</text>
+<line x1="345" y1="94" x2="345" y2="104" stroke="#A7B6C2" stroke-width="1.5"/>
+<rect x="290" y="104" width="110" height="54" rx="4" fill="#2F4A3E"/>
+<rect x="318" y="109" width="54" height="24" rx="2" fill="#4A5C6B"/>
+<text x="298" y="149" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">브랜드 3</text>
+<text x="392" y="149" font-size="9" fill="#A7B6C2" text-anchor="end" font-weight="normal">▶ 20</text>
+</g>
+<circle cx="205" cy="74" r="8" fill="#202B33" stroke="#A7B6C2" stroke-width="1.3"/>
+<line x1="201" y1="74" x2="209" y2="74" stroke="#F5F8FA" stroke-width="1.6"/>
+<g><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.33;0.34;0.73;0.74;1" dur="8s" repeatCount="indefinite"/>
+<line x1="205" y1="70" x2="205" y2="78" stroke="#F5F8FA" stroke-width="1.6"/>
+<text x="219" y="80" font-size="16" fill="#F5F8FA" text-anchor="start" font-weight="bold">3</text>
+</g>
+<g><animateTransform attributeName="transform" type="translate" values="330 200;203 72;203 72;300 60;203 72;203 72;330 200;330 200" keyTimes="0;0.22;0.4;0.55;0.66;0.8;0.92;1" dur="8s" repeatCount="indefinite"/>
+<path d="M0,0 L0,17 L4.5,13 L7.5,20 L10.5,18.8 L7.5,12 L13,12 Z" fill="#FFFFFF" stroke="#10161A" stroke-width="1.3"/>
+</g>
+<circle cx="205" cy="74" r="4" fill="none" stroke="#F29D49" stroke-width="2.5" opacity="0"><animate attributeName="r" values="4;4;18;18" keyTimes="0;0.32;0.38;1" dur="8s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;0;1;0;0" keyTimes="0;0.32;0.325;0.39;1" dur="8s" repeatCount="indefinite"/></circle>
+<circle cx="205" cy="74" r="4" fill="none" stroke="#F29D49" stroke-width="2.5" opacity="0"><animate attributeName="r" values="4;4;18;18" keyTimes="0;0.72;0.78;1" dur="8s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;0;1;0;0" keyTimes="0;0.72;0.725;0.79;1" dur="8s" repeatCount="indefinite"/></circle>
+<text x="470" y="60" font-size="12" fill="#738694" text-anchor="start" font-weight="normal">1. 카드 아래 − 단추를 누름</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.19;0.2;0.36;0.37;1" dur="8s" repeatCount="indefinite"/>
+<rect x="462" y="45" width="300" height="22" rx="3" fill="rgba(242,157,73,0.15)"/>
+<text x="470" y="60" font-size="12" fill="#F5F8FA" text-anchor="start" font-weight="bold">1. 카드 아래 − 단추를 누름</text>
+</g>
+<text x="470" y="84" font-size="12" fill="#738694" text-anchor="start" font-weight="normal">2. 하위가 접히고 접힌 수(3)가 보임</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.35;0.36;0.7;0.71;1" dur="8s" repeatCount="indefinite"/>
+<rect x="462" y="69" width="300" height="22" rx="3" fill="rgba(242,157,73,0.15)"/>
+<text x="470" y="84" font-size="12" fill="#F5F8FA" text-anchor="start" font-weight="bold">2. 하위가 접히고 접힌 수(3)가 보임</text>
+</g>
+<text x="470" y="108" font-size="12" fill="#738694" text-anchor="start" font-weight="normal">3. + 를 다시 누르면 펼침 (↓ 키도 됨)</text>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.69;0.7;1" dur="8s" repeatCount="indefinite"/>
+<rect x="462" y="93" width="300" height="22" rx="3" fill="rgba(242,157,73,0.15)"/>
+<text x="470" y="108" font-size="12" fill="#F5F8FA" text-anchor="start" font-weight="bold">3. + 를 다시 누르면 펼침 (↓ 키도 됨)</text>
+</g>
+</svg><figcaption><span class="badge">움직이는 그림</span> − / + 로 하위 제작사 접고 펼치기</figcaption></figure>
 <ul><li><b>격자</b> - 정렬([이름 | 영상수])과 검색 순서대로.</li><li><b>리스트</b> - 이름 · 영상 수 표. 열 머리글로 정렬.</li><li><b>계층</b> - 상위 → 하위 트리. − / + 로 접고 펼칩니다.</li><li>빈 곳 오른쪽 클릭 → [새 제작사 추가...], 카드 오른쪽 클릭 → 편집 · 삭제.</li></ul>
 <p>제작사 카드를 더블클릭하면 <a href="#studio-drill">제작사 영상 화면</a>으로 들어갑니다.</p>
 </section><section id="studio-drill"><h2>제작사 영상 화면</h2>
@@ -1699,6 +2166,74 @@ th{background:var(--panel)}
 <p><b>[목록 관리 ▾] → [파일 관리...]</b>. 등록 폴더의 실제 폴더 · 파일을 트리로 보여 주고, DB 정보와 폴더 구조(제작사 \ 배우 \ 영상)가 맞지 않는 영상을 찾아 고칩니다.
 항목을 오른쪽 클릭하면 폴더 열기 등의 메뉴가 나옵니다.</p>
 <p class="note"><b>주의</b> 파일 · 폴더 이름을 실제로 바꾸는 기능입니다. 고치기 전에 목록을 잘 확인하세요.</p>
+</section><section id="video-check"><h2>영상 검사</h2>
+<p><b>[목록 관리 ▾] → [영상 검사...]</b>. 영상 파일이 손상되었는지 ffmpeg 로 실제로 풀어 보며 검사합니다. 미리보기가 만들어지지 않는 영상의 원인을 찾을 때도 씁니다.
+검사 창은 열어 둔 채 다른 작업을 할 수 있고(모달리스), 닫아도 검사는 뒤에서 계속됩니다.</p>
+<figure><svg viewBox="0 0 880 360" role="img" aria-label="영상 검사 창" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
+<rect x="0" y="0" width="880" height="360" rx="6" fill="#202B33" stroke="#10161A" stroke-width="1.5"/>
+<path d="M0,26 L0,6 Q0,0 6,0 L874,0 Q880,0 880,6 L880,26 Z" fill="#182026"/>
+<text x="12" y="17" font-size="11" fill="#A7B6C2" text-anchor="start" font-weight="normal">영상 검사</text>
+<text x="820" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">—</text>
+<text x="840" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">☐</text>
+<text x="860" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">✕</text>
+<text x="12" y="50" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">검사 방식</text>
+<rect x="70" y="36" width="230" height="20" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="76" y="49.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">빠른 검사 (곳곳 몇 군데 · 1편에 몇 초) ▾</text>
+<rect x="308" y="36" width="50" height="20" rx="3" fill="#137CBD"/>
+<text x="333.0" y="49.96" font-size="11" fill="#F5F8FA" text-anchor="middle" font-weight="normal">시작</text>
+<rect x="364" y="36" width="50" height="20" rx="3" fill="#137CBD"/>
+<text x="389.0" y="49.96" font-size="11" fill="#F5F8FA" text-anchor="middle" font-weight="normal">중단</text>
+<rect x="420" y="36" width="66" height="20" rx="3" fill="#DB3737"/>
+<text x="453.0" y="49.96" font-size="11" fill="#F5F8FA" text-anchor="middle" font-weight="normal">선택 삭제</text>
+<rect x="492" y="36" width="104" height="20" rx="3" fill="#137CBD"/>
+<text x="544.0" y="49.96" font-size="11" fill="#F5F8FA" text-anchor="middle" font-weight="normal">끝난 항목 지우기</text>
+<rect x="808" y="36" width="60" height="20" rx="3" fill="#137CBD"/>
+<text x="838.0" y="49.96" font-size="11" fill="#F5F8FA" text-anchor="middle" font-weight="normal">닫기</text>
+<rect x="12" y="66" width="856" height="22" rx="0" fill="#394B59"/>
+<text x="20" y="81" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">파일</text>
+<text x="270" y="81" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">상태</text>
+<text x="360" y="81" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">결과</text>
+<text x="650" y="81" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">폴더</text>
+<rect x="12" y="88" width="856" height="22" rx="0" fill="#202B33" opacity="1"/>
+<text x="20" y="103" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">ABC-101.mp4</text>
+<text x="270" y="103" font-size="10" fill="#3DCC91" text-anchor="start" font-weight="bold">정상</text>
+<text x="360" y="103" font-size="10" fill="#3DCC91" text-anchor="start" font-weight="normal">정상 (빠른 검사 9곳)</text>
+<text x="650" y="103" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">D:\Videos\…</text>
+<rect x="12" y="110" width="856" height="22" rx="0" fill="#137CBD" opacity="0.9"/>
+<text x="20" y="125" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">ABC-102.mkv</text>
+<text x="270" y="125" font-size="10" fill="#F29D49" text-anchor="start" font-weight="bold">의심</text>
+<text x="360" y="125" font-size="10" fill="#F29D49" text-anchor="start" font-weight="normal">의심 - 실패 1곳 · 오류 3줄</text>
+<text x="650" y="125" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">D:\Videos\…</text>
+<rect x="12" y="132" width="856" height="22" rx="0" fill="#202B33" opacity="1"/>
+<text x="20" y="147" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">ABC-103_1.mp4</text>
+<text x="270" y="147" font-size="10" fill="#FF7373" text-anchor="start" font-weight="bold">손상</text>
+<text x="360" y="147" font-size="10" fill="#FF7373" text-anchor="start" font-weight="normal">손상 - 9곳 중 7곳을 풀 수 없음</text>
+<text x="650" y="147" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">D:\Videos\…</text>
+<rect x="12" y="154" width="856" height="22" rx="0" fill="#202B33" opacity="1"/>
+<text x="20" y="169" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">ABC-104.mp4</text>
+<text x="270" y="169" font-size="10" fill="#48AFF0" text-anchor="start" font-weight="bold">검사 중 42%</text>
+<text x="360" y="169" font-size="10" fill="#48AFF0" text-anchor="start" font-weight="normal">빠른 검사 중...</text>
+<text x="650" y="169" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">D:\Videos\…</text>
+<rect x="12" y="176" width="856" height="22" rx="0" fill="#202B33" opacity="1"/>
+<text x="20" y="191" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">ABC-105.avi</text>
+<text x="270" y="191" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">대기</text>
+<text x="360" y="191" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal"></text>
+<text x="650" y="191" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">D:\Videos\…</text>
+<rect x="12" y="198" width="856" height="22" rx="0" fill="#202B33" opacity="1"/>
+<text x="20" y="213" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">ABC-106.mp4</text>
+<text x="270" y="213" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">대기</text>
+<text x="360" y="213" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal"></text>
+<text x="650" y="213" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">D:\Videos\…</text>
+<rect x="12" y="228" width="856" height="92" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="20" y="244" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">D:\Videos\ABC-102.mkv</text>
+<text x="20" y="260" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">빠른 검사 · 의심</text>
+<text x="20" y="276" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">의심 - 실패 1곳 · 오류 3줄</text>
+<text x="20" y="292" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">길이: 2:03:15 · 스트림 2개 (영상 1개) / 구간 검사: 9곳 중 1곳 실패 (1:49:24)</text>
+<text x="20" y="308" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">[1:49:24] [h264 @ …] error while decoding MB 23 41</text>
+<text x="12" y="346" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">대기 2 · 정상 1 · 의심 1 · 손상 1   ▶ 검사 중: ABC-104.mp4 (42%)</text>
+</svg><figcaption>영상 검사 창</figcaption></figure>
+<ul><li><b>목록에 넣기</b> - 영상 카드 오른쪽 클릭 <b>[영상 검사]</b> (분할 영상은 모든 파트), 카드를 체크했으면 <b>[영상 검사(n)]</b>. 여러 번 넣어도 되고, 넣은 순서대로 한 편씩 검사합니다.</li><li><b>검사 방식</b> - <b>빠른 검사</b>: 머리 정보를 읽고 영상 곳곳(9곳)을 1초씩 풀어 봄, 1편에 몇 초. <b>정밀 검사</b>: 처음부터 끝까지 영상 · 소리를 모두 풀어 봄, 오래 걸림. 의심되는 영상만 정밀 검사하는 것을 권합니다.</li><li><b>[중단]</b> - 지금 검사를 취소하고 남은 항목은 멈춤. <b>[시작]</b> 을 누르면 이어서 검사 (취소된 항목도 다시).</li><li><b>결과</b> - <span style="color:#3DCC91">정상</span> · <span style="color:#F29D49">의심</span>(일부 구간 실패, 오류 몇 줄, 길이 정보 없음, 끝까지 풀리지 않음) · <span style="color:#FF7373">손상</span>(열리지 않음, 영상 스트림 없음, 절반 이상 구간 실패, 오류가 많음).</li><li>목록에서 고르면 아래 칸에 자세한 결과(길이 · 스트림, 실패한 위치, ffmpeg 오류 줄)가 나옵니다. 더블클릭하면 탐색기에서 그 파일을 보여 줍니다.</li><li>[선택 삭제] · [끝난 항목 지우기] 로 목록을 정리합니다. 결과는 프로그램을 닫으면 지워집니다.</li></ul>
+<p class="note"><b>주의</b> ffmpeg.exe 가 필요합니다 (미리보기 영상과 같은 위치). 연결되지 않은 이동식 디스크의 영상은 검사할 수 없습니다.</p>
 </section><section id="settings"><h2>설정</h2>
 <p>오른쪽 위 톱니바퀴. 탭 네 개로 나뉩니다.</p>
 <ul><li><b>표시</b> - 카드에 해상도 · 재생 시간 표시, SFW(배우 · 영상 이미지를 모자이크로), 분할 영상 합쳐서 보기, 별점 단위(1점 / 0.5점).</li><li><b>상세 화면</b> - 상세 화면 위치(왼쪽 / 오른쪽), 영상 상세 맨 아래 띠(출연 배우 카드 / 스크린샷), 스크린샷 가로 배치 수.</li><li><b>테마</b> - 색상표(Stash · Dark · Midnight). 미리보기로 확인하고, 다시 시작하면 적용됩니다.</li><li><b>DB 관리</b> - DB 삭제(영상 / 배우 / 제작사 / 태그), 텍스트 내보내기 · 일괄 등록, 미리보기 영상 일괄 만들기 · 재생성 · 모두 삭제.</li></ul>
@@ -1726,6 +2261,16 @@ const secs=links.map(a=>document.querySelector(a.getAttribute('href')));
 function mark(){let cur=0;const y=window.scrollY+80;secs.forEach((s,i)=>{if(s&&s.offsetTop<=y)cur=i;});
  links.forEach((a,i)=>a.classList.toggle('on',i===cur));}
 window.addEventListener('scroll',mark);window.addEventListener('hashchange',mark);mark();
+// 움직이는 그림: 누르면 멈춤 / 다시 재생, 화면 밖에서는 멈춤 (움직임 줄이기 설정이면 처음엔 멈춤)
+const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+document.querySelectorAll('figure.anim').forEach(f=>{
+ const svg=f.querySelector('svg');
+ if(reduce){svg.pauseAnimations();f.classList.add('paused');}
+ f.addEventListener('click',()=>{if(f.classList.toggle('paused'))svg.pauseAnimations();else svg.unpauseAnimations();});
+});
+const io=new IntersectionObserver(es=>es.forEach(e=>{const f=e.target,svg=f.querySelector('svg');
+ if(f.classList.contains('paused'))return; if(e.isIntersecting)svg.unpauseAnimations();else svg.pauseAnimations();}));
+document.querySelectorAll('figure.anim').forEach(f=>io.observe(f));
 </script>
 </body>
 </html>

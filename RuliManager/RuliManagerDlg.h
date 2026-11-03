@@ -22,6 +22,7 @@
 #include <atomic>
 
 class CSeriesDlg;   // 품번 관리 창 (OpenSeriesManager)
+class CVideoCheckDlg;   // 영상 검사 창 (모달리스, OpenVideoCheck)
 #include "DropCounter.h"
 #include "ScreenshotExtractor.h"
 #include "YearView.h"
@@ -1017,6 +1018,12 @@ protected:
 	void UpdatePreviewStatus();
 	afx_msg void OnVideoMakePreview();
 	afx_msg void OnVideoMakePreviewChecked();
+	// 영상 검사 (모달리스 창 - 손상 여부를 ffmpeg 로 검사, 별도 스레드)
+	CVideoCheckDlg* m_pCheckDlg = nullptr;
+	void OpenVideoCheck(const std::vector<int>* items = nullptr);   // 창을 열고(없으면 만듦) items 를 검사 목록에 추가
+	afx_msg void OnManageCheck();          // [목록 관리 ▾] → 영상 검사
+	afx_msg void OnVideoCheck();           // 영상 오른쪽 클릭 [영상 검사] (분할 영상은 모든 파트)
+	afx_msg void OnVideoCheckChecked();    // 체크한 영상 [영상 검사(n)]
 	afx_msg LRESULT OnPreviewDone(WPARAM wParam, LPARAM lParam);
 	// 미리보기 재생: 영상 격자 카드 이미지에 마우스를 올리면 바로 카드 이미지 자리에 소리 없이 반복 재생 (격자의 자식 창 - [월 모드] 처럼 화면에 직접, 별도 팝업 창 없음)
 	//  분할 영상 파트를 바꿀 때는 다음 파트를 뒤에서 열어 두고(m_pNextPlayer, 숨김) 준비되면 바꿔 끼움 → 꺼졌다 켜지지 않음

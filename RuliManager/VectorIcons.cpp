@@ -1059,4 +1059,24 @@ namespace VectorIcon
 		const SilhouetteDef& d = kMaleSet[((index % n) + n) % n];
 		Silhouette(dc, area, col, d.data, d.vbW, d.vbH, fill);
 	}
+
+	void Inspect(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		// 돋보기 (테두리 고리 + 손잡이) 안에 재생 삼각형 - 겹치는 부분이 구멍이 되지 않게 따로 그림
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			p.AddEllipse(1.5f, 1.5f, 16.0f, 16.0f);                // 고리 바깥
+			p.AddEllipse(4.3f, 4.3f, 10.4f, 10.4f);                // 고리 안 (구멍)
+		});
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			const Gdiplus::PointF tri[3] = { { 7.6f, 6.6f }, { 12.6f, 9.5f }, { 7.6f, 12.4f } };
+			p.AddPolygon(tri, 3);                                   // 재생 (영상)
+		});
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			const Gdiplus::PointF handle[4] = { { 14.0f, 16.4f }, { 16.4f, 14.0f }, { 22.6f, 20.2f }, { 20.2f, 22.6f } };
+			p.AddPolygon(handle, 4);                                // 손잡이
+		});
+	}
 }

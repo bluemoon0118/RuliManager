@@ -13,6 +13,7 @@
 #include "NameListDlg.h"
 #include "SeriesDlg.h"
 #include "FileManageDlg.h"
+#include "VideoCheckDlg.h"
 #include "DarkTheme.h"
 #include "CountryCombo.h"
 #include "VectorIcons.h"
@@ -675,6 +676,9 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_COMMAND(ID_MANAGE_TAGS, &CRuliManagerDlg::OnManageTags)
 	ON_COMMAND(ID_MANAGE_SERIES, &CRuliManagerDlg::OnManageSeries)
 	ON_COMMAND(ID_MANAGE_FILES, &CRuliManagerDlg::OnManageFiles)
+	ON_COMMAND(ID_MANAGE_CHECK, &CRuliManagerDlg::OnManageCheck)
+	ON_COMMAND(ID_VIDEO_CHECK, &CRuliManagerDlg::OnVideoCheck)
+	ON_COMMAND(ID_VIDEO_CHECKCHECKED, &CRuliManagerDlg::OnVideoCheckChecked)
 	ON_BN_CLICKED(IDC_BTN_ACTOR_BACK, &CRuliManagerDlg::OnBnClickedActorBack)
 	ON_BN_CLICKED(IDC_DRILL_VIEW_GRID, &CRuliManagerDlg::OnBnClickedDrillViewGrid)
 	ON_BN_CLICKED(IDC_DRILL_VIEW_YEAR, &CRuliManagerDlg::OnBnClickedDrillViewYear)
@@ -4100,6 +4104,14 @@ void CRuliManagerDlg::ForgetFailedMediaInfo()
 
 void CRuliManagerDlg::OnDestroy()
 {
+	// 영상 검사 창: 검사 중이면 ffmpeg 를 끝내고 기다린 뒤 닫음
+	if (m_pCheckDlg)
+	{
+		if (m_pCheckDlg->GetSafeHwnd())
+			m_pCheckDlg->DestroyWindow();
+		delete m_pCheckDlg;
+		m_pCheckDlg = nullptr;
+	}
 	// 스크린샷 추출 중이면 대기열은 버리고 멈춤 신호 → 지금 장면이 끝날 때까지 기다림, 남은 결과 메시지 정리
 	m_shotQueue.clear();
 	m_shotCancel = true;
@@ -5953,6 +5965,7 @@ void CRuliManagerDlg::OnBnClickedActors()
 	menu.AppendMenu(MF_STRING, ID_MANAGE_SERIES,  L"품번 관리...");
 	menu.AppendMenu(MF_SEPARATOR);
 	menu.AppendMenu(MF_STRING, ID_MANAGE_FILES,   L"파일 관리...");
+	menu.AppendMenu(MF_STRING, ID_MANAGE_CHECK,   L"영상 검사...");
 	CRect rc;
 	GetDlgItem(IDC_BTN_ACTORS)->GetWindowRect(&rc);
 	DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_LEFTBUTTON, rc.left, rc.bottom, this);
@@ -5997,6 +6010,58 @@ void CRuliManagerDlg::OnManageTags()
 	else if (m_mode == MODE_TAG && m_catSelKind == CAT_VALUE)
 		select = m_catSelValue;
 	OpenListManager(LIST_TAG, select);
+}
+
+void CRuliManagerDlg::OpenVideoCheck(const std::vector<int>* items)
+{
+	if (!m_pCheckDlg)
+	{
+		m_pCheckDlg = new CVideoCheckDlg(this);
+		if (!m_pCheckDlg->CreateModeless(this))
+		{
+			delete m_pCheckDlg;
+			m_pCheckDlg = nullptr;
+			return;
+		}
+	}
+	m_pCheckDlg->ShowAndActivate();
+	if (!items)
+		return;
+	std::vector<CString> paths;
+	int offline = 0;
+	for (int i : *items)
+	{
+		if (i < 0 || i >= static_cast<int>(m_lib.items.size()))
+			continue;
+		if (IsItemOffline(i)) { ++offline; continue; }   // 연결 안 된 이동식 디스크
+		paths.push_back(m_lib.items[i].path);
+	}
+	m_pCheckDlg->AddVideos(paths);
+	if (offline > 0 && paths.empty())
+		m_pCheckDlg->MessageBox(L"연결되지 않은 이동식 디스크의 영상은 검사할 수 없습니다.", L"영상 검사", MB_ICONINFORMATION);
+}
+
+void CRuliManagerDlg::OnManageCheck()
+{
+	OpenVideoCheck();
+}
+
+void CRuliManagerDlg::OnVideoCheck()
+{
+	const int idx = GetSelectedItem();
+	if (idx < 0)
+		return;
+	const std::vector<int> parts = SplitPartItems(idx);   // 분할 영상: 모든 파트
+	OpenVideoCheck(&parts);
+}
+
+void CRuliManagerDlg::OnVideoCheckChecked()
+{
+	std::vector<int> items;
+	for (size_t i = 0; i < m_lib.items.size(); ++i)
+		if (IsItemChecked(static_cast<int>(i)))
+			items.push_back(static_cast<int>(i));
+	OpenVideoCheck(&items);
 }
 
 void CRuliManagerDlg::OnManageFiles()
@@ -14385,6 +14450,9 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 			CString prev;
 			prev.Format(L"미리보기 만들기(%d)", CheckedItemCount());
 			menu.AppendMenu(MF_STRING, ID_VIDEO_MAKEPREVIEWCHECKED, prev);
+			CString chk;
+			chk.Format(L"영상 검사(%d)", CheckedItemCount());
+			menu.AppendMenu(MF_STRING, ID_VIDEO_CHECKCHECKED, chk);
 			menu.AppendMenu(MF_SEPARATOR);
 			menu.AppendMenu(MF_STRING, ID_VIDEO_UNCHECKALL, L"체크 모두 해제");
 			DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
@@ -14410,6 +14478,9 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 		CString prev;
 		prev.Format(L"미리보기 만들기(%d)", CheckedItemCount());
 		menu.AppendMenu(MF_STRING, ID_VIDEO_MAKEPREVIEWCHECKED, prev);
+		CString chk;
+		chk.Format(L"영상 검사(%d)", CheckedItemCount());
+		menu.AppendMenu(MF_STRING, ID_VIDEO_CHECKCHECKED, chk);
 		menu.AppendMenu(MF_SEPARATOR);
 		menu.AppendMenu(MF_STRING, ID_VIDEO_UNCHECKALL, L"체크 모두 해제");
 		DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
@@ -14444,6 +14515,7 @@ void CRuliManagerDlg::ShowVideoContextMenu(int row, CPoint point)
 				has = false;
 		menu.AppendMenu(MF_STRING | ro, ID_VIDEO_MAKEPREVIEW, has ? L"미리보기 다시 만들기" : L"미리보기 만들기");
 	}
+	menu.AppendMenu(MF_STRING | ro, ID_VIDEO_CHECK, L"영상 검사");   // 영상 검사 창 목록에 추가 (분할 영상은 모든 파트)
 	menu.AppendMenu(MF_SEPARATOR);
 	{
 		// [컬렉션에 추가 ▸]: 컬렉션 목록 (이미 들어 있으면 체크 · 누르면 뺌) + [새 컬렉션...]
@@ -19146,6 +19218,7 @@ void CRuliManagerDlg::ShowHelp(HWND active)
 	else if (dynamic_cast<CSettingsDlg*>(w))    topic = L"settings";
 	else if (dynamic_cast<CActorDlg*>(w))       topic = L"manage-actor";
 	else if (dynamic_cast<CFileManageDlg*>(w))  topic = L"manage-file";
+	else if (dynamic_cast<CVideoCheckDlg*>(w))  topic = L"video-check";
 	else if (dynamic_cast<CTextInfoDlg*>(w) || dynamic_cast<CTagLinkDlg*>(w)) topic = L"input";
 	else if (dynamic_cast<CNameListDlg*>(w))
 	{

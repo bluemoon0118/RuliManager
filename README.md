@@ -18,11 +18,19 @@
 - 버전 0.82 → 0.83 (Version.h: APP_VERSION_MINOR 83, APP_VERSION_STR "0.83" → 창 제목 "RuliManager v0.83", 파일 버전 0.83.0.0)
 
 ### 추가
+- 영상 검사 (모달리스 창 CVideoCheckDlg - VideoCheckDlg.h/.cpp 새 파일): [목록 관리 ▾] → [영상 검사...], 영상 오른쪽 클릭 [영상 검사] (분할 영상은 모든 파트) · 체크한 영상 [영상 검사(n)] 로 검사 목록에 추가 (여러 번 예약 가능, 넣은 순서대로 한 편씩)
+  - ffmpeg 로 실제로 풀어 보며 판정, 별도 스레드 (한 편에 스레드 하나, 결과는 창 메시지로), [중단] = 지금 검사 취소(ffmpeg 종료) + 남은 항목 멈춤, [시작] = 이어서 (취소 · 오류 항목도 다시)
+  - 빠른 검사: 머리 정보(길이 · 스트림) + 곳곳 8곳과 끝 부분을 1초씩 풀기 (-ss 위치 -t 1 -map 0:V:0, 구간마다 60초 제한) / 정밀 검사: 처음부터 끝까지 영상 · 소리 전부 풀기 (-progress 로 진행률)
+  - 결과: 정상 · 의심(일부 구간 실패 · 오류 줄 · 길이 정보 없음 · 끝까지 풀리지 않음) · 손상(열리지 않음 · 영상 스트림 없음 · 절반 이상 구간 실패 · 오류 50줄 넘음 · 절반도 못 풂), 목록 글자색으로 구분, 고르면 아래 칸에 길이 · 실패 위치 · ffmpeg 오류 줄(40줄까지), 더블클릭 = 탐색기에서 보기
+  - 아이콘: 돋보기 + 재생 (VectorIcon::Inspect) - 메뉴 [영상 검사] · [영상 검사(n)] · [영상 검사...] 왼쪽 아이콘(DarkMenu DMI_INSPECT), 검사 창 제목 표시줄 · Alt+Tab 아이콘(강조색 바탕에 흰 아이콘, 직접 그린 HICON)
+  - 창을 닫으면 숨기기만 (검사 계속), 메인 창이 닫힐 때 검사를 끝내고 정리, 검사 방식은 레지스트리 Settings\VideoCheckMode, 결과는 저장하지 않음, F1 = 설명서 [영상 검사] 장
+  - Resource.h: IDD_VIDEO_CHECK 146, IDC_VC_LIST ~ IDC_VC_MODE_LBL 1367 ~ 1375, ID_MANAGE_CHECK 33048 · ID_VIDEO_CHECK 33049 · ID_VIDEO_CHECKCHECKED 33050 (rc 에 대화상자, vcxproj · filters 에 새 파일)
 - F1 설명서: 어느 화면에서든 F1 을 누르면 `help\index.html` (설명서 - 화면 그림은 프로그램 색 · 배치를 본뜬 SVG 도식) 을 기본 브라우저로, 지금 화면에 맞는 장으로 엶
   - 메인 창: 영상 / 배우 / 배우 출연작 / 제작사 / 제작사 영상 / 태그 / 컬렉션, 대화상자: 품번 관리 · 설정 · 배우 관리 · 제작사 관리 · 태그 관리 · 파일 관리 · 텍스트 입력 · 태그 연결 (모르는 창은 메인 화면 기준)
   - CRuliManagerApp::PreTranslateMessage (F1, 모달 창 안에서도) → CRuliManagerDlg::ShowHelp / HelpTopic / OpenHelpFile - 브라우저 실행 파일(AssocQueryString http)에 `file:///…/index.html#장` 으로 넘김 (못 찾으면 장 없이 파일 열기)
   - help 폴더 찾기: 실행 파일 폴더부터 위로 3단계 (개발 중 x64\Debug → 프로젝트 폴더의 help), 배포할 때는 RuliManager.exe 옆에 help 폴더를 함께 둠
-  - 설명서 원본: `help\build.py` (본문) · `figs.py` (그림) · `svg.py` (그리기 도우미) → `python build.py 0.83` 으로 index.html 다시 만듦
+  - 설명서 원본: `help\build.py` (본문) · `figs.py` (그림) · `anim.py` (움직이는 그림) · `svg.py` (그리기 도우미) → `python build.py 0.83` 으로 index.html 다시 만듦
+  - 움직이는 그림 7개 (SVG 애니메이션, 반복): 카드 마우스 오버 미리보기, 분할 영상 파트 고르기, 별점 · 물방울, 태그 칩 팝업, 웹페이지 붙여넣기 흐름, 제작사 계층 접기 · 펼치기, 배우 카드 더블클릭 → 출연작 화면 - 그림을 누르면 멈춤 / 다시 재생, 화면 밖이면 멈춤, Windows 의 애니메이션 효과를 끈 경우 처음엔 멈춤
 - 세로 커버 이미지 "파일명_V": 세로 칸에 커버를 그리는 곳([패키지] · [레이블] 보기 커버 칸 · 영상 탭 [세로] 격자)은 `영상파일명_V.jpg` (확장자는 jpg · png · webp 등 커버와 같음) 가 있으면 그 이미지를 자르지 않고 그대로 씀 - 없으면 예전처럼 가로 커버의 오른쪽 절반
   - 찾는 순서: 확장자를 뺀 파일 이름 + _V (ABC-123.mp4 → ABC-123_V.jpg), 분할 영상은 파트 번호를 뺀 이름 + _V (ABC-123_2.mp4 → ABC-123_V.jpg, "_2_V" 는 찾지 않음 - 모든 파트 공용) → '_' 왼쪽 이름 + _V (ABC-123_1080p.mp4 → ABC-123_V.jpg) - CRuliManagerDlg::FindVerticalImageFor
   - 가로 커버 찾기(FindImageFor)는 _V 이미지를 건너뜀 (가로 커버가 하나도 없을 때만 _V 를 씀)
