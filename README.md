@@ -1,6 +1,6 @@
-﻿# RuliManager v0.83 (MFC, Visual Studio 2022)
+﻿# RuliManager v0.84 (MFC, Visual Studio 2022)
 
-- 버전: 0.83 — 창 제목 "RuliManager v0.83", 파일 버전 정보 0.83.0.0 (`RuliManager\Version.h` 에서 관리 — 아래 빌드 3번 참고)
+- 버전: 0.84 — 창 제목 "RuliManager v0.84", 파일 버전 정보 0.84.0.0 (`RuliManager\Version.h` 에서 관리 — 아래 빌드 3번 참고)
 
 ## 빌드
 1. Visual Studio Installer에서 **"C++를 사용한 데스크톱 개발"** + **"최신 v143 빌드 도구용 C++ MFC"** 구성 요소 설치
@@ -14,7 +14,10 @@
 - 예전 버전 기능을 고친 경우: 새 버전 섹션에 `### 변경` (버그면 `### 수정`) 에 적고, 예전 섹션의 해당 항목에도 바뀐 내용을 반영 (예전 섹션은 지금 동작 기준 설명)
 - 빌드(맨 위) · 화면 · 데이터 저장 위치 · 참고(맨 아래)는 버전과 관계없는 공통 내용
 
-## v0.83 (현재)
+## v0.84 (현재)
+- 버전 0.83 → 0.84 (Version.h: APP_VERSION_MINOR 84, APP_VERSION_STR "0.84" → 창 제목 "RuliManager v0.84", 파일 버전 0.84.0.0)
+
+## v0.83
 - 버전 0.82 → 0.83 (Version.h: APP_VERSION_MINOR 83, APP_VERSION_STR "0.83" → 창 제목 "RuliManager v0.83", 파일 버전 0.83.0.0)
 
 ### 추가
