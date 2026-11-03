@@ -1,6 +1,6 @@
 import figs, anim, sys
 
-VERSION = sys.argv[1] if len(sys.argv) > 1 else '0.83'
+VERSION = sys.argv[1] if len(sys.argv) > 1 else '0.84'
 
 
 def fig(svg, cap):
