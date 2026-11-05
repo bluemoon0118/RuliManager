@@ -135,6 +135,7 @@
     <ClInclude Include="DbCrypt.h" />
     <ClInclude Include="WebHelper.h" />
     <ClInclude Include="ImageSearchDlg.h" />
+    <ClInclude Include="DupCheckDlg.h" />
     <ClInclude Include="VideoCheckDlg.h" />
     <ClInclude Include="VideoGrid.h" />
     <ClInclude Include="VideoLibrary.h" />
@@ -182,6 +183,7 @@
     <ClCompile Include="DbCrypt.cpp" />
     <ClCompile Include="WebHelper.cpp" />
     <ClCompile Include="ImageSearchDlg.cpp" />
+    <ClCompile Include="DupCheckDlg.cpp" />
     <ClCompile Include="VideoCheckDlg.cpp" />
     <ClCompile Include="VideoGrid.cpp" />
     <ClCompile Include="VideoLibrary.cpp" />

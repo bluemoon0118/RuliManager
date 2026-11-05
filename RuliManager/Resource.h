@@ -17,6 +17,7 @@
 #define IDD_BULK_NAMES                  138
 #define IDD_TEXT_INFO                   139
 #define IDD_VIDEO_CHECK                 146
+#define IDD_DUP_CHECK                   147
 #define IDD_SERIES                      140
 #define IDD_TAG_LINK                    141
 #define IDD_FILE_MANAGE                 145
@@ -60,6 +61,7 @@
 #define IDC_STATIC_RELEASE_LBL          1038
 #define IDC_DATE_RELEASE                1039
 #define IDC_BTN_ACTORS                  1040
+#define IDC_BTN_TOOLS                   1376
 #define IDC_BTN_PICKACTORS              1041
 #define IDC_GRID                        1042
 #define IDC_ACTOR_GRID                  1043
@@ -180,6 +182,14 @@
 #define IDC_VC_DETAIL                   1373
 #define IDC_VC_STATUS                   1374
 #define IDC_VC_MODE_LBL                 1375
+#define IDC_DUP_SIZE                    1377
+#define IDC_DUP_CODE                    1378
+#define IDC_DUP_SCAN                    1379
+#define IDC_DUP_AUTO                    1380
+#define IDC_DUP_REMOVE                  1381
+#define IDC_DUP_GRID                    1382
+#define IDC_DUP_STATUS                  1383
+#define IDC_DUP_CLEAR                   1384
 #define IDC_TI_GUIDE                    1212
 #define IDC_ACT_URLS                    1213
 #define IDC_NL_SUB_LBL                  1214
@@ -366,6 +376,10 @@
 #define ID_MANAGE_CHECK                 33048
 #define ID_VIDEO_CHECK                  33049
 #define ID_VIDEO_CHECKCHECKED           33050
+#define ID_STUDIO_MERGE                 33051
+#define ID_STUDIO_MERGECHECKED          33052
+#define ID_ACTOR_CHECKNOVIDEO           33053
+#define ID_MANAGE_DUPS                  33054
 #define ID_CAT_MERGE                    32823
 #define ID_VIDEO_SCREENSHOT             32824
 #define ID_ACTOR_PASTEINFO              32825
@@ -379,9 +393,9 @@
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        147
-#define _APS_NEXT_COMMAND_VALUE         33051
-#define _APS_NEXT_CONTROL_VALUE         1376
+#define _APS_NEXT_RESOURCE_VALUE        148
+#define _APS_NEXT_COMMAND_VALUE         33055
+#define _APS_NEXT_CONTROL_VALUE         1385
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

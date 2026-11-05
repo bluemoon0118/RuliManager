@@ -652,6 +652,18 @@ void CStudioTreeView::OnMouseHWheel(UINT /*nFlags*/, short zDelta, CPoint /*pt*/
 	ScrollTo(m_scrollX + (m_nodeW / 2) * zDelta / WHEEL_DELTA, m_scrollY);
 }
 
+int CStudioTreeView::CheckAt(CPoint client) const
+{
+	if (!m_onCheckHit)
+		return -1;
+	const int n = NodeAt(client);
+	if (n < 0)
+		return -1;
+	CRect r = m_nodes[n].rc;
+	r.OffsetRect(-m_scrollX, -m_scrollY);
+	return m_onCheckHit(m_nodes[n].row, r, client) ? n : -1;
+}
+
 void CStudioTreeView::OnLButtonDown(UINT /*nFlags*/, CPoint point)
 {
 	SetFocus();
@@ -659,6 +671,15 @@ void CStudioTreeView::OnLButtonDown(UINT /*nFlags*/, CPoint point)
 	if (t >= 0)
 	{
 		Toggle(t);
+		return;
+	}
+	const int c = CheckAt(point);
+	if (c >= 0)
+	{
+		// 체크 칸: 체크 전환만 (선택은 그대로)
+		if (m_onCheck)
+			m_onCheck(m_nodes[c].row);
+		InvalidateRow(m_nodes[c].row);
 		return;
 	}
 	const int n = NodeAt(point);
@@ -671,6 +692,15 @@ void CStudioTreeView::OnLButtonDblClk(UINT /*nFlags*/, CPoint point)
 	if (ToggleAt(point) >= 0)
 	{
 		Toggle(ToggleAt(point));
+		return;
+	}
+	const int c = CheckAt(point);
+	if (c >= 0)
+	{
+		// 체크 칸을 빠르게 두 번 누름: 두 번째 클릭도 체크 전환 (영상 화면으로 들어가지 않음)
+		if (m_onCheck)
+			m_onCheck(m_nodes[c].row);
+		InvalidateRow(m_nodes[c].row);
 		return;
 	}
 	const int n = NodeAt(point);
@@ -796,10 +826,12 @@ void CStudioTreeView::OnMouseMove(UINT nFlags, CPoint point)
 	}
 	const int t = ToggleAt(point);
 	const int n = (t >= 0) ? -1 : NodeAt(point);
-	if (t != m_hotToggle || n != m_hot)
+	const int c = (t >= 0) ? -1 : CheckAt(point);
+	if (t != m_hotToggle || n != m_hot || c != m_hotCheck)
 	{
 		m_hotToggle = t;
 		m_hot = n;
+		m_hotCheck = c;
 		Invalidate(FALSE);
 	}
 	CWnd::OnMouseMove(nFlags, point);
@@ -808,9 +840,9 @@ void CStudioTreeView::OnMouseMove(UINT nFlags, CPoint point)
 LRESULT CStudioTreeView::OnMouseLeave(WPARAM, LPARAM)
 {
 	m_tracking = false;
-	if (m_hot >= 0 || m_hotToggle >= 0)
+	if (m_hot >= 0 || m_hotToggle >= 0 || m_hotCheck >= 0)
 	{
-		m_hot = m_hotToggle = -1;
+		m_hot = m_hotToggle = m_hotCheck = -1;
 		Invalidate(FALSE);
 	}
 	return 0;
