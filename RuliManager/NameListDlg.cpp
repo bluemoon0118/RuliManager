@@ -1728,6 +1728,8 @@ void CNamePickDlg::FillList()
 		};
 		for (int si : SortedNamedIndices(items, CString()))
 		{
+			if (!m_exclude.IsEmpty() && items[si].name.CompareNoCase(m_exclude) == 0)
+				continue;   // 병합할 원래 제작사는 뺌
 			const bool stHit = hit(items[si].name);
 			std::vector<int> lbs;
 			for (int li : m_lib.LabelsOf(items[si].name))

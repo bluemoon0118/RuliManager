@@ -14,6 +14,7 @@
 #include "SeriesDlg.h"
 #include "FileManageDlg.h"
 #include "VideoCheckDlg.h"
+#include "DupCheckDlg.h"
 #include "DarkTheme.h"
 #include "CountryCombo.h"
 #include "VectorIcons.h"
@@ -663,6 +664,7 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BTN_RESCAN, &CRuliManagerDlg::OnBnClickedRescan)
 	ON_BN_CLICKED(IDC_BTN_EXPORTTXT, &CRuliManagerDlg::OnBnClickedExportTxt)
 	ON_BN_CLICKED(IDC_BTN_ACTORS, &CRuliManagerDlg::OnBnClickedActors)
+	ON_BN_CLICKED(IDC_BTN_TOOLS, &CRuliManagerDlg::OnBnClickedTools)
 	ON_BN_CLICKED(IDC_BTN_SETTINGS, &CRuliManagerDlg::OnBnClickedSettings)
 	ON_BN_CLICKED(IDC_BTN_CHANGEIMAGE, &CRuliManagerDlg::OnBnClickedChangeImage)
 	ON_BN_CLICKED(IDC_BTN_SEARCHIMAGE, &CRuliManagerDlg::OnBnClickedSearchImage)
@@ -677,6 +679,7 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_COMMAND(ID_MANAGE_SERIES, &CRuliManagerDlg::OnManageSeries)
 	ON_COMMAND(ID_MANAGE_FILES, &CRuliManagerDlg::OnManageFiles)
 	ON_COMMAND(ID_MANAGE_CHECK, &CRuliManagerDlg::OnManageCheck)
+	ON_COMMAND(ID_MANAGE_DUPS, &CRuliManagerDlg::OnManageDups)
 	ON_COMMAND(ID_VIDEO_CHECK, &CRuliManagerDlg::OnVideoCheck)
 	ON_COMMAND(ID_VIDEO_CHECKCHECKED, &CRuliManagerDlg::OnVideoCheckChecked)
 	ON_BN_CLICKED(IDC_BTN_ACTOR_BACK, &CRuliManagerDlg::OnBnClickedActorBack)
@@ -705,10 +708,13 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_COMMAND(ID_ACTOR_EDIT, &CRuliManagerDlg::OnActorEdit)
 	ON_COMMAND(ID_CAT_DELETE, &CRuliManagerDlg::OnCatDelete)
 	ON_COMMAND(ID_CAT_MERGE, &CRuliManagerDlg::OnCatMerge)
+	ON_COMMAND(ID_STUDIO_MERGE, &CRuliManagerDlg::OnStudioMerge)
+	ON_COMMAND(ID_STUDIO_MERGECHECKED, &CRuliManagerDlg::OnStudioMergeChecked)
 	ON_COMMAND(ID_ACTOR_DELETE, &CRuliManagerDlg::OnActorDelete)
 	ON_COMMAND(ID_ACTOR_MERGE, &CRuliManagerDlg::OnActorMerge)
 	ON_COMMAND(ID_ACTOR_DELETECHECKED, &CRuliManagerDlg::OnActorDeleteChecked)
 	ON_COMMAND(ID_ACTOR_UNCHECKALL, &CRuliManagerDlg::OnActorUncheckAll)
+	ON_COMMAND(ID_ACTOR_CHECKNOVIDEO, &CRuliManagerDlg::OnActorCheckNoVideo)
 	ON_COMMAND(ID_CAT_DELETECHECKED, &CRuliManagerDlg::OnCatDeleteChecked)
 	ON_COMMAND(ID_CAT_UNCHECKALL, &CRuliManagerDlg::OnCatUncheckAll)
 	ON_COMMAND(ID_VIDEO_DELETECHECKED, &CRuliManagerDlg::OnVideoDeleteChecked)
@@ -1554,6 +1560,19 @@ BOOL CRuliManagerDlg::OnInitDialog()
 			m_studioTree.m_onActivate = [this](int row) { if (row >= 0) DrillIntoCategory(row); };
 			m_studioTree.m_onContext = [this](int row, CPoint pt) { ShowStudioTreeMenu(row, pt); };
 			m_studioTree.m_onKey = [this](UINT vk) { HandleCatKey(vk); };
+			// 체크 칸 (격자 카드와 같은 왼쪽 위 자리)
+			m_studioTree.m_onCheckHit = [this](int row, const CRect& rc, CPoint pt) -> bool
+			{
+				if (!CatChecksEnabled() || row < 0 || row >= static_cast<int>(m_catRows.size()))
+					return false;
+				const int kind = m_catRows[row].kind;
+				if (kind != CAT_VALUE && kind != CAT_LABEL)
+					return false;
+				CRect check = ActorCheckRect(rc);
+				check.InflateRect(3, 3);
+				return check.PtInRect(pt) != FALSE;
+			};
+			m_studioTree.m_onCheck = [this](int row) { ToggleCatCheck(row); };
 			SetupActorCards();   // 노드 크기 (확대 단계)
 		}
 
@@ -2557,7 +2576,8 @@ void CRuliManagerDlg::LayoutControls(int cx, int cy)
 		if (rm->IsWindowVisible()) rm->ShowWindow(SW_HIDE);
 	MoveCtrl(IDC_BTN_REFRESH,      x, y, DX(50), btnH);  x += DX(50) + gap;
 	MoveCtrl(IDC_BTN_RESCAN,       x, y, DX(40), btnH);  x += DX(40) + gap;
-	MoveCtrl(IDC_BTN_ACTORS,       x, y, DX(50), btnH);  x += DX(50) + gap * 3;
+	MoveCtrl(IDC_BTN_ACTORS,       x, y, DX(50), btnH);  x += DX(50) + gap;
+	MoveCtrl(IDC_BTN_TOOLS,        x, y, DX(50), btnH);  x += DX(50) + gap * 3;   // [관리 도구 ▾] (유틸리티)
 	// 검색 / 별점 / 정렬 / 페이지 / 확대는 각 탭 목록 위 도구줄로 옮김 (LayoutListToolbar)
 	// 설정 (톱니바퀴): 오른쪽 위 고정, 정사각형
 	{
@@ -5961,13 +5981,24 @@ void CRuliManagerDlg::OnBnClickedActors()
 	menu.AppendMenu(MF_STRING, ID_MANAGE_ACTORS,  L"배우 관리...");
 	menu.AppendMenu(MF_STRING, ID_MANAGE_STUDIOS, L"제작사 관리...");
 	menu.AppendMenu(MF_STRING, ID_MANAGE_TAGS,    L"태그 관리...");
-	menu.AppendMenu(MF_SEPARATOR);
-	menu.AppendMenu(MF_STRING, ID_MANAGE_SERIES,  L"품번 관리...");
-	menu.AppendMenu(MF_SEPARATOR);
-	menu.AppendMenu(MF_STRING, ID_MANAGE_FILES,   L"파일 관리...");
-	menu.AppendMenu(MF_STRING, ID_MANAGE_CHECK,   L"영상 검사...");
+	menu.AppendMenu(MF_STRING, ID_MANAGE_SERIES,  L"품번 관리...");   // 배우 · 제작사 · 태그와 한 묶음 (바코드 아이콘)
 	CRect rc;
 	GetDlgItem(IDC_BTN_ACTORS)->GetWindowRect(&rc);
+	DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_LEFTBUTTON, rc.left, rc.bottom, this);
+}
+
+void CRuliManagerDlg::OnBnClickedTools()
+{
+	// [관리 도구 ▾] → 파일 관리 · 영상 검사 (유틸리티 - 열린 채로 다시 누르면 닫힘)
+	if (DarkMenu::ClosedByClickOn(GetDlgItem(IDC_BTN_TOOLS)->GetSafeHwnd()))
+		return;
+	CMenu menu;
+	menu.CreatePopupMenu();
+	menu.AppendMenu(MF_STRING, ID_MANAGE_FILES,   L"파일 관리...");
+	menu.AppendMenu(MF_STRING, ID_MANAGE_CHECK,   L"영상 검사...");
+	menu.AppendMenu(MF_STRING, ID_MANAGE_DUPS,    L"중복 파일 검사...");
+	CRect rc;
+	GetDlgItem(IDC_BTN_TOOLS)->GetWindowRect(&rc);
 	DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_LEFTBUTTON, rc.left, rc.bottom, this);
 }
 
@@ -6039,6 +6070,66 @@ void CRuliManagerDlg::OpenVideoCheck(const std::vector<int>* items)
 	m_pCheckDlg->AddVideos(paths);
 	if (offline > 0 && paths.empty())
 		m_pCheckDlg->MessageBox(L"연결되지 않은 이동식 디스크의 영상은 검사할 수 없습니다.", L"영상 검사", MB_ICONINFORMATION);
+}
+
+void CRuliManagerDlg::OnManageDups()
+{
+	// 중복 파일 검사 창 (같은 크기 · 같은 품번 묶음, 체크한 파일은 휴지통 + DB 삭제)
+	CommitDetails();
+	CDupCheckDlg dlg(m_lib, this);
+	dlg.m_isOffline = [this](int item) { return IsItemOffline(item); };
+	dlg.m_findImage = [](const CString& path) { return FindImageFor(path); };
+	dlg.m_remove = [this](const std::vector<CString>& paths) { return RemoveVideoFiles(paths); };
+	dlg.DoModal();
+}
+
+std::vector<CString> CRuliManagerDlg::RemoveVideoFiles(const std::vector<CString>& paths)
+{
+	// 파일은 휴지통으로 (되살릴 수 있음), 휴지통으로 보낸 파일은 DB 항목도 삭제 + 그 영상의 미리보기 영상도 지움
+	std::vector<CString> failed;
+	if (paths.empty())
+		return failed;
+	CommitDetails();
+	StopPreviewPlayer();   // 재생 중인 미리보기 · 파일 잠김 방지
+	BeginLibraryChange();
+	for (const CString& p : paths)
+	{
+		if (::PathFileExistsW(p))
+		{
+			std::vector<wchar_t> from(p.GetString(), p.GetString() + p.GetLength());
+			from.push_back(L'\0');
+			from.push_back(L'\0');   // 이중 NULL 종료
+			SHFILEOPSTRUCTW op = {};
+			op.hwnd = m_hWnd;
+			op.wFunc = FO_DELETE;
+			op.pFrom = from.data();
+			op.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI;
+			::SHFileOperationW(&op);
+			if (::PathFileExistsW(p))
+			{
+				failed.push_back(p);   // 사용 중 · 권한 없음 → DB 는 그대로
+				continue;
+			}
+		}
+		for (size_t i = m_lib.items.size(); i-- > 0;)
+		{
+			if (m_lib.items[i].path.CompareNoCase(p) != 0)
+				continue;
+			const CString prev = PreviewFileOf(static_cast<int>(i));
+			if (!prev.IsEmpty())
+				::DeleteFileW(prev);
+			m_lib.items.erase(m_lib.items.begin() + i);
+		}
+		CString key = p;
+		key.MakeLower();
+		m_videoChecked.erase(key);
+	}
+	if (!m_lib.Save())
+		AfxMessageBox(L"라이브러리 파일을 저장하지 못했습니다.", MB_ICONWARNING);
+	m_catsDirty = true;
+	ApplyFilter();
+	MarkCategoriesDirty();
+	return failed;
 }
 
 void CRuliManagerDlg::OnManageCheck()
@@ -6638,6 +6729,7 @@ void CRuliManagerDlg::UpdateLeftPane()
 	const bool videoList = VideoListActive();
 	m_list.ShowWindow(videoList ? SW_SHOW : SW_HIDE);
 	m_grid.SetScrollHidden(videoList);
+	m_catGrid.SetScrollHidden(StudioTreeActive());   // 제작사 [계층]: 트리가 자기 스크롤바를 씀 → 격자(도구줄 머리 영역)의 세로 스크롤바는 숨김 (두 개 겹쳐 보이던 문제)
 	if (m_zoomSlider.GetSafeHwnd())
 		m_zoomSlider.ShowWindow(videoList || ActorTreemapActive() ? SW_HIDE : SW_SHOW);   // [리스트] 보기 · 배우 [트리맵] 은 카드가 없으므로 확대 슬라이더 숨김
 	m_grid.ShowWindow(showVideos && !YearViewActive() ? SW_SHOW : SW_HIDE);   // 연도별 보기에서는 격자(도구줄 포함) 숨김
@@ -8065,6 +8157,8 @@ void CRuliManagerDlg::ToggleCatCheck(int row)
 	CRect tile;
 	if (m_catGrid.GetTileRect(row, tile))
 		m_catGrid.InvalidateRect(&tile, FALSE);
+	if (StudioTreeActive() && m_studioTree.GetSafeHwnd())
+		m_studioTree.InvalidateRow(row);   // [계층] 노드
 }
 
 std::vector<CRuliManagerDlg::CatRow> CRuliManagerDlg::CheckedCatRows() const
@@ -9583,6 +9677,50 @@ void CRuliManagerDlg::OnActorMergeChecked()
 	ApplyFilter();   // 영상의 배우가 바뀜
 }
 
+int CRuliManagerDlg::NoVideoActorRows(std::vector<int>* rows) const
+{
+	// 지금 보이는 배우(검색 · 성별 거르기 적용) 중 출연 영상이 없는 배우 (출연 수 = m_actorCounts, 이름 · 별칭 모두 셈)
+	int n = 0;
+	for (int ai : m_actorRows)
+	{
+		if (ai < 0 || ai >= static_cast<int>(m_lib.actors.size()))
+			continue;
+		CString key = m_lib.actors[ai].name;
+		key.MakeLower();
+		const auto it = m_actorCounts.find(key);
+		if (it != m_actorCounts.end() && it->second > 0)
+			continue;
+		++n;
+		if (rows)
+			rows->push_back(ai);
+	}
+	return n;
+}
+
+void CRuliManagerDlg::OnActorCheckNoVideo()
+{
+	// 영상 없는 배우 일괄 체크 → 체크한 배우 메뉴로 한꺼번에 삭제 등 (이미 체크한 배우는 그대로 둠)
+	if (!IsActorGridMode())
+		return;
+	std::vector<int> rows;
+	NoVideoActorRows(&rows);
+	for (int ai : rows)
+	{
+		CString key = m_lib.actors[ai].name;
+		key.MakeLower();
+		m_actorChecked.insert(key);
+	}
+	if (m_actorGrid.GetSafeHwnd())
+		m_actorGrid.Invalidate(FALSE);
+	CString t;
+	if (rows.empty())
+		t = L"영상이 없는 배우가 없습니다.";
+	else
+		t.Format(L"영상이 없는 배우 %d명을 체크했습니다. (체크 모두 %d명 - 체크한 배우 오른쪽 클릭으로 삭제 등)",
+			static_cast<int>(rows.size()), static_cast<int>(CheckedActorIndices().size()));
+	SetDlgItemText(IDC_STATIC_STATUS, t);
+}
+
 void CRuliManagerDlg::OnActorUncheckAll()
 {
 	m_actorChecked.clear();
@@ -9647,6 +9785,254 @@ void CRuliManagerDlg::OnCatDelete()
 	m_catSelKind = -1;
 	m_catSelValue.Empty();
 	RebuildCategories();
+	UpdateStatus();
+}
+
+bool CRuliManagerDlg::ShowCatCheckedMenu(int row, CPoint point)
+{
+	if (!CatChecksEnabled() || row < 0 || row >= static_cast<int>(m_catRows.size()) || !IsCatChecked(m_catRows[row].kind, m_catRows[row].value))
+		return false;
+	CMenu menu;
+	menu.CreatePopupMenu();
+	const std::vector<CatRow> checked = CheckedCatRows();
+	if (m_mode == MODE_STUDIO)
+	{
+		// 제작사 병합: 오른쪽 클릭한 제작사 기준 (체크한 제작사가 2개 이상 · 오른쪽 클릭한 것이 제작사일 때만, 레이블은 빼고 셈)
+		int studios = 0;
+		for (const CatRow& r : checked)
+			if (r.kind == CAT_VALUE)
+				++studios;
+		CString merge;
+		merge.Format(L"제작사 병합(%d) - '%s' 기준", studios, static_cast<LPCWSTR>(m_catRows[row].value));
+		menu.AppendMenu(MF_STRING | (studios >= 2 && m_catRows[row].kind == CAT_VALUE ? 0 : MF_GRAYED), ID_STUDIO_MERGECHECKED, merge);
+	}
+	CString del;
+	del.Format(L"%s 삭제(%d)\tDel", m_mode == MODE_TAG ? L"태그" : (m_mode == MODE_COLLECTION ? L"컬렉션" : L"제작사 · 레이블"),
+		static_cast<int>(checked.size()));
+	menu.AppendMenu(MF_STRING, ID_CAT_DELETECHECKED, del);
+	menu.AppendMenu(MF_SEPARATOR);
+	menu.AppendMenu(MF_STRING, ID_CAT_UNCHECKALL, L"체크 모두 해제");
+	DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
+	return true;
+}
+
+bool CRuliManagerDlg::MergeStudioInto(const CString& src, const CString& dst)
+{
+	// 제작사 src 를 dst 로 합침 - 영상의 제작사 · 하위 제작사 · 레이블의 상위 제작사를 dst 로, 품번 DB 항목을 dst 로 옮김,
+	//  src 이름 · 서브이름은 dst 의 서브이름에 추가 (붙여넣기 · txt 에서 그 이름으로 적혀도 dst), 링크는 합치고, 이미지 · 메모는 dst 가 비어 있으면 가져옴
+	const int si0 = m_lib.FindNamed(LIST_STUDIO, src);
+	const int di0 = m_lib.FindNamed(LIST_STUDIO, dst);
+	if (si0 < 0 || di0 < 0 || si0 == di0)
+		return false;
+	const NamedInfo from = m_lib.studios[si0];
+	const CString srcName = from.name, dstName = m_lib.studios[di0].name;
+	m_lib.RenameNamedInVideos(LIST_STUDIO, srcName, dstName);   // 영상 · 하위 제작사 · 레이블의 상위 제작사
+	NamedInfo& to = m_lib.studios[m_lib.FindNamed(LIST_STUDIO, dstName)];
+	// 서브이름: dst 서브이름 + src 이름 + src 서브이름 (중복 · dst 이름과 같은 것 제외)
+	{
+		std::vector<CString> names = CVideoLibrary::SplitLines(to.subName);
+		std::vector<CString> add = CVideoLibrary::SplitLines(from.subName);
+		add.insert(add.begin(), srcName);
+		for (CString a : add)
+		{
+			a.Trim();
+			if (a.IsEmpty() || a.CompareNoCase(dstName) == 0)
+				continue;
+			bool dup = false;
+			for (const CString& n : names)
+				if (n.CompareNoCase(a) == 0) { dup = true; break; }
+			if (!dup)
+				names.push_back(a);
+		}
+		CString joined;
+		for (const CString& n : names)
+			joined += (joined.IsEmpty() ? CString() : CString(L"\n")) + n;
+		to.subName = joined;
+	}
+	// 링크: 합침 (중복 제외)
+	{
+		std::vector<CString> urls = CVideoLibrary::SplitLines(to.urls);
+		for (CString u : CVideoLibrary::SplitLines(from.urls))
+		{
+			u.Trim();
+			if (u.IsEmpty())
+				continue;
+			bool dup = false;
+			for (const CString& x : urls)
+				if (x.CompareNoCase(u) == 0) { dup = true; break; }
+			if (!dup)
+				urls.push_back(u);
+		}
+		CString joined;
+		for (const CString& u : urls)
+			joined += (joined.IsEmpty() ? CString() : CString(L"\n")) + u;
+		to.urls = joined;
+	}
+	// 품번 DB 항목 (시리즈): src 의 항목을 dst 뒤에 붙임
+	if (!from.series.IsEmpty())
+	{
+		std::vector<SeriesInfo> list = CVideoLibrary::ParseSeries(to.series);
+		for (const SeriesInfo& x : CVideoLibrary::ParseSeries(from.series))
+			list.push_back(x);
+		to.series = CVideoLibrary::JoinSeries(list);
+	}
+	if (to.image.IsEmpty() || !::PathFileExistsW(to.image))
+		to.image = from.image;
+	{
+		CString m1 = to.memo, m2 = from.memo;
+		m1.Trim();
+		m2.Trim();
+		if (m1.IsEmpty())
+			to.memo = from.memo;
+		else if (!m2.IsEmpty() && m1.Find(m2) < 0)
+			to.memo += L"\n" + from.memo;   // 둘 다 있으면 이어 붙임
+	}
+	if (from.favorite)
+		to.favorite = true;
+	// 상위 제작사: dst 의 상위가 src 였으면(RenameNamedInVideos 로 자기 자신이 됨) src 의 상위로
+	if (to.parent.CompareNoCase(dstName) == 0)
+		to.parent = (from.parent.CompareNoCase(dstName) == 0) ? CString() : from.parent;
+	// src 항목 삭제
+	m_lib.studios.erase(m_lib.studios.begin() + m_lib.FindNamed(LIST_STUDIO, srcName));
+	// 순환 정리: 상위를 따라 올라가다 자기 자신으로 돌아오면 그 제작사의 상위를 비움 (dst 부터)
+	auto breakCycle = [this](int start)
+	{
+		std::set<int> seen;
+		int cur = start;
+		for (int guard = 0; guard < 64 && cur >= 0; ++guard)
+		{
+			if (!seen.insert(cur).second)
+				break;
+			CString p = m_lib.studios[cur].parent;
+			p.Trim();
+			if (p.IsEmpty())
+				return;
+			const int pi = m_lib.FindNamed(LIST_STUDIO, p);
+			if (pi == start)
+			{
+				m_lib.studios[start].parent.Empty();
+				return;
+			}
+			cur = pi;
+		}
+	};
+	const int dIdx = m_lib.FindNamed(LIST_STUDIO, dstName);
+	if (dIdx >= 0)
+		breakCycle(dIdx);
+	for (size_t k = 0; k < m_lib.studios.size(); ++k)
+		breakCycle(static_cast<int>(k));
+	return true;
+}
+
+void CRuliManagerDlg::OnStudioMerge()
+{
+	// 제작사 탭: 선택한 제작사(원래)를 고른 제작사(대상)에 병합
+	if (m_mode != MODE_STUDIO || m_catSelKind != CAT_VALUE || m_catSelValue.IsEmpty())
+		return;
+	const CString src = m_catSelValue;
+	if (m_lib.FindNamed(LIST_STUDIO, src) < 0)
+		return;
+	CNamePickDlg dlg(m_lib, LIST_STUDIO, CString(), this);
+	dlg.m_single = true;
+	dlg.m_exclude = src;
+	dlg.m_caption = L"'" + src + L"' 제작사를 병합할 제작사 선택";
+	if (dlg.DoModal() != IDOK)
+		return;
+	CString dst = dlg.m_result;
+	dst.Trim();
+	const int d = m_lib.FindNamed(LIST_STUDIO, dst);   // 서브이름으로 골라도 제작사 이름으로
+	if (d < 0)
+	{
+		AfxMessageBox(dst.IsEmpty() ? CString(L"병합할 제작사를 고르세요. (레이블은 고를 수 없습니다)")
+			: L"목록에 있는 제작사를 고르세요. ('" + dst + L"' 은(는) 등록된 제작사가 아닙니다)", MB_ICONINFORMATION);
+		return;
+	}
+	dst = m_lib.studios[d].name;
+	if (dst.CompareNoCase(src) == 0)
+		return;
+	int videos = 0;
+	for (const VideoItem& v : m_lib.items)
+	{
+		CString s = v.studio;
+		if (s.Trim().CompareNoCase(src) == 0)
+			++videos;
+	}
+	CString msg;
+	msg.Format(L"제작사 '%s'을(를) '%s'(으)로 병합할까요?\n\n"
+		L"영상 %d개의 제작사가 '%s'(으)로 바뀌고, 하위 제작사 · 레이블 · 품번 DB 항목도 '%s' 쪽으로 옮겨집니다.\n"
+		L"'%s' 의 이름 · 서브이름은 '%s' 의 서브이름에 추가되고(붙여넣기 · txt 에서 그 이름으로 적혀도 '%s'), 링크는 합쳐지며, 이미지 · 메모는 비어 있을 때만 가져옵니다.\n"
+		L"'%s' 항목은 삭제됩니다.",
+		static_cast<LPCWSTR>(src), static_cast<LPCWSTR>(dst), videos, static_cast<LPCWSTR>(dst), static_cast<LPCWSTR>(dst),
+		static_cast<LPCWSTR>(src), static_cast<LPCWSTR>(dst), static_cast<LPCWSTR>(dst), static_cast<LPCWSTR>(src));
+	if (AfxMessageBox(msg, MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
+		return;
+	CommitDetails();
+	if (!MergeStudioInto(src, dst))
+		return;
+	m_lib.RefreshDerivedLabels();
+	if (!m_lib.Save())
+		AfxMessageBox(L"라이브러리 파일을 저장하지 못했습니다.", MB_ICONWARNING);
+	m_catChecked[MODE_STUDIO].clear();
+	m_catSelKind = CAT_VALUE;
+	m_catSelValue = dst;   // 남은 제작사 선택
+	RebuildCategories();
+	if (m_curItem >= 0)
+		ShowDetails(m_curItem);
+	UpdateStatus();
+}
+
+void CRuliManagerDlg::OnStudioMergeChecked()
+{
+	// 체크한 제작사 병합: 오른쪽 클릭한(선택한) 제작사 기준 - 나머지 체크한 제작사는 그 제작사로 합쳐지고 항목은 삭제 (체크한 레이블은 건드리지 않음)
+	if (m_mode != MODE_STUDIO || m_catSelKind != CAT_VALUE || m_catSelValue.IsEmpty() || !IsCatChecked(CAT_VALUE, m_catSelValue))
+		return;
+	const int t = m_lib.FindNamed(LIST_STUDIO, m_catSelValue);
+	if (t < 0)
+		return;
+	const CString keep = m_lib.studios[t].name;
+	std::vector<CString> others;
+	for (const CatRow& r : CheckedCatRows())
+		if (r.kind == CAT_VALUE && r.value.CompareNoCase(keep) != 0 && m_lib.FindNamed(LIST_STUDIO, r.value) >= 0)
+			others.push_back(r.value);
+	if (others.empty())
+		return;
+	CString msg;
+	msg.Format(L"체크한 제작사 %d개를 '%s'(으)로 병합할까요?\n\n", static_cast<int>(others.size()), static_cast<LPCWSTR>(keep));
+	for (size_t k = 0; k < others.size() && k < 15; ++k)
+	{
+		int videos = 0;
+		for (const VideoItem& v : m_lib.items)
+		{
+			CString s = v.studio;
+			if (s.Trim().CompareNoCase(others[k]) == 0)
+				++videos;
+		}
+		CString line;
+		line.Format(L"  %s  (영상 %d개)\n", static_cast<LPCWSTR>(others[k]), videos);
+		msg += line;
+	}
+	if (others.size() > 15)
+	{
+		CString more;
+		more.Format(L"  … 외 %d개\n", static_cast<int>(others.size() - 15));
+		msg += more;
+	}
+	msg += L"\n영상의 제작사 · 하위 제작사 · 레이블 · 품번 DB 항목은 '" + keep + L"' 쪽으로 옮겨지고, 병합되는 제작사의 이름 · 서브이름은 '" + keep +
+		L"' 의 서브이름에 추가됩니다. 링크는 합쳐지고 이미지 · 메모는 비어 있을 때만 가져온 뒤 그 제작사 항목은 삭제됩니다.";
+	if (AfxMessageBox(msg, MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
+		return;
+	CommitDetails();
+	for (const CString& n : others)
+		MergeStudioInto(n, keep);
+	m_lib.RefreshDerivedLabels();
+	if (!m_lib.Save())
+		AfxMessageBox(L"라이브러리 파일을 저장하지 못했습니다.", MB_ICONWARNING);
+	m_catChecked[MODE_STUDIO].clear();
+	m_catSelKind = CAT_VALUE;
+	m_catSelValue = keep;
+	RebuildCategories();
+	if (m_curItem >= 0)
+		ShowDetails(m_curItem);
 	UpdateStatus();
 }
 
@@ -10105,6 +10491,17 @@ void CRuliManagerDlg::DrawStudioTreeNode(CDC* dc, int row, const CRect& rc, bool
 	m_treeCardDraw = true;   // 격자 기준 마우스 오버 표시(개수 칸 배경) 끔 - 트리 좌표와 다름
 	DrawStudioCard(dc, row, rc, selected, GetFocus() == &m_studioTree);
 	m_treeCardDraw = false;
+	// 왼쪽 위 체크 칸 (격자 카드와 같음): 체크했으면 항상, 아니면 그 자리에 마우스가 있을 때만 빈 칸
+	if (CatChecksEnabled() && row >= 0 && row < static_cast<int>(m_catRows.size()))
+	{
+		const CatRow& r = m_catRows[row];
+		if (r.kind == CAT_VALUE || r.kind == CAT_LABEL)
+		{
+			const bool checked = IsCatChecked(r.kind, r.value);
+			if (checked || m_studioTree.HotCheckRow() == row)
+				DrawCardCheck(dc, ActorCheckRect(rc), checked);
+		}
+	}
 }
 
 void CRuliManagerDlg::SetNamedMemoTarget(int kind, const CString& name)
@@ -14284,6 +14681,12 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 			del.Format(L"배우 삭제(%d)\tDel", checkedCount);
 			menu.AppendMenu(MF_STRING, ID_ACTOR_DELETECHECKED, del);
 			menu.AppendMenu(MF_SEPARATOR);
+			{
+				const int none = NoVideoActorRows();
+				CString nv;
+				nv.Format(L"영상 없는 배우 체크(%d)", none);
+				menu.AppendMenu(MF_STRING | (none > 0 ? 0 : MF_GRAYED), ID_ACTOR_CHECKNOVIDEO, nv);
+			}
 			menu.AppendMenu(MF_STRING, ID_ACTOR_UNCHECKALL, L"체크 모두 해제");
 			DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
 			return;
@@ -14295,6 +14698,13 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 		menu.AppendMenu(MF_SEPARATOR);
 		menu.AppendMenu(MF_STRING, ID_ACTOR_MERGE,      L"다른 배우와 합치기...");
 		menu.AppendMenu(MF_STRING, ID_ACTOR_DELETE,     L"배우 삭제\tDel");
+		{
+			const int none = NoVideoActorRows();
+			CString nv;
+			nv.Format(L"영상 없는 배우 체크(%d)", none);
+			menu.AppendMenu(MF_SEPARATOR);
+			menu.AppendMenu(MF_STRING | (none > 0 ? 0 : MF_GRAYED), ID_ACTOR_CHECKNOVIDEO, nv);
+		}
 		menu.SetDefaultItem(ID_ACTOR_SHOWVIDEOS);
 		DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
 		return;
@@ -14321,17 +14731,8 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 		CMenu menu;
 		menu.CreatePopupMenu();
 		// 체크한 카드에서 오른쪽 클릭: 체크한 항목 전용 메뉴 (제작사 · 태그 · 컬렉션)
-		if (CatChecksEnabled() && row >= 0 && row < static_cast<int>(m_catRows.size()) && IsCatChecked(m_catRows[row].kind, m_catRows[row].value))
-		{
-			CString del;
-			del.Format(L"%s 삭제(%d)\tDel", m_mode == MODE_TAG ? L"태그" : (m_mode == MODE_COLLECTION ? L"컬렉션" : L"제작사 · 레이블"),
-				static_cast<int>(CheckedCatRows().size()));
-			menu.AppendMenu(MF_STRING, ID_CAT_DELETECHECKED, del);
-			menu.AppendMenu(MF_SEPARATOR);
-			menu.AppendMenu(MF_STRING, ID_CAT_UNCHECKALL, L"체크 모두 해제");
-			DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
+		if (ShowCatCheckedMenu(row, point))
 			return;
-		}
 		menu.AppendMenu(MF_STRING, ID_ACTOR_SHOWVIDEOS, L"영상 보기\tEnter");
 		menu.AppendMenu(MF_STRING, ID_ACTOR_EDIT,       m_mode == MODE_COLLECTION ? L"편집 (제목 · 커버 · 메모)...\tF2" : L"편집...\tF2");
 		if (m_mode == MODE_COLLECTION)
@@ -14345,6 +14746,11 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 			menu.AppendMenu(MF_SEPARATOR);
 			menu.AppendMenu(MF_STRING, ID_CAT_MERGE, L"다른 태그와 병합...");
 			menu.AppendMenu(MF_STRING, ID_CAT_DELETE, L"삭제");
+		}
+		if (m_mode == MODE_STUDIO && m_catSelKind == CAT_VALUE)
+		{
+			menu.AppendMenu(MF_SEPARATOR);
+			menu.AppendMenu(MF_STRING, ID_STUDIO_MERGE, L"다른 제작사와 병합...");
 		}
 		menu.SetDefaultItem(ID_ACTOR_SHOWVIDEOS);
 		DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
@@ -14385,6 +14791,11 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 			menu.AppendMenu(MF_SEPARATOR);
 			menu.AppendMenu(MF_STRING, ID_CAT_MERGE, L"다른 태그와 병합...");
 			menu.AppendMenu(MF_STRING, ID_CAT_DELETE, L"삭제");
+		}
+		if (m_mode == MODE_STUDIO && m_catSelKind == CAT_VALUE)
+		{
+			menu.AppendMenu(MF_SEPARATOR);
+			menu.AppendMenu(MF_STRING, ID_STUDIO_MERGE, L"다른 제작사와 병합...");
 		}
 		menu.SetDefaultItem(ID_ACTOR_SHOWVIDEOS);
 		DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
@@ -14604,6 +15015,16 @@ void CRuliManagerDlg::ShowNewItemMenu(CPoint screenPt)
 		if (menu.GetMenuItemCount() > 0)
 			menu.AppendMenu(MF_SEPARATOR);
 		menu.AppendMenu(MF_STRING, ID_CHECK_ALL, t);
+	}
+	// 배우 격자: 영상 없는 배우 체크 (지금 보이는 배우 중 출연 0편)
+	if (IsActorGridMode() && !ActorTreemapActive())
+	{
+		const int none = NoVideoActorRows();
+		CString t;
+		t.Format(L"영상 없는 배우 체크(%d)", none);
+		if (menu.GetMenuItemCount() > 0 && !CheckAllCount())
+			menu.AppendMenu(MF_SEPARATOR);
+		menu.AppendMenu(MF_STRING | (none > 0 ? 0 : MF_GRAYED), ID_ACTOR_CHECKNOVIDEO, t);
 	}
 	// 체크한 카드가 있으면: 체크 모두 해제 (배우 격자 / 제작사 · 태그 · 컬렉션 카드 목록 / 영상 격자)
 	if (IsActorGridMode())
@@ -15441,7 +15862,7 @@ void CRuliManagerDlg::ApplyColors()
 
 	// 버튼 (#137CBD)
 	const UINT buttons[] = {
-		IDC_BTN_ADDFOLDER, IDC_BTN_REMOVEFOLDER, IDC_BTN_REFRESH, IDC_BTN_RESCAN, IDC_BTN_ACTORS,
+		IDC_BTN_ADDFOLDER, IDC_BTN_REMOVEFOLDER, IDC_BTN_REFRESH, IDC_BTN_RESCAN, IDC_BTN_ACTORS, IDC_BTN_TOOLS,
 		IDC_BTN_ACTOR_BACK, IDC_BTN_SAVE, IDC_BTN_PICKACTORS, IDC_BTN_PICKVALIASES, IDC_BTN_PICKSTUDIO, IDC_BTN_PICKTAGS,
 		IDC_BTN_OPENDEFAULT, IDC_BTN_DELETE, IDC_BTN_EXPLORER, IDC_BTN_SORTDIR, IDC_BTN_OPENDB, IDC_BTN_CHANGEIMAGE, IDC_BTN_SEARCHIMAGE,
 		IDC_BTN_APPLYDB, IDC_BTN_EXPORTTXT
@@ -18484,10 +18905,17 @@ void CRuliManagerDlg::ShowStudioTreeMenu(int row, CPoint screen)
 		return;
 	}
 	m_catOwner.GridSetSel(row);
+	if (ShowCatCheckedMenu(row, screen))   // 체크한 노드: 체크한 항목 전용 메뉴
+		return;
 	CMenu menu;
 	menu.CreatePopupMenu();
 	menu.AppendMenu(MF_STRING, ID_ACTOR_SHOWVIDEOS, L"영상 보기\tEnter");
 	menu.AppendMenu(MF_STRING, ID_ACTOR_EDIT, L"편집...\tF2");
+	if (m_catRows[row].kind == CAT_VALUE)
+	{
+		menu.AppendMenu(MF_SEPARATOR);
+		menu.AppendMenu(MF_STRING, ID_STUDIO_MERGE, L"다른 제작사와 병합...");
+	}
 	menu.SetDefaultItem(ID_ACTOR_SHOWVIDEOS);
 	DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, screen.x, screen.y, this);
 }
@@ -19219,6 +19647,7 @@ void CRuliManagerDlg::ShowHelp(HWND active)
 	else if (dynamic_cast<CActorDlg*>(w))       topic = L"manage-actor";
 	else if (dynamic_cast<CFileManageDlg*>(w))  topic = L"manage-file";
 	else if (dynamic_cast<CVideoCheckDlg*>(w))  topic = L"video-check";
+	else if (dynamic_cast<CDupCheckDlg*>(w))    topic = L"dup-check";
 	else if (dynamic_cast<CTextInfoDlg*>(w) || dynamic_cast<CTagLinkDlg*>(w)) topic = L"input";
 	else if (dynamic_cast<CNameListDlg*>(w))
 	{

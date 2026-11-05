@@ -6,11 +6,11 @@ def fig_main():
     s.window(0, 0, 900, 540, 'RuliManager v0.83')
     # 위 1줄: 폴더 · 새로고침 · 목록 관리 · 검색 · 설정
     x = 12
-    for t, w in (('폴더 관리', 70), ('새로고침 (F5)', 84), ('재 스캔', 58), ('목록 관리 ▾', 78)):
+    for t, w in (('폴더 관리', 64), ('새로고침 (F5)', 80), ('재 스캔', 54), ('목록 관리 ▾', 74), ('관리 도구 ▾', 74)):
         s.button(x, 36, w, t)
         x += w + 6
     s.text(x + 8, 50, '검색', 11, SUB)
-    s.edit(x + 36, 36, 200, '이름 · 품번 · 배우 …')
+    s.edit(x + 36, 36, 170, '이름 · 품번 · 배우 …')
     s.circle(876, 46, 9, COMBO)
     s.text(876, 50, '⚙', 11, TEXT, 'middle')
     # 탭
@@ -578,4 +578,44 @@ def fig_video_check():
                            '[1:49:24] [h264 @ …] error while decoding MB 23 41')):
         s.text(20, y + 24 + k * 16, t, 10, SUB if k else TEXT)
     s.text(12, 346, '대기 2 · 정상 1 · 의심 1 · 손상 1   ▶ 검사 중: ABC-104.mp4 (42%)', 10, SUB)
+    return s.render()
+
+
+def fig_dup_check():
+    s = Svg(880, 420, '중복 파일 검사 창')
+    s.window(0, 0, 880, 420, '중복 파일 검사')
+    s.rect(12, 40, 12, 12, ACC, r=2)
+    s.path('M14.5,46 l2.5,2.5 l4,-5', 'none', TEXT, 1.6)
+    s.text(30, 50, '같은 크기', 10, TEXT)
+    s.rect(92, 40, 12, 12, ACC, r=2)
+    s.path('M94.5,46 l2.5,2.5 l4,-5', 'none', TEXT, 1.6)
+    s.text(110, 50, '같은 품번', 10, TEXT)
+    x = 175
+    for t, w, c in (('검사', 50, ACC), ('자동 선택', 70, ACC), ('체크 해제', 70, ACC), ('선택 삭제 (휴지통)', 120, DANGER)):
+        s.button(x, 36, w, t, c)
+        x += w + 6
+    s.button(808, 36, 60, '닫기', ACC)
+    s.rect(12, 66, 856, 24, COMBO, r=0)
+    s.text(22, 83, '같은 품번 · ABC-123 · 3개 (합계 9.60 GB)', 12, TEXT, weight='bold')
+    infos = [('ABC-123.mp4', '4.21 GB   2:03:15', '1920 × 1080 · 29.97 fps', 'D:\\Videos\\배우 A', False),
+             ('ABC-123.mkv', '4.10 GB   2:03:10', '1920 × 1080 · 23.98 fps', 'E:\\Backup\\ABC-123', True),
+             ('ABC-123 (1).mp4', '1.29 GB   2:03:15', '1280 × 720 · 29.97 fps', 'D:\\Downloads', True)]
+    covers = ['#3B5163', '#4A3F5C', '#3F5A4B']
+    for i, (n, l1, l2, l3, chk) in enumerate(infos):
+        cx = 22 + i * 236
+        s.rect(cx, 98, 226, 232, CARD, r=3)
+        s.rect(cx, 98, 226, 127, covers[i], r=3)
+        s.play(cx + 113, 161, 20, op=0.35)
+        if chk:
+            s.rect(cx, 98, 226, 232, 'none', DANGER, r=3, sw=3)
+            s.rect(cx + 6, 104, 18, 18, DANGER, r=2)
+            s.path(f'M{cx + 10},{113} l4,4 l7,-8', 'none', TEXT, 2)
+        s.text(cx + 8, 244, n, 11, TEXT, weight='bold')
+        s.text(cx + 8, 262, l1, 10, TEXT)
+        s.text(cx + 8, 280, l2, 10, SUB)
+        s.text(cx + 8, 298, '수정 2024-05-17 21:30', 10, SUB)
+        s.text(cx + 8, 316, l3, 10, SUB2)
+    s.rect(12, 340, 856, 24, COMBO, r=0)
+    s.text(22, 357, '같은 크기 · 2.31 GB (2,480,123,904 바이트) · 2개', 12, TEXT, weight='bold')
+    s.text(12, 406, '중복 묶음 2개 · 파일 5개 · 삭제할 파일로 체크 2개 (5.39 GB)   카드 더블클릭 = 재생, 왼쪽 위 칸 = 체크', 10, SUB)
     return s.render()

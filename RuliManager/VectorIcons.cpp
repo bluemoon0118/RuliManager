@@ -1079,4 +1079,20 @@ namespace VectorIcon
 			p.AddPolygon(handle, 4);                                // 손잡이
 		});
 	}
+
+	void Barcode(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		// 굵기가 다른 세로 막대 (품번 = 상품 번호), 아래쪽에 숫자 줄 자리만큼 짧은 막대 몇 개
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			struct Bar { float x, w; bool tall; };
+			static const Bar bars[] = {
+				{ 2.0f, 2.0f, true }, { 5.0f, 1.0f, false }, { 7.0f, 1.6f, false }, { 9.6f, 2.6f, false },
+				{ 13.2f, 1.0f, false }, { 15.2f, 2.0f, false }, { 18.2f, 1.0f, false }, { 20.0f, 2.0f, true } };
+			for (const Bar& b : bars)
+				p.AddRectangle(Gdiplus::RectF(b.x, 4.0f, b.w, b.tall ? 16.0f : 13.0f));   // 양 끝 막대는 길게 (가드 바)
+			p.AddRectangle(Gdiplus::RectF(5.0f, 18.4f, 6.6f, 1.6f));    // 숫자 줄
+			p.AddRectangle(Gdiplus::RectF(13.2f, 18.4f, 5.8f, 1.6f));
+		});
+	}
 }

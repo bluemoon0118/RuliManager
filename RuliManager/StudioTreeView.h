@@ -29,6 +29,10 @@ public:
 	std::function<void(int row)> m_onActivate;                // 더블클릭 · Enter
 	std::function<void(int row, CPoint screenPt)> m_onContext;   // 오른쪽 클릭 (row = -1 이면 빈곳)
 	std::function<void(UINT vk)> m_onKey;                     // 그 밖의 키 (F2 · Del · F5 등 - 격자와 같게)
+	// 체크 칸 (카드 왼쪽 위 - 격자 카드와 같음): 주인이 그 점이 체크 칸인지 판단, 누르면 m_onCheck (선택 · 열기 대신)
+	std::function<bool(int row, const CRect& nodeClient, CPoint client)> m_onCheckHit;
+	std::function<void(int row)> m_onCheck;
+	int  HotCheckRow() const { return (m_hotCheck >= 0 && m_hotCheck < static_cast<int>(m_nodes.size())) ? m_nodes[m_hotCheck].row : -1; }   // 마우스가 체크 칸 위에 있는 노드 (그릴 때 빈 칸 표시)
 
 	bool Create(CWnd* parent, UINT id);
 	void SetColors(COLORREF back, COLORREF line, COLORREF text);
@@ -69,6 +73,8 @@ protected:
 	int  m_scrollX = 0, m_scrollY = 0;
 	int  m_sel = -1;                    // 선택 노드 (m_nodes 번호)
 	int  m_hot = -1, m_hotToggle = -1;
+	int  m_hotCheck = -1;               // 마우스가 체크 칸 위에 있는 노드
+	int  CheckAt(CPoint client) const;  // 체크 칸 위의 노드 (-1 = 없음)
 	bool m_tracking = false;
 	COLORREF m_back = RGB(32, 43, 51), m_line = RGB(92, 112, 128), m_text = RGB(232, 238, 242);
 	CString m_emptyText;

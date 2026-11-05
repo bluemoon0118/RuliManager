@@ -94,7 +94,7 @@ protected:
 	static inline const COLORREF& kButtonColor = TCOL(TC_ACCENT); // #137CBD (버튼 배경)
 	static inline const COLORREF& kSaveColor = TCOL(TC_SAVE);   // #0F9960 (저장 버튼 배경)
 	static inline const COLORREF& kDangerColor = TCOL(TC_DANGER); // #DB3737 (삭제/제거 버튼 배경)
-	CDarkButton m_darkButtons[20];
+	CDarkButton m_darkButtons[21];
 	CDarkButton m_btnSettings;      // 오른쪽 위 톱니바퀴 (설정 창)
 	CDarkButton m_modeButtons[5];   // 영상 / 배우 / 스튜디오 / 태그 / 컬렉션 토글 버튼
 	CDarkButton m_pageButtons[9];   // 페이지: « < 1 2 3 4 5 > »
@@ -324,6 +324,10 @@ protected:
 	void ToggleActorFavorite(int actorIdx);
 	afx_msg void OnCatDelete();
 	afx_msg void OnCatMerge();
+	afx_msg void OnStudioMerge();          // 제작사 오른쪽 클릭 [다른 제작사와 병합...]
+	afx_msg void OnStudioMergeChecked();   // 체크한 제작사들을 오른쪽 클릭한 제작사로 병합
+	bool MergeStudioInto(const CString& src, const CString& dst);   // 제작사 src → dst (영상 · 하위 제작사 · 레이블 · 품번 DB · 서브이름 · 링크 · 메모, src 항목 삭제)
+	bool ShowCatCheckedMenu(int row, CPoint point);   // 체크한 카드 오른쪽 클릭: 체크한 항목 전용 메뉴 (격자 · [계층] 공용, 보였으면 true)
 	static void SortTagsKo(std::vector<CString>& tags);   // 영상 상세 태그 칩: 가나다 순   // 태그 탭: 선택한 태그를 다른 태그에 병합
 	afx_msg void OnActorDelete();
 	afx_msg void OnVideoTextInfo();
@@ -598,6 +602,8 @@ protected:
 	afx_msg void OnActorDeleteChecked();             // 체크한 배우 모두 삭제
 	afx_msg void OnActorUncheckAll();                // 체크 모두 해제
 	afx_msg void OnActorMergeChecked();              // 체크한 배우들을 오른쪽 클릭한(선택한) 배우로 병합
+	afx_msg void OnActorCheckNoVideo();               // 지금 보이는 배우 중 영상이 없는 배우를 모두 체크
+	int  NoVideoActorRows(std::vector<int>* rows = nullptr) const;   // 지금 보이는 배우(m_actorRows) 중 출연 영상이 0편인 배우 수 (rows: 그 배우 인덱스)
 
 	// 배우 카드 (세로 사진 + 국기 / 성별 기호 + 이름(별칭) / 나이 / ▶ 출연 수)
 	CFont m_cardNameFont;
@@ -902,6 +908,7 @@ protected:
 	afx_msg void OnBnClickedOpenDb();
 	afx_msg void OnBnClickedOpenDefault();
 	afx_msg void OnBnClickedActors();
+	afx_msg void OnBnClickedTools();    // [관리 도구 ▾] → 파일 관리 · 영상 검사 (유틸리티)
 	afx_msg void OnBnClickedSettings();
 	void DeleteDb(int mask);
 	CString m_pendingImage;   // 영상 상세에서 고른 새 이미지 (저장하면 영상 파일 옆에 같은 이름으로 복사)
@@ -1022,6 +1029,8 @@ protected:
 	CVideoCheckDlg* m_pCheckDlg = nullptr;
 	void OpenVideoCheck(const std::vector<int>* items = nullptr);   // 창을 열고(없으면 만듦) items 를 검사 목록에 추가
 	afx_msg void OnManageCheck();          // [목록 관리 ▾] → 영상 검사
+	afx_msg void OnManageDups();           // [관리 도구 ▾] → 중복 파일 검사 (같은 크기 · 같은 품번)
+	std::vector<CString> RemoveVideoFiles(const std::vector<CString>& paths);   // 영상 파일을 휴지통으로 + DB 에서 삭제 (지우지 못한 파일을 돌려줌)
 	afx_msg void OnVideoCheck();           // 영상 오른쪽 클릭 [영상 검사] (분할 영상은 모든 파트)
 	afx_msg void OnVideoCheckChecked();    // 체크한 영상 [영상 검사(n)]
 	afx_msg LRESULT OnPreviewDone(WPARAM wParam, LPARAM lParam);

@@ -1553,12 +1553,13 @@ namespace
 	// 메뉴 글자 → 아이콘 (위에서부터 먼저 맞는 것)
 	enum DarkMenuIcon { DMI_NONE = 0, DMI_UNCHECK, DMI_CHECKALL, DMI_TRASH, DMI_MINUS, DMI_ERASER, DMI_MERGE, DMI_PASTE, DMI_TEXT,
 		DMI_PICTURE, DMI_REFRESH, DMI_FOLDER, DMI_PLAY, DMI_COLLECTION, DMI_PLUS, DMI_PENCIL, DMI_GEAR, DMI_MOVIE, DMI_COPY,
-		DMI_ACTOR, DMI_STUDIO, DMI_TAG, DMI_INSPECT };   // INSPECT: 돋보기 (영상 검사)   // 배우 · 제작사 · 태그 탭 상징 (목록 관리 메뉴)
+		DMI_ACTOR, DMI_STUDIO, DMI_TAG, DMI_INSPECT, DMI_BARCODE };   // BARCODE: 바코드 (품번 관리)   // INSPECT: 돋보기 (영상 검사)   // 배우 · 제작사 · 태그 탭 상징 (목록 관리 메뉴)
 	int DarkMenuIconFor(const CString& text)
 	{
 		struct Rule { const wchar_t* word; int icon; };
 		static const Rule rules[] = {
-			{ L"영상 검사", DMI_INSPECT },
+			{ L"영상 검사", DMI_INSPECT }, { L"중복 파일", DMI_COPY },   // 중복 파일 검사: 겹친 두 장
+			{ L"없는 배우 체크", DMI_CHECKALL },   // 영상 없는 배우 일괄 체크
 			{ L"체크 모두 해제", DMI_UNCHECK }, { L"체크 해제", DMI_UNCHECK }, { L"전체 체크", DMI_CHECKALL },
 			{ L"빼기", DMI_MINUS }, { L"삭제", DMI_TRASH }, { L"모두 지우기", DMI_TRASH },
 			{ L"비우기", DMI_ERASER }, { L"초기화", DMI_ERASER },
@@ -1568,7 +1569,7 @@ namespace
 			{ L"재생", DMI_PLAY }, { L"컬렉션에 추가", DMI_COLLECTION },
 			{ L"추가", DMI_PLUS }, { L"새 ", DMI_PLUS },
 			{ L"편집", DMI_PENCIL }, { L"변경", DMI_PENCIL },
-			{ L"배우 관리", DMI_ACTOR }, { L"제작사 관리", DMI_STUDIO }, { L"태그 관리", DMI_TAG },   // 목록 관리: 각 탭의 상징 (품번 관리는 톱니바퀴 그대로)
+			{ L"배우 관리", DMI_ACTOR }, { L"제작사 관리", DMI_STUDIO }, { L"태그 관리", DMI_TAG }, { L"품번 관리", DMI_BARCODE },   // 목록 관리: 각 탭의 상징 (품번 관리는 톱니바퀴 그대로)
 			{ L"관리", DMI_GEAR },
 			{ L"보기", DMI_MOVIE } };
 		for (const Rule& r : rules)
@@ -1603,6 +1604,7 @@ namespace
 		case DMI_STUDIO:     VectorIcon::Camera(dc, area, col); break;   // 제작사 탭: 비디오 카메라
 		case DMI_TAG:        VectorIcon::Tag(dc, area, col); break;      // 태그 탭: 꼬리표
 		case DMI_INSPECT:    VectorIcon::Inspect(dc, area, col); break;  // 영상 검사: 돋보기 + 재생
+		case DMI_BARCODE:    VectorIcon::Barcode(dc, area, col); break;  // 품번 관리: 바코드
 		default: break;
 		}
 	}
@@ -1849,6 +1851,14 @@ namespace
 	// 메뉴가 마우스 왼쪽 클릭으로 닫힌 자리 · 시각 (DarkMenu::ClosedByClickOn)
 	ULONGLONG g_menuClickCloseTick = 0;
 	POINT     g_menuClickClosePt = {};
+	HWND      g_menuOpener = nullptr;   // 메뉴를 연 창 (메뉴를 띄울 때 마우스 아래 창 - 펼침 버튼)
+
+	void NoteMenuOpener()
+	{
+		POINT p = {};
+		::GetCursorPos(&p);
+		g_menuOpener = ::WindowFromPoint(p);
+	}
 
 	void NoteMenuClosed()
 	{
@@ -1871,12 +1881,15 @@ bool DarkMenu::ClosedByClickOn(HWND wnd)
 	RECT rc = {};
 	::GetWindowRect(wnd, &rc);
 	const bool on = ::PtInRect(&rc, g_menuClickClosePt) != FALSE;
+	// 그 메뉴를 연 버튼을 다시 눌러 닫은 경우만 (다른 펼침 버튼을 누른 것이면 그 버튼 메뉴를 바로 엶 - [목록 관리 ▾] → [관리 도구 ▾])
+	const bool sameOpener = (g_menuOpener == wnd);
 	g_menuClickCloseTick = 0;   // 한 번만
-	return recent && on;
+	return recent && on && sameOpener;
 }
 
 BOOL DarkMenu::Track(CMenu& menu, UINT flags, int x, int y, CWnd* owner)
 {
+	NoteMenuOpener();
 	if (!owner || !owner->GetSafeHwnd() || !menu.GetSafeHmenu() || g_darkMenu)
 	{
 		const BOOL r = menu.TrackPopupMenu(flags, x, y, owner);   // 주인 창이 없거나 이미 다른 메뉴가 떠 있으면 기본 메뉴
