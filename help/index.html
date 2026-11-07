@@ -49,10 +49,10 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 </style>
 </head>
 <body>
-<nav><div class="brand">RuliManager<small>설명서 · v0.84</small></div><a class="lv1" href="#start">시작하기</a><a class="lv1" href="#layout">화면 구성</a><a class="lv1" href="#video">영상 탭</a><a class="lv1" href="#detail">영상 상세</a><a class="lv1" href="#input">정보 입력 (txt · 붙여넣기)</a><a class="lv1" href="#preview">미리보기 영상</a><a class="lv1" href="#actor">배우 탭</a><a class="lv2" href="#actor-drill">배우 출연작 화면</a><a class="lv1" href="#studio">제작사 탭</a><a class="lv2" href="#studio-drill">제작사 영상 화면</a><a class="lv1" href="#tag">태그 탭</a><a class="lv1" href="#collection">컬렉션 탭</a><a class="lv1" href="#series">품번 관리</a><a class="lv2" href="#manage-actor">배우 관리</a><a class="lv2" href="#manage-studio">제작사 관리</a><a class="lv2" href="#manage-tag">태그 관리</a><a class="lv2" href="#manage-file">파일 관리</a><a class="lv2" href="#video-check">영상 검사</a><a class="lv2" href="#dup-check">중복 파일 검사</a><a class="lv1" href="#settings">설정</a><a class="lv1" href="#data">데이터와 백업</a><a class="lv1" href="#keys">단축키</a></nav>
+<nav><div class="brand">RuliManager<small>설명서 · v0.9</small></div><a class="lv1" href="#start">시작하기</a><a class="lv1" href="#layout">화면 구성</a><a class="lv1" href="#video">영상 탭</a><a class="lv1" href="#detail">영상 상세</a><a class="lv1" href="#input">정보 입력 (txt · 붙여넣기)</a><a class="lv1" href="#preview">미리보기 영상</a><a class="lv1" href="#actor">배우 탭</a><a class="lv2" href="#actor-drill">배우 출연작 화면</a><a class="lv1" href="#studio">제작사 탭</a><a class="lv2" href="#studio-drill">제작사 영상 화면</a><a class="lv1" href="#tag">태그 탭</a><a class="lv1" href="#collection">컬렉션 탭</a><a class="lv1" href="#series">품번 관리</a><a class="lv2" href="#manage-actor">배우 관리</a><a class="lv2" href="#manage-studio">제작사 관리</a><a class="lv2" href="#manage-tag">태그 관리</a><a class="lv2" href="#manage-file">파일 관리</a><a class="lv2" href="#video-check">영상 검사</a><a class="lv2" href="#dup-check">중복 파일 검사</a><a class="lv1" href="#plugin">플러그인</a><a class="lv1" href="#settings">설정</a><a class="lv1" href="#data">데이터와 백업</a><a class="lv1" href="#keys">단축키</a></nav>
 <main>
 <h1>RuliManager 설명서</h1>
-<p class="hint">v0.84 기준 · 그림은 실제 화면을 단순하게 그린 것이라 세부 모양은 다를 수 있습니다 · 어느 화면에서든 <kbd>F1</kbd> 을 누르면 그 화면의 장이 열립니다.</p>
+<p class="hint">v0.9 기준 · 그림은 실제 화면을 단순하게 그린 것이라 세부 모양은 다를 수 있습니다 · 어느 화면에서든 <kbd>F1</kbd> 을 누르면 그 화면의 장이 열립니다.</p>
 <section id="start"><h2>시작하기</h2>
 <p>RuliManager 는 PC 에 있는 영상 파일을 배우 · 제작사 · 태그 · 컬렉션으로 정리해서 보는 프로그램입니다.
 영상 파일은 그대로 두고, 정보(제목 · 배우 · 별점 등)는 프로그램 DB 에 따로 저장합니다.</p>
@@ -442,7 +442,7 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 <circle cx="12" cy="500" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
 <text x="12" y="504" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">8</text>
 </svg><figcaption>메인 화면 (영상 탭)</figcaption></figure>
-<ol class="callouts"><li><b>폴더 · 새로고침</b> - [폴더 관리] 로 등록 폴더 추가 · 제거, [새로고침] <kbd>F5</kbd> 은 새 파일 찾기, [재 스캔] 은 저장된 영상에도 폴더 구조를 다시 적용해 빈 배우 · 제작사 · 발매일을 채웁니다.</li><li><b>[목록 관리 ▾] · [관리 도구 ▾] · 검색</b> - [목록 관리 ▾] 는 배우 / 제작사 / 태그 / 품번 관리 창, [관리 도구 ▾] 는 파일 관리 · 영상 검사를 엽니다. 검색 칸은 이름 · 품번 · 제목 · 배우 · 제작사 · 태그를 바로 찾습니다 (띄어 쓰면 모두 포함하는 것만).</li><li><b>설정 (톱니바퀴)</b> - <a href="#settings">설정 창</a>. 미리보기를 만드는 동안에는 톱니바퀴가 돌고, 오른쪽 클릭으로 만들기를 멈출 수 있습니다.</li><li><b>탭</b> - <a href="#video">영상</a> · <a href="#actor">배우</a> · <a href="#studio">제작사</a> · <a href="#tag">태그</a> · <a href="#collection">컬렉션</a>.</li><li><b>도구줄</b> - 정렬 · 방향, 보기 방식, 확대 슬라이더, 장르 칩, 페이지 단추. 카드와 함께 스크롤됩니다.</li><li><b>카드 격자</b> - 고르면 오른쪽에 상세 정보, 더블클릭 · <kbd>Enter</kbd> · <kbd>Space</kbd> 는 재생(영상) 또는 들어가기(<a href="#actor-drill">배우 출연작</a> · <a href="#studio-drill">제작사 영상 화면</a> · 태그 · 컬렉션).</li><li><b>상세 화면</b> - 고른 항목의 정보. <a href="#detail">영상 상세</a> 참고. 격자와 사이의 얇은 바를 누르면 접고 펼 수 있고, 설정에서 왼쪽 / 오른쪽 위치를 바꿀 수 있습니다.</li><li><b>아래 단추</b> - 재생, DB 에서 삭제 (파일은 지우지 않음), 탐색기에서 보기, DB 폴더 열기, DB 반영, 정보 txt 생성.</li></ol>
+<ol class="callouts"><li><b>폴더 · 새로고침</b> - [폴더 관리] 로 등록 폴더 추가 · 제거, [새로고침] <kbd>F5</kbd> 은 새 파일 찾기, [재 스캔] 은 저장된 영상에도 폴더 구조를 다시 적용해 빈 배우 · 제작사 · 발매일을 채웁니다.</li><li><b>[목록 관리 ▾] · [관리 도구 ▾] · 검색</b> - [목록 관리 ▾] 는 배우 / 제작사 / 태그 / 품번 관리 창, [관리 도구 ▾] 는 파일 관리 · 영상 검사 · 중복 파일 검사 · 플러그인을 엽니다. 검색 칸은 이름 · 품번 · 제목 · 배우 · 제작사 · 태그를 바로 찾습니다 (띄어 쓰면 모두 포함하는 것만).</li><li><b>설정 (톱니바퀴)</b> - <a href="#settings">설정 창</a>. 미리보기를 만드는 동안에는 톱니바퀴가 돌고, 오른쪽 클릭으로 만들기를 멈출 수 있습니다.</li><li><b>탭</b> - <a href="#video">영상</a> · <a href="#actor">배우</a> · <a href="#studio">제작사</a> · <a href="#tag">태그</a> · <a href="#collection">컬렉션</a>.</li><li><b>도구줄</b> - 정렬 · 방향, 보기 방식, 확대 슬라이더, 장르 칩, 페이지 단추. 카드와 함께 스크롤됩니다.</li><li><b>카드 격자</b> - 고르면 오른쪽에 상세 정보, 더블클릭 · <kbd>Enter</kbd> · <kbd>Space</kbd> 는 재생(영상) 또는 들어가기(<a href="#actor-drill">배우 출연작</a> · <a href="#studio-drill">제작사 영상 화면</a> · 태그 · 컬렉션).</li><li><b>상세 화면</b> - 고른 항목의 정보. <a href="#detail">영상 상세</a> 참고. 격자와 사이의 얇은 바를 누르면 접고 펼 수 있고, 설정에서 왼쪽 / 오른쪽 위치를 바꿀 수 있습니다.</li><li><b>아래 단추</b> - 재생, DB 에서 삭제 (파일은 지우지 않음), 탐색기에서 보기, DB 폴더 열기, DB 반영, 정보 txt 생성.</li></ol>
 <h3>영상 카드</h3>
 <figure><svg viewBox="0 0 560 220" role="img" aria-label="영상 카드 각 부분" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
 <g transform="translate(190,16) scale(1.45)">
@@ -496,7 +496,7 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 <circle cx="120" cy="200" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
 <text x="120" y="204" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">7</text>
 </svg><figcaption>영상 카드 각 부분</figcaption></figure>
-<ol class="callouts"><li><b>체크 칸</b> - 마우스를 올리면 나타남. 여러 영상을 체크해서 한 번에 삭제 · 미리보기 만들기 등을 합니다.</li><li><b>별점 리본</b> - 별점이 있는 영상만.</li><li><b>재생 시간</b></li><li><b>제목</b> (최대 3줄)</li><li><b>품번</b></li><li><b>해상도 · 등급</b> 표시 (예: 1080p | FHD)</li><li><b>배우 수 · 태그 수 · 물방울</b> - 숫자에 마우스를 올려 두면 출연 배우 카드 / 태그 칩이 팝업으로 나옵니다.</li></ol>
+<ol class="callouts"><li><b>체크 칸</b> - 마우스를 올리면 나타남. 여러 영상을 체크해서 한 번에 삭제 · 미리보기 만들기 · 플러그인 실행 등을 합니다. <kbd>Ctrl</kbd>+<kbd>A</kbd> (또는 빈 곳 오른쪽 클릭 [전체 체크]) 는 지금 페이지의 카드를 모두 체크합니다.</li><li><b>별점 리본</b> - 별점이 있는 영상만.</li><li><b>재생 시간</b></li><li><b>제목</b> (최대 3줄)</li><li><b>품번</b></li><li><b>해상도 · 등급</b> 표시 (예: 1080p | FHD)</li><li><b>배우 수 · 태그 수 · 물방울</b> - 숫자에 마우스를 올려 두면 출연 배우 카드 / 태그 칩이 팝업으로 나옵니다.</li></ol>
 </section><section id="video"><h2>영상 탭</h2>
 <p>등록된 모든 영상을 카드로 봅니다. 위 도구줄에서 정렬(이름 · 제목 · 크기 · 수정일 · 별점 · 발매일 · 배우 · 제작사 · 품번 · 재생 시간 · 해상도 등)과 방향 [▲▼] 을 고릅니다.</p>
 <h3>보기 방식</h3>
@@ -2309,9 +2309,164 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 </svg><figcaption>중복 파일 검사 창</figcaption></figure>
 <ul><li><b>검사 기준</b> - <b>같은 크기</b>: 파일 크기(바이트)가 똑같은 영상. <b>같은 품번</b>: 품번이 같은 영상 (분할 영상 ABC-123_1 · _2 처럼 파트가 다르면 중복으로 보지 않음). 둘 다 같은 묶음은 하나로 보여 줍니다. 기준을 바꾸면 바로 다시 검사합니다.</li><li><b>카드</b> - 커버, 파일 이름, 크기 · 재생 시간, 해상도 · fps, 수정일, 위치(폴더). 묶음 안에서는 해상도가 높고 큰 파일이 앞에 옵니다.</li><li><b>재생</b> - 카드 더블클릭 (오른쪽 클릭 메뉴에서 재생 · 탐색기에서 보기).</li><li><b>체크</b> - 카드 왼쪽 위 칸을 누르면 삭제할 파일로 체크 (빨간 테두리). <b>[자동 선택]</b> 은 묶음마다 해상도가 높은 것 → 큰 것 하나만 남기고 나머지를 체크합니다.</li><li><b>[선택 삭제 (휴지통)]</b> - 체크한 파일을 Windows 휴지통으로 보내고 DB 에서도 지웁니다 (휴지통에서 되살릴 수 있음). 한 묶음의 파일이 모두 체크돼 있으면 확인 창에서 알려 줍니다. 커버 이미지 · 정보 txt 는 그대로 둡니다.</li></ul>
 <p class="note"><b>주의</b> 연결되지 않은 이동식 디스크의 영상은 카드에 표시만 되고 체크 · 삭제할 수 없습니다.</p>
+</section><section id="plugin"><h2>플러그인</h2>
+<p>사이트에서 정보를 받아 오는 등의 일을 <b>외부 프로그램(플러그인)</b>에 맡깁니다. 플러그인은 <code>plugins</code> 폴더에 넣기만 하면 메뉴에 나타나고,
+받아 온 정보는 [웹페이지 내용 붙여넣기] 와 같은 과정으로 들어갑니다. 플러그인이 멈추거나 오류가 나도 RuliManager 에는 영향이 없습니다.</p>
+<h3>실행하기</h3>
+<ul><li><b>영상</b> - 영상 카드 오른쪽 클릭 <b>[플러그인 ▸]</b>. 카드를 체크했으면 <b>[플러그인(n) ▸]</b> 로 체크한 영상을 한꺼번에 (분할 영상은 묶음마다 한 번).</li><li><b>배우</b> - 배우 카드 오른쪽 클릭 <b>[플러그인 ▸]</b> (체크한 배우도 같음).</li><li><b>관리 도구</b> - <b>[관리 도구 ▾] → [플러그인 ▸]</b>. 맨 아래 <b>[플러그인 관리...]</b> 는 설정 [플러그인] 탭을 엽니다.</li><li>그 대상의 플러그인이 하나도 없으면 영상 · 배우 메뉴에는 [플러그인] 이 나오지 않습니다.</li></ul>
+<figure><svg viewBox="0 0 560 250" role="img" aria-label="플러그인 실행 창" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
+<rect x="0" y="0" width="560" height="250" rx="6" fill="#202B33" stroke="#10161A" stroke-width="1.5"/>
+<path d="M0,26 L0,6 Q0,0 6,0 L554,0 Q560,0 560,6 L560,26 Z" fill="#182026"/>
+<text x="12" y="17" font-size="11" fill="#A7B6C2" text-anchor="start" font-weight="normal">플러그인 실행 - AV 정보 가져오기</text>
+<text x="500" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">—</text>
+<text x="520" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">☐</text>
+<text x="540" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">✕</text>
+<text x="12" y="50" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">ABC-124 받는 중 (2/10) (37초)  · 결과 1 / 10</text>
+<rect x="12" y="60" width="536" height="12" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<rect x="13" y="61" width="105" height="10" rx="1" fill="#137CBD"/>
+<rect x="12" y="82" width="536" height="124" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="20" y="100" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">[ABC-123] 제목=新人NO.1 STYLE / 출연=葵つかさ 三上悠亜</text>
+<text x="20" y="116" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">[ABC-123] 커버 https://… (212 KB)</text>
+<text x="20" y="132" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">[ABC-124] 받는 중...</text>
+<rect x="488" y="218" width="60" height="20" rx="3" fill="#DB3737"/>
+<text x="518.0" y="231.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">중단</text>
+</svg><figcaption>플러그인 실행 창</figcaption></figure>
+<ul><li>진행 막대 · 메시지 · 걸린 시간 · 받은 결과 수, 아래 칸은 플러그인이 남긴 기록입니다.</li><li><b>[중단]</b> - 플러그인과 플러그인이 띄운 프로그램(크롬 등)을 함께 끝냅니다. 시간 제한(플러그인마다, 기본 2분)을 넘겨도 같이 끝납니다.</li><li>성공하면 창이 저절로 닫히고, 실패하면 이유와 기록을 보여 줍니다.</li><li>플러그인이 띄운 창(셀레늄 크롬 등)은 처음 뜰 때 한 번 RuliManager 뒤로 보냅니다 (크기 · 최대화는 그대로). 직접 봐야 하면 작업 표시줄에서 꺼내세요.</li></ul>
+<h3>채울 항목 고르기</h3>
+<p>결과가 오면 배우 · 제작사 · 태그 연결 창(붙여넣기와 같음)을 거쳐 이 창이 뜹니다. 그동안 플러그인은 잠시 멈춰 기다립니다.</p>
+<figure><svg viewBox="0 0 880 330" role="img" aria-label="채울 항목 고르기 창" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
+<rect x="0" y="0" width="880" height="330" rx="6" fill="#202B33" stroke="#10161A" stroke-width="1.5"/>
+<path d="M0,26 L0,6 Q0,0 6,0 L874,0 Q880,0 880,6 L880,26 Z" fill="#182026"/>
+<text x="12" y="17" font-size="11" fill="#A7B6C2" text-anchor="start" font-weight="normal">채울 항목 고르기 - ABC-123.mp4</text>
+<text x="820" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">—</text>
+<text x="840" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">☐</text>
+<text x="860" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">✕</text>
+<text x="12" y="46" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">[AV 정보 가져오기] 이 가져온 값입니다. 채울 항목을 체크하세요 (가져온 값은 고칠 수 있음). 체크한 항목만 바뀌고 나머지는 지금 값 그대로입니다.</text>
+<text x="34" y="70" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">항목</text>
+<text x="160" y="70" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">가져온 값 (고칠 수 있음)</text>
+<text x="530" y="70" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">지금 값</text>
+<rect x="12" y="82" width="12" height="12" rx="2" fill="#137CBD"/>
+<path d="M14.5,88 l2.5,2.5 l4,-5" fill="none" stroke="#F5F8FA" stroke-width="1.6"/>
+<text x="30" y="92" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">제목</text>
+<rect x="155" y="78" width="340" height="20" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="161" y="91.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">新人NO.1 STYLE デビュー</text>
+<text x="512" y="93" font-size="13" fill="#48AFF0" text-anchor="middle" font-weight="bold">→</text>
+<rect x="530" y="78" width="338" height="20" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="536" y="91.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">(비어 있음)</text>
+<rect x="12" y="108" width="12" height="12" rx="2" fill="#137CBD"/>
+<path d="M14.5,114 l2.5,2.5 l4,-5" fill="none" stroke="#F5F8FA" stroke-width="1.6"/>
+<text x="30" y="118" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">배우</text>
+<rect x="155" y="104" width="340" height="20" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="161" y="117.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">葵つかさ, 三上悠亜</text>
+<text x="512" y="119" font-size="13" fill="#48AFF0" text-anchor="middle" font-weight="bold">→</text>
+<rect x="530" y="104" width="338" height="20" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="536" y="117.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">葵つかさ</text>
+<rect x="12" y="134" width="12" height="12" rx="2" fill="#1B252C" stroke="#738694" stroke-width="1"/>
+<text x="30" y="144" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">발매일 (같음)</text>
+<rect x="155" y="130" width="340" height="20" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="161" y="143.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">2021-02-19</text>
+<rect x="530" y="130" width="338" height="20" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="536" y="143.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">2021-02-19</text>
+<rect x="12" y="160" width="12" height="12" rx="2" fill="#1B252C" stroke="#738694" stroke-width="1"/>
+<text x="30" y="170" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">제작사</text>
+<rect x="155" y="156" width="340" height="20" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="161" y="169.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">エスワン ナンバーワンスタイル</text>
+<rect x="530" y="156" width="338" height="20" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="536" y="169.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">S1</text>
+<rect x="12" y="190" width="12" height="12" rx="2" fill="#137CBD"/>
+<path d="M14.5,196 l2.5,2.5 l4,-5" fill="none" stroke="#F5F8FA" stroke-width="1.6"/>
+<text x="30" y="200" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">커버 이미지</text>
+<text x="30" y="218" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">가져온: 800 × 538</text>
+<text x="30" y="232" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">지금: 없음</text>
+<text x="30" y="250" font-size="9" fill="#738694" text-anchor="start" font-weight="normal">더블클릭 = 원본 보기</text>
+<rect x="155" y="186" width="340" height="92" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<rect x="240" y="194" width="170" height="76" rx="2" fill="#30404D"/>
+<text x="325" y="236" font-size="10" fill="#A7B6C2" text-anchor="middle" font-weight="normal">가져온 커버</text>
+<text x="512" y="236" font-size="13" fill="#48AFF0" text-anchor="middle" font-weight="bold">→</text>
+<rect x="530" y="186" width="338" height="92" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="699" y="236" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">(이미지 없음)</text>
+<rect x="12" y="292" width="12" height="12" rx="2" fill="#1B252C" stroke="#738694" stroke-width="1"/>
+<text x="30" y="302" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">나머지 9개에도 같은 항목 적용 (창 없이)</text>
+<rect x="12" y="300" width="70" height="20" rx="3" fill="#394B59"/>
+<text x="47.0" y="313.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">모두 체크</text>
+<rect x="676" y="300" width="60" height="20" rx="3" fill="#137CBD"/>
+<text x="706.0" y="313.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">적용</text>
+<rect x="742" y="300" width="60" height="20" rx="3" fill="#394B59"/>
+<text x="772.0" y="313.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">건너뛰기</text>
+<rect x="808" y="300" width="60" height="20" rx="3" fill="#394B59"/>
+<text x="838.0" y="313.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">취소</text>
+</svg><figcaption>채울 항목 고르기 창</figcaption></figure>
+<ul><li><b>왼쪽 = 가져온 값, 오른쪽 = 지금 값</b>. 체크하면 사이에 <b>→</b> 가 나타나고, 그 항목만 가져온 값으로 바뀝니다. 체크하지 않은 항목은 지금 값 그대로입니다.</li><li>가져온 값은 바로 고칠 수 있습니다 (고친 값으로 들어감). 값이 같으면 <b>(같음)</b> 이 붙지만 체크할 수 있습니다.</li><li><b>처음 체크</b> - 지금 값이 비어 있는 항목만. 한 번 고른 선택은 플러그인마다 기억해서 다음에도 그대로 체크됩니다.</li><li><b>이미지 줄</b> (맨 아래) - 가져온 커버 / 사진과 지금 이미지를 썸네일로 비교합니다. 썸네일을 <b>더블클릭</b> 하면 원본 크기로 봅니다. 체크하면 커버는 영상 옆 "영상이름.확장자" 로 저장(예전 이미지는 휴지통), 배우 사진은 DB 에 복사됩니다.</li><li><b>[모두 체크]</b> - 모두 켜기 / 모두 끄기.</li></ul>
+<h3>여러 개를 한 번에</h3>
+<ol class="callouts"><li>첫 결과가 오면 바로 고르기 창이 뜹니다 (모두 받을 때까지 기다리지 않음).</li><li><b>[나머지 n개에도 같은 항목 적용 (창 없이)]</b> 을 체크하고 적용하면, 다음 결과부터는 창 없이 같은 항목만 채웁니다. 배우 · 제작사 연결 창은 그때그때 물어봅니다.</li><li><b>[건너뛰기]</b> = 이 영상만 넘김, <b>[취소]</b> = 남은 것을 모두 그만두고 플러그인도 끝냄.</li><li>끝나면 "n개 중 m개 적용" 을 알려 줍니다.</li></ol>
+<p class="tip"><b>팁</b> 결과를 처리하는 동안 뜨는 창(연결 · 고르기 · 메시지)은 크롬 등 다른 창이 앞에 있어도 맨 앞에 뜹니다.</p>
+<h3>플러그인 관리</h3>
+<figure><svg viewBox="0 0 640 300" role="img" aria-label="설정 [플러그인] 탭" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
+<rect x="0" y="0" width="640" height="300" rx="6" fill="#202B33" stroke="#10161A" stroke-width="1.5"/>
+<path d="M0,26 L0,6 Q0,0 6,0 L634,0 Q640,0 640,6 L640,26 Z" fill="#182026"/>
+<text x="12" y="17" font-size="11" fill="#A7B6C2" text-anchor="start" font-weight="normal">설정</text>
+<text x="580" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">—</text>
+<text x="600" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">☐</text>
+<text x="620" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">✕</text>
+<rect x="12" y="36" width="112" height="22" rx="3" fill="#394B59"/>
+<text x="68.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">표시</text>
+<rect x="130" y="36" width="112" height="22" rx="3" fill="#394B59"/>
+<text x="186.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">상세 화면</text>
+<rect x="248" y="36" width="112" height="22" rx="3" fill="#394B59"/>
+<text x="304.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">테마</text>
+<rect x="366" y="36" width="112" height="22" rx="3" fill="#394B59"/>
+<text x="422.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">DB 관리</text>
+<rect x="484" y="36" width="112" height="22" rx="3" fill="#137CBD"/>
+<text x="540.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">플러그인</text>
+<text x="12" y="82" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">plugins 폴더 안 폴더마다 plugin.json 이 있는 것이 플러그인입니다. 체크한 것만 메뉴에 나타납니다.</text>
+<rect x="12" y="92" width="616" height="20" rx="0" fill="#394B59"/>
+<text x="36" y="106" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">이름</text>
+<text x="300" y="106" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">대상</text>
+<text x="400" y="106" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">버전</text>
+<text x="480" y="106" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">상태</text>
+<rect x="12" y="112" width="616" height="20" rx="0" fill="#137CBD" opacity="0.9"/>
+<rect x="18" y="116" width="12" height="12" rx="2" fill="#137CBD"/>
+<path d="M20.5,122 l2.5,2.5 l4,-5" fill="none" stroke="#F5F8FA" stroke-width="1.6"/>
+<text x="36" y="126" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">AV 정보 가져오기</text>
+<text x="300" y="126" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">영상</text>
+<text x="400" y="126" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">1.0</text>
+<text x="480" y="126" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">사용</text>
+<rect x="12" y="132" width="616" height="20" rx="0" fill="#202B33" opacity="1"/>
+<rect x="18" y="136" width="12" height="12" rx="2" fill="#137CBD"/>
+<path d="M20.5,142 l2.5,2.5 l4,-5" fill="none" stroke="#F5F8FA" stroke-width="1.6"/>
+<text x="36" y="146" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">예제 - 파일 이름을 제목으로</text>
+<text x="300" y="146" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">영상</text>
+<text x="400" y="146" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">1.0</text>
+<text x="480" y="146" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">사용</text>
+<rect x="12" y="152" width="616" height="20" rx="0" fill="#202B33" opacity="1"/>
+<rect x="18" y="156" width="12" height="12" rx="2" fill="#1B252C" stroke="#738694" stroke-width="1"/>
+<text x="36" y="166" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">예제 - 라이브러리 통계</text>
+<text x="300" y="166" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">관리 도구</text>
+<text x="400" y="166" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">1.0</text>
+<text x="480" y="166" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">꺼짐</text>
+<rect x="12" y="172" width="616" height="20" rx="0" fill="#202B33" opacity="1"/>
+<rect x="18" y="176" width="12" height="12" rx="2" fill="#1B252C" stroke="#738694" stroke-width="1"/>
+<text x="36" y="186" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">고장 난 플러그인</text>
+<text x="300" y="186" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal"></text>
+<text x="400" y="186" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal"></text>
+<text x="480" y="186" font-size="10" fill="#FF7373" text-anchor="start" font-weight="normal">오류</text>
+<text x="12" y="222" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">품번으로 사이트에서 제목 · 배우 · 발매일을 가져옵니다.  [메뉴: 사이트에서 정보 가져오기]</text>
+<rect x="12" y="236" width="90" height="20" rx="3" fill="#394B59"/>
+<text x="57.0" y="249.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">폴더 열기</text>
+<rect x="108" y="236" width="90" height="20" rx="3" fill="#394B59"/>
+<text x="153.0" y="249.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">새로 고침</text>
+<rect x="204" y="236" width="90" height="20" rx="3" fill="#394B59"/>
+<text x="249.0" y="249.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">만드는 법</text>
+<rect x="500" y="268" width="60" height="20" rx="3" fill="#137CBD"/>
+<text x="530.0" y="281.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">확인</text>
+<rect x="568" y="268" width="60" height="20" rx="3" fill="#394B59"/>
+<text x="598.0" y="281.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">취소</text>
+</svg><figcaption>설정 [플러그인] 탭</figcaption></figure>
+<ul><li>체크 = 사용 (확인을 누르면 저장). plugin.json 이 잘못된 플러그인은 상태가 <b>오류</b> 로 나오고 실행되지 않습니다. 목록에서 고르면 아래에 설명이 나옵니다.</li><li><b>[폴더 열기]</b> - plugins 폴더 (없으면 만듦). 플러그인 폴더를 넣고 <b>[새로 고침]</b>.</li><li><b>[만드는 법]</b> - <code>plugins\README.md</code> (plugin.json 형식, 주고받는 JSON, 예제). 예제 플러그인 sample_title · sample_stats 가 들어 있습니다 (python 필요).</li></ul>
+<p class="note"><b>주의</b> python 플러그인은 python 이 설치되어 있고 PATH 에 등록되어 있어야 합니다. Microsoft Store 의 python 바로 가기만 있으면 실행되지 않습니다 (실행 창 기록에 이유가 나옴).</p>
 </section><section id="settings"><h2>설정</h2>
-<p>오른쪽 위 톱니바퀴. 탭 네 개로 나뉩니다.</p>
-<ul><li><b>표시</b> - 카드에 해상도 · 재생 시간 표시, SFW(배우 · 영상 이미지를 모자이크로), 분할 영상 합쳐서 보기, 별점 단위(1점 / 0.5점).</li><li><b>상세 화면</b> - 상세 화면 위치(왼쪽 / 오른쪽), 영상 상세 맨 아래 띠(출연 배우 카드 / 스크린샷), 스크린샷 가로 배치 수.</li><li><b>테마</b> - 색상표(Stash · Dark · Midnight). 미리보기로 확인하고, 다시 시작하면 적용됩니다.</li><li><b>DB 관리</b> - DB 삭제(영상 / 배우 / 제작사 / 태그), 텍스트 내보내기 · 일괄 등록, 미리보기 영상 일괄 만들기 · 재생성 · 모두 삭제.</li></ul>
+<p>오른쪽 위 톱니바퀴. 탭 다섯 개로 나뉩니다.</p>
+<ul><li><b>표시</b> - 카드에 해상도 · 재생 시간 표시, SFW(배우 · 영상 이미지를 모자이크로), 분할 영상 합쳐서 보기, 별점 단위(1점 / 0.5점).</li><li><b>상세 화면</b> - 상세 화면 위치(왼쪽 / 오른쪽), 영상 상세 맨 아래 띠(출연 배우 카드 / 스크린샷), 스크린샷 가로 배치 수.</li><li><b>테마</b> - 색상표(Stash · Dark · Midnight). 미리보기로 확인하고, 다시 시작하면 적용됩니다.</li><li><b>DB 관리</b> - DB 삭제(영상 / 배우 / 제작사 / 태그), 텍스트 내보내기 · 일괄 등록, 미리보기 영상 일괄 만들기 · 재생성 · 모두 삭제.</li><li><b>플러그인</b> - 플러그인 목록 · 켜고 끄기 · 폴더 열기 (<a href="#plugin">플러그인</a> 장).</li></ul>
 </section><section id="data"><h2>데이터와 백업</h2>
 <ul><li>DB 는 실행 파일 폴더의 <code>library.vmdb</code>(정보)와 <code>images.vmdb</code>(배우 사진 · 제작사 이미지) 두 파일입니다. 두 파일만 옮기면 다른 PC 에서도 그대로 쓸 수 있습니다. 아래 [DB 폴더 열기] 로 폴더를 엽니다.</li><li>실행 중에는 작업용 사본에 저장하고, <b>[DB 반영]</b> 이나 종료할 때 원본에 반영합니다.</li><li>프로그램을 켤 때마다 DB 폴더의 <code>backup</code> 에 자동 백업합니다 (파일마다 최근 10개). 되돌리려면 프로그램을 끄고 백업 파일을 원래 이름으로 바꿔 덮어씁니다.</li><li>프로그램 버전이 바뀌어 DB 형식을 고칠 때는 <code>DbBackup</code> 폴더에 원본을 먼저 백업합니다.</li><li>이동식 디스크 영상의 커버는 캐시에 보관해서 디스크를 빼도 카드 이미지가 보입니다.</li></ul>
 </section><section id="keys"><h2>단축키</h2>
@@ -2324,6 +2479,7 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 <tr><td><kbd>Backspace</kbd></td><td>들어간 화면에서 목록으로 돌아가기</td></tr>
 <tr><td><kbd>Del</kbd></td><td>DB 에서 삭제 (파일은 그대로), 체크한 카드가 있으면 모두</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>검색 칸으로</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>체크 칸이 있는 목록에서 지금 보이는 카드 모두 체크 (영상 · 배우 · 제작사 · 태그 · 컬렉션)</td></tr>
 <tr><td><kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd></td><td>카드 이동 (제작사 [계층] 보기: ↑ 상위, ↓ 첫 하위)</td></tr>
 <tr><td>마우스 휠 / <kbd>←</kbd> <kbd>→</kbd> (확대 슬라이더에서)</td><td>카드 크기</td></tr>
 </table>
