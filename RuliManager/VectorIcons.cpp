@@ -1095,4 +1095,21 @@ namespace VectorIcon
 			p.AddRectangle(Gdiplus::RectF(13.2f, 18.4f, 5.8f, 1.6f));
 		});
 	}
+
+	void Plugin(CDC* dc, const CRect& area, COLORREF col, double fill)
+	{
+		// 퍼즐 조각: 네모 몸통 + 위 · 오른쪽 둥근 돌기 (겹치는 부분이 구멍이 되지 않게 따로 칠함)
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			p.AddRectangle(Gdiplus::RectF(3.0f, 7.5f, 13.5f, 13.5f));   // 몸통
+		});
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			p.AddEllipse(6.9f, 2.6f, 5.8f, 5.8f);                       // 위 돌기
+		});
+		Paint(dc, area, fill, col, [](Gdiplus::GraphicsPath& p)
+		{
+			p.AddEllipse(15.0f, 11.3f, 5.8f, 5.8f);                     // 오른쪽 돌기
+		});
+	}
 }

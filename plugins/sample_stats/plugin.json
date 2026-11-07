@@ -1,0 +1,11 @@
+{
+  "name": "예제 - 라이브러리 통계",
+  "version": "1.0",
+  "author": "RuliManager",
+  "description": "관리 도구 플러그인 예제. 받은 라이브러리 개수를 메시지로 보여 줍니다 (python 필요).",
+  "api": 1,
+  "run": "python plugin.py",
+  "target": "tool",
+  "menu": "예제: 라이브러리 통계",
+  "timeout": 30
+}

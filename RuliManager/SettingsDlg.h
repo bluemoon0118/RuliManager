@@ -3,6 +3,7 @@
 #include <functional>
 #include "DarkTheme.h"
 #include "VideoLibrary.h"
+#include "PluginHost.h"
 
 // ---------------------------------------------------------------------------
 // 테마 미리보기: 고른 테마의 색으로 화면 조각(카드 · 목록 · 입력 칸 · 칩 · 버튼)을 작게 그림 (적용은 다시 시작할 때)
@@ -50,6 +51,7 @@ public:
 	int  m_detailStrip = 0;  // [영상 상세 태그 아래] 0 = 출연 배우 카드, 1 = 영상 스크린샷
 	int  m_shotCols = 3;     // 영상 스크린샷 가로 배치 수 (1 ~ 10)
 	int  m_themeIndex = 0;   // [테마] 고른 테마 번호 (Theme::Name, 다시 시작하면 적용)
+	int  m_startPage = -1;   // 처음 보일 탭 (-1 = 마지막으로 본 탭, 4 = [플러그인])
 
 #ifdef AFX_DESIGN_TIME
 	enum { IDD = IDD_SETTINGS };
@@ -63,8 +65,9 @@ protected:
 	CDarkDialogTheme m_theme;   // 메인 창과 같은 어두운 색상
 
 	void UpdateCounts();        // 체크박스 글자에 개수 표시
-	// 탭: [표시] [상세 화면] [테마] [DB 관리] - 리소스에서 페이지마다 x 400 DLU 씩 떨어뜨려 둔 컨트롤을 첫 페이지 자리로 옮기고 탭마다 보이기 / 숨기기
-	CDarkButton m_tabs[4];
+	// 탭: [표시] [상세 화면] [테마] [DB 관리] [플러그인] - 리소스에서 페이지마다 x 400 DLU 씩 떨어뜨려 둔 컨트롤을 첫 페이지 자리로 옮기고 탭마다 보이기 / 숨기기
+	static const int kPages = 5;
+	CDarkButton m_tabs[kPages];
 	std::vector<std::pair<HWND, int>> m_pageCtrls;   // (컨트롤, 페이지 번호)
 	int  m_page = 0;
 	void ShowPage(int page);
@@ -73,6 +76,17 @@ protected:
 	afx_msg void OnTab2() { ShowPage(1); }
 	afx_msg void OnTab3() { ShowPage(2); }
 	afx_msg void OnTab4() { ShowPage(3); }
+	afx_msg void OnTab5() { ShowPage(4); }
+	// [플러그인] 탭: plugins 폴더의 플러그인 목록 (체크 = 사용, 확인을 누르면 저장)
+	CListCtrl m_pluginList;
+	std::vector<PluginInfo> m_plugins;
+	bool m_pluginFilling = false;
+	void FillPlugins();
+	void UpdatePluginDesc();
+	afx_msg void OnPluginItemChanged(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnBnClickedPluginFolder();
+	afx_msg void OnBnClickedPluginReload();
+	afx_msg void OnBnClickedPluginHelp();
 	CThemePreview m_themePreview;   // [테마] 고른 색 미리보기
 	afx_msg void OnThemeChanged();  // 테마 콤보 → 미리보기 갱신
 	afx_msg void OnBnClickedDeleteDb();

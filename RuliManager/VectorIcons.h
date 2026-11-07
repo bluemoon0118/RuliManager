@@ -19,6 +19,7 @@ namespace VectorIcon
 	void Copy(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);        // 겹친 두 장 (복사 - 품번 복사 버튼)
 	void Inspect(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);     // 돋보기 + 재생 (영상 검사 - 메뉴 · 검사 창 아이콘)
 	void Barcode(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);     // 바코드 (품번 관리 - 목록 관리 메뉴)
+	void Plugin(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);      // 퍼즐 조각 (플러그인 - 메뉴 · 실행 창 아이콘)
 	// 메뉴 아이콘 (오른쪽 클릭 메뉴 왼쪽 - DarkMenu)
 	void Trash(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0);       // 휴지통 (삭제)
 	void MinusCircle(CDC* dc, const CRect& area, COLORREF col, double fill = 1.0); // 원 + 빼기 (컬렉션에서 빼기)

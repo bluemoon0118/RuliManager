@@ -17,10 +17,18 @@ enum
 
 namespace
 {
-	bool ParseYmd(const CString& text, SYSTEMTIME& st)
+	// 일 없이 연-월만 적힌 값인지 ("2018-04")
+	bool IsMonthOnly(const CString& text)
 	{
 		int y = 0, m = 0, d = 0;
-		if (text.IsEmpty() || swscanf_s(text, L"%d-%d-%d", &y, &m, &d) != 3)
+		return !text.IsEmpty() && swscanf_s(text, L"%d-%d-%d", &y, &m, &d) == 2;
+	}
+
+	// "YYYY-MM-DD" (또는 일을 모르는 "YYYY-MM" → 1일)
+	bool ParseYmd(const CString& text, SYSTEMTIME& st)
+	{
+		int y = 0, m = 0, d = 1;
+		if (text.IsEmpty() || swscanf_s(text, L"%d-%d-%d", &y, &m, &d) < 2)
 			return false;
 		if (y < 1601 || y > 9999 || m < 1 || m > 12 || d < 1 || d > 31)
 			return false;
@@ -138,6 +146,8 @@ BEGIN_MESSAGE_MAP(CActorDlg, CDialogEx)
 	ON_NOTIFY(DTN_DATETIMECHANGE, IDC_ACT_BIRTH, &CActorDlg::OnDtnBirthChanged)
 	ON_NOTIFY(DTN_DATETIMECHANGE, IDC_ACT_DEBUT, &CActorDlg::OnDtnDebutChanged)
 	ON_NOTIFY(DTN_DATETIMECHANGE, IDC_ACT_RETIRE, &CActorDlg::OnDtnDebutChanged)   // 같은 처리 (변경 표시)
+	ON_BN_CLICKED(IDC_ACT_DEBUT_NODAY, &CActorDlg::OnBnClickedNoDay)
+	ON_BN_CLICKED(IDC_ACT_RETIRE_NODAY, &CActorDlg::OnBnClickedNoDay)
 	ON_CBN_SELCHANGE(IDC_ACT_NATIONALITY, &CActorDlg::OnFieldChanged)
 	ON_EN_CHANGE(IDC_ACT_HEIGHT, &CActorDlg::OnFieldChanged)
 	ON_EN_CHANGE(IDC_ACT_BUST, &CActorDlg::OnFieldChanged)
@@ -370,6 +380,9 @@ void CActorDlg::ShowActor(int idx)
 			const int cupSel = a.cup.IsEmpty() ? 0 : m_comboCup.FindStringExact(0, a.cup);
 			m_comboCup.SetCurSel(cupSel < 0 ? 0 : cupSel);
 		}
+		CheckDlgButton(IDC_ACT_DEBUT_NODAY, IsMonthOnly(a.debut) ? BST_CHECKED : BST_UNCHECKED);
+		CheckDlgButton(IDC_ACT_RETIRE_NODAY, IsMonthOnly(a.retire) ? BST_CHECKED : BST_UNCHECKED);
+		ApplyNoDayFormat();
 		if (ParseYmd(a.debut, st))
 			m_dateDebut.SetTime(&st);
 		else
@@ -404,6 +417,9 @@ void CActorDlg::ShowActor(int idx)
 		m_editWaist.SetWindowText(L"");
 		m_editHip.SetWindowText(L"");
 		m_comboCup.SetCurSel(0);
+		CheckDlgButton(IDC_ACT_DEBUT_NODAY, BST_UNCHECKED);
+		CheckDlgButton(IDC_ACT_RETIRE_NODAY, BST_UNCHECKED);
+		ApplyNoDayFormat();
 		m_dateDebut.SetTime(static_cast<LPSYSTEMTIME>(nullptr));
 		m_dateRetire.SetTime(static_cast<LPSYSTEMTIME>(nullptr));
 		m_starRating.SetRating(0);
@@ -424,6 +440,10 @@ void CActorDlg::ShowActor(int idx)
 	m_comboCup.EnableWindow(enable);
 	m_dateDebut.EnableWindow(enable);
 	m_dateRetire.EnableWindow(enable);
+	if (CWnd* w = GetDlgItem(IDC_ACT_DEBUT_NODAY))
+		w->EnableWindow(enable);
+	if (CWnd* w = GetDlgItem(IDC_ACT_RETIRE_NODAY))
+		w->EnableWindow(enable);
 	m_starRating.EnableWindow(enable);
 	m_editMemo.EnableWindow(enable);
 	m_editUrls.EnableWindow(enable);
@@ -484,6 +504,18 @@ void CActorDlg::OnDtnDebutChanged(NMHDR* /*pNMHDR*/, LRESULT* pResult)
 {
 	OnFieldChanged();
 	*pResult = 0;
+}
+
+void CActorDlg::ApplyNoDayFormat()
+{
+	m_dateDebut.SetMonthOnly(IsDlgButtonChecked(IDC_ACT_DEBUT_NODAY) == BST_CHECKED);
+	m_dateRetire.SetMonthOnly(IsDlgButtonChecked(IDC_ACT_RETIRE_NODAY) == BST_CHECKED);
+}
+
+void CActorDlg::OnBnClickedNoDay()
+{
+	ApplyNoDayFormat();
+	OnFieldChanged();
 }
 
 void CActorDlg::OnDtnBirthChanged(NMHDR* /*pNMHDR*/, LRESULT* pResult)
@@ -588,15 +620,20 @@ bool CActorDlg::Commit()
 			m_comboCup.GetLBText(cupSel, a.cup);
 	}
 
-	if (m_dateDebut.GetTime(&st) == GDT_VALID)
-		a.debut.Format(L"%04d-%02d-%02d", st.wYear, st.wMonth, st.wDay);
-	else
+	// [일 모름] 체크 = 연-월만 ("2018-04")
+	if (m_dateDebut.GetTime(&st) != GDT_VALID)
 		a.debut.Empty();
-
-	if (m_dateRetire.GetTime(&st) == GDT_VALID)
-		a.retire.Format(L"%04d-%02d-%02d", st.wYear, st.wMonth, st.wDay);
+	else if (IsDlgButtonChecked(IDC_ACT_DEBUT_NODAY))
+		a.debut.Format(L"%04d-%02d", st.wYear, st.wMonth);
 	else
+		a.debut.Format(L"%04d-%02d-%02d", st.wYear, st.wMonth, st.wDay);
+
+	if (m_dateRetire.GetTime(&st) != GDT_VALID)
 		a.retire.Empty();
+	else if (IsDlgButtonChecked(IDC_ACT_RETIRE_NODAY))
+		a.retire.Format(L"%04d-%02d", st.wYear, st.wMonth);
+	else
+		a.retire.Format(L"%04d-%02d-%02d", st.wYear, st.wMonth, st.wDay);
 
 	a.rating = m_starRating.GetRating();
 

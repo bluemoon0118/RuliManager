@@ -73,6 +73,8 @@ protected:
 	afx_msg void OnFieldChanged();
 	afx_msg void OnDtnBirthChanged(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnDtnDebutChanged(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnBnClickedNoDay();          // [일 모름] 체크: 데뷔일 / 은퇴일을 연-월로만
+	void ApplyNoDayFormat();                  // 체크 상태에 맞춰 날짜 표시 형식 (yyyy-MM / yyyy-MM-dd)
 	void UpdateAgeText();
 	afx_msg void OnLvnItemChanged(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnNmCustomDrawList(NMHDR* pNMHDR, LRESULT* pResult);   // 국적 칸에 국기 그리기

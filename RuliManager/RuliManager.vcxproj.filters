@@ -55,6 +55,9 @@
     <ClInclude Include="WebHelper.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="ImageSearchDlg.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="DupCheckDlg.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="PluginHost.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="PluginRunDlg.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="PluginPickDlg.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="VideoCheckDlg.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="VideoGrid.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="VideoLibrary.h"><Filter>헤더 파일</Filter></ClInclude>
@@ -98,6 +101,9 @@
     <ClCompile Include="WebHelper.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="ImageSearchDlg.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="DupCheckDlg.cpp"><Filter>소스 파일</Filter></ClCompile>
+    <ClCompile Include="PluginHost.cpp"><Filter>소스 파일</Filter></ClCompile>
+    <ClCompile Include="PluginRunDlg.cpp"><Filter>소스 파일</Filter></ClCompile>
+    <ClCompile Include="PluginPickDlg.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="VideoCheckDlg.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="VideoGrid.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="VideoLibrary.cpp"><Filter>소스 파일</Filter></ClCompile>

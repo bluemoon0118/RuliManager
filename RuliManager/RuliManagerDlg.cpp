@@ -15,6 +15,9 @@
 #include "FileManageDlg.h"
 #include "VideoCheckDlg.h"
 #include "DupCheckDlg.h"
+#include "PluginRunDlg.h"
+#include "PluginPickDlg.h"
+#include "WebHelper.h"
 #include "DarkTheme.h"
 #include "CountryCombo.h"
 #include "VectorIcons.h"
@@ -680,6 +683,8 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_COMMAND(ID_MANAGE_FILES, &CRuliManagerDlg::OnManageFiles)
 	ON_COMMAND(ID_MANAGE_CHECK, &CRuliManagerDlg::OnManageCheck)
 	ON_COMMAND(ID_MANAGE_DUPS, &CRuliManagerDlg::OnManageDups)
+	ON_COMMAND(ID_MANAGE_PLUGINS, &CRuliManagerDlg::OnManagePlugins)
+	ON_COMMAND_RANGE(ID_PLUGIN_FIRST, ID_PLUGIN_LAST, &CRuliManagerDlg::OnPluginCommand)
 	ON_COMMAND(ID_VIDEO_CHECK, &CRuliManagerDlg::OnVideoCheck)
 	ON_COMMAND(ID_VIDEO_CHECKCHECKED, &CRuliManagerDlg::OnVideoCheckChecked)
 	ON_BN_CLICKED(IDC_BTN_ACTOR_BACK, &CRuliManagerDlg::OnBnClickedActorBack)
@@ -4723,6 +4728,10 @@ void CRuliManagerDlg::HandleCatKey(UINT vk)
 		if (m_mode == MODE_COLLECTION || m_mode == MODE_TAG || m_mode == MODE_STUDIO)
 			OnCatDelete();   // 컬렉션 · 태그 삭제 (선택한 카드가 체크되어 있으면 체크한 항목 모두 - 제작사는 체크했을 때만)
 		break;
+	case 'A':
+		if ((::GetKeyState(VK_CONTROL) & 0x8000) && CheckAllCount() > 0)
+			OnCheckAll();   // Ctrl+A: 제작사 · 태그 · 컬렉션 카드 모두 체크 (제작사 [계층] 보기 포함)
+		break;
 	case 'F':
 		if (::GetKeyState(VK_CONTROL) & 0x8000)
 		{
@@ -5278,6 +5287,7 @@ void CRuliManagerDlg::HandleListKey(UINT vk)
 	case VK_F5:     OnBnClickedRefresh(); break;
 	case VK_SPACE:  OnBnClickedOpenDefault(); break;
 	case 'F':       if (ctrl) { m_editSearch.SetFocus(); m_editSearch.SetSel(0, -1); } break;
+	case 'A':       if (ctrl && CheckAllCount() > 0) OnCheckAll(); break;   // Ctrl+A: 지금 페이지 영상 모두 체크
 	case VK_BACK:   if (!m_drill.IsEmpty()) BackToList(); break;
 	}
 }
@@ -5791,6 +5801,8 @@ void CRuliManagerDlg::OnBnClickedSettings()
 {
 	CommitDetails();
 	CSettingsDlg dlg(m_lib, this);
+	dlg.m_startPage = m_settingsStartPage;   // [플러그인 관리...] 로 열면 [플러그인] 탭
+	m_settingsStartPage = -1;
 	dlg.m_onDeleteDb = [this](int mask) { DeleteDb(mask); };
 	dlg.m_onMakePreviews = [this, &dlg]() { MakeAllPreviews(&dlg); };
 	dlg.m_onDeletePreviews = [this, &dlg]() { DeleteAllPreviews(&dlg); };
@@ -5997,6 +6009,7 @@ void CRuliManagerDlg::OnBnClickedTools()
 	menu.AppendMenu(MF_STRING, ID_MANAGE_FILES,   L"파일 관리...");
 	menu.AppendMenu(MF_STRING, ID_MANAGE_CHECK,   L"영상 검사...");
 	menu.AppendMenu(MF_STRING, ID_MANAGE_DUPS,    L"중복 파일 검사...");
+	AppendPluginMenu(menu, L"tool", std::vector<int>());   // [플러그인 ▸]: 관리 도구 플러그인 + 플러그인 관리...
 	CRect rc;
 	GetDlgItem(IDC_BTN_TOOLS)->GetWindowRect(&rc);
 	DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_LEFTBUTTON, rc.left, rc.bottom, this);
@@ -6081,6 +6094,381 @@ void CRuliManagerDlg::OnManageDups()
 	dlg.m_findImage = [](const CString& path) { return FindImageFor(path); };
 	dlg.m_remove = [this](const std::vector<CString>& paths) { return RemoveVideoFiles(paths); };
 	dlg.DoModal();
+}
+
+// ---------------------------------------------------------------------------
+// 플러그인 (외부 프로그램 - PluginHost.h)
+
+void CRuliManagerDlg::AppendPluginMenu(CMenu& menu, LPCWSTR target, const std::vector<int>& items, UINT flags, bool separatorBefore)
+{
+	// [플러그인 ▸] 하위 메뉴: 켜진 그 대상의 플러그인 (관리 도구는 플러그인이 없어도 [플러그인 관리...] 를 둠)
+	const bool tool = (wcscmp(target, L"tool") == 0);
+	const std::vector<PluginInfo> list = PluginHost::LoadUsable(target);
+	if (list.empty() && !tool)
+		return;   // 영상 · 배우 메뉴: 플러그인이 없으면 메뉴도 없음
+	m_ctxPlugins.clear();
+	m_ctxPluginItems = items;
+	CMenu sub;
+	sub.CreatePopupMenu();
+	for (const PluginInfo& p : list)
+	{
+		if (m_ctxPlugins.size() >= static_cast<size_t>(ID_PLUGIN_LAST - ID_PLUGIN_FIRST + 1))
+			break;
+		sub.AppendMenu(MF_STRING, ID_PLUGIN_FIRST + static_cast<UINT>(m_ctxPlugins.size()), p.menu);
+		m_ctxPlugins.push_back(p);
+	}
+	if (tool)
+	{
+		if (!list.empty())
+			sub.AppendMenu(MF_SEPARATOR);
+		sub.AppendMenu(MF_STRING, ID_MANAGE_PLUGINS, L"플러그인 관리...");
+	}
+	CString title = L"플러그인";
+	if (!tool && items.size() > 1)
+		title.Format(L"플러그인(%d)", static_cast<int>(items.size()));
+	if (separatorBefore)
+		menu.AppendMenu(MF_SEPARATOR);
+	menu.AppendMenu(MF_POPUP | flags, reinterpret_cast<UINT_PTR>(sub.Detach()), title);
+}
+
+void CRuliManagerDlg::OnPluginCommand(UINT nID)
+{
+	const size_t k = nID - ID_PLUGIN_FIRST;
+	if (k >= m_ctxPlugins.size())
+		return;
+	const PluginInfo p = m_ctxPlugins[k];
+	const std::vector<int> items = m_ctxPluginItems;
+	RunPlugin(p, p.target, items);
+}
+
+void CRuliManagerDlg::OnManagePlugins()
+{
+	m_settingsStartPage = 4;   // 설정 창 [플러그인] 탭
+	OnBnClickedSettings();
+}
+
+void CRuliManagerDlg::RunPlugin(const PluginInfo& p, LPCWSTR target, const std::vector<int>& items)
+{
+	// 요청 JSON → 실행 창 (진행 · 중단) → 결과 JSON → 항목마다 붙여넣기와 같은 확인 창으로 적용
+	CommitDetails();
+	const bool isVideo = (wcscmp(target, L"video") == 0), isActor = (wcscmp(target, L"actor") == 0);
+	auto q = [](const CString& s) { return Json::Quote(s); };
+
+	// 플러그인 임시 폴더 (%TEMP%\RuliManager\plugin): 플러그인이 받은 이미지 · 받아 둔 URL 이미지를 두는 곳, 실행 전 · 끝난 뒤 비움
+	CString tempDir;
+	{
+		wchar_t t[MAX_PATH] = {};
+		::GetTempPathW(MAX_PATH, t);
+		tempDir = CString(t) + L"RuliManager";
+		::CreateDirectoryW(tempDir, nullptr);
+		tempDir += L"\\plugin";
+		::CreateDirectoryW(tempDir, nullptr);
+	}
+	auto clearTemp = [&tempDir]()
+	{
+		WIN32_FIND_DATAW fd = {};
+		HANDLE f = ::FindFirstFileW(tempDir + L"\\*", &fd);
+		if (f == INVALID_HANDLE_VALUE)
+			return;
+		do
+		{
+			if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+				::DeleteFileW(tempDir + L"\\" + fd.cFileName);
+		} while (::FindNextFileW(f, &fd));
+		::FindClose(f);
+	};
+	clearTemp();
+	::SetEnvironmentVariableW(L"RULIMANAGER_TEMP_DIR", tempDir);
+
+	std::vector<int> targets;   // 요청에 넣은 항목 (id = 이 목록의 번호)
+	std::vector<CString> targetKeys;   // 그 항목의 경로(영상) / 이름(배우) - 적용 중 배우 병합으로 번호가 바뀌어도 다시 찾음
+	std::set<CString> partGroups;      // 분할 영상은 묶음마다 한 번만 보냄 (적용할 때 SyncPartGroup 으로 다른 파트도 같은 정보 - 합쳐 보기에서 파트가 모두 체크돼 두 번 처리되던 것)
+	CString req;
+	req.Format(L"{\"api\":%d,\"app\":\"RuliManager\",\"appVersion\":\"%s\",\"action\":%s,\"plugin\":%s,\"dataDir\":%s,\"tempDir\":%s",
+		PluginHost::kApiVersion, _T(APP_VERSION_STR), static_cast<LPCWSTR>(q(target)), static_cast<LPCWSTR>(q(p.id)),
+		static_cast<LPCWSTR>(q(CVideoLibrary::GetDataDir())), static_cast<LPCWSTR>(q(tempDir)));
+	if (isVideo || isActor)
+	{
+		req += L",\"items\":[";
+		for (int idx : items)
+		{
+			CString one;
+			if (isVideo)
+			{
+				if (idx < 0 || idx >= static_cast<int>(m_lib.items.size()) || IsItemOffline(idx))
+					continue;   // 연결 안 된 이동식 디스크의 영상은 빼고
+				{
+					CString group = CVideoLibrary::PartGroupPath(m_lib.items[idx].path);
+					group.MakeLower();
+					if (!partGroups.insert(group).second)
+						continue;   // 같은 묶음의 다른 파트는 이미 넣음
+				}
+				const VideoItem& v = m_lib.items[idx];
+				CString folder = v.path;
+				const int slash = folder.ReverseFind(L'\\');
+				if (slash > 0)
+					folder = folder.Left(slash);
+				one.Format(L"{\"id\":%d,\"path\":%s,\"file\":%s,\"folder\":%s,\"code\":%s,\"title\":%s,\"release\":%s,"
+					L"\"actors\":%s,\"studio\":%s,\"label\":%s,\"series\":%s,\"tags\":%s,\"size\":%llu}",
+					static_cast<int>(targets.size()), static_cast<LPCWSTR>(q(v.path)), static_cast<LPCWSTR>(q(v.FileName())),
+					static_cast<LPCWSTR>(q(folder)), static_cast<LPCWSTR>(q(v.code)), static_cast<LPCWSTR>(q(v.title)),
+					static_cast<LPCWSTR>(q(v.release)), static_cast<LPCWSTR>(Json::QuoteList(CVideoLibrary::SplitList(v.actors))),
+					static_cast<LPCWSTR>(q(v.studio)), static_cast<LPCWSTR>(q(v.label)), static_cast<LPCWSTR>(q(v.series)),
+					static_cast<LPCWSTR>(Json::QuoteList(CVideoLibrary::SplitList(v.tags))), v.size);
+			}
+			else
+			{
+				if (idx < 0 || idx >= static_cast<int>(m_lib.actors.size()))
+					continue;
+				const ActorInfo& a = m_lib.actors[idx];
+				one.Format(L"{\"id\":%d,\"name\":%s,\"aliases\":%s,\"gender\":%s,\"birth\":%s,\"nationality\":%s,\"height\":%s,"
+					L"\"bust\":%s,\"waist\":%s,\"hip\":%s,\"cup\":%s,\"debut\":%s,\"retire\":%s,\"urls\":%s,\"photo\":%s}",
+					static_cast<int>(targets.size()), static_cast<LPCWSTR>(q(a.name)),
+					static_cast<LPCWSTR>(Json::QuoteList(CVideoLibrary::SplitList(a.aliases))), static_cast<LPCWSTR>(q(a.gender)),
+					static_cast<LPCWSTR>(q(a.birth)), static_cast<LPCWSTR>(q(a.nationality)), static_cast<LPCWSTR>(q(a.height)),
+					static_cast<LPCWSTR>(q(a.bust)), static_cast<LPCWSTR>(q(a.waist)), static_cast<LPCWSTR>(q(a.hip)),
+					static_cast<LPCWSTR>(q(a.cup)), static_cast<LPCWSTR>(q(a.debut)), static_cast<LPCWSTR>(q(a.retire)),
+					static_cast<LPCWSTR>(Json::QuoteList(CVideoLibrary::SplitUrls(a.urls))), static_cast<LPCWSTR>(q(a.photo)));
+			}
+			if (!targets.empty())
+				req += L",";
+			req += one;
+			targets.push_back(idx);
+			targetKeys.push_back(isVideo ? m_lib.items[idx].path : m_lib.actors[idx].name);
+		}
+		req += L"]";
+		if (targets.empty())
+		{
+			AfxMessageBox(L"플러그인에 보낼 항목이 없습니다. (연결되지 않은 이동식 디스크의 영상은 보낼 수 없음)", MB_ICONINFORMATION);
+			return;
+		}
+	}
+	else
+	{
+		CString lib;
+		lib.Format(L",\"library\":{\"videos\":%d,\"actors\":%d,\"studios\":%d,\"tags\":%d}",
+			static_cast<int>(m_lib.items.size()), static_cast<int>(m_lib.actors.size()),
+			static_cast<int>(m_lib.studios.size()), static_cast<int>(m_lib.tagInfos.size()));
+		req += lib;
+	}
+	req += L"}";
+
+	// 결과 처리: 한 편씩 바로 적용 ({"item":..} 줄이 올 때마다 - 첫 결과의 고르기 창에서 [나머지에도 같은 항목 적용] 하면
+	// 다음 것부터는 창 없이 따라감, 그동안 플러그인은 계속 다음 것을 받음). 예전 방식(끝에 "items" 한꺼번에)도 처리
+	int applied = 0, empty = 0, offered = 0, processed = 0;
+	std::set<int> doneIds;   // 처리한 요청 id (끝 결과의 "items" 와 겹치지 않게)
+	PluginPickState pick;   // 채울 항목 고르기: 플러그인별 기억 · [나머지에도 같은 항목 적용]
+	pick.pluginId = p.id;
+	pick.pluginName = p.name;
+	pick.LoadRemembered();
+	// 결과의 이미지 ("cover" = 영상 커버, "photo" = 배우 사진): 로컬 파일 경로(상대 경로 = 플러그인 폴더 기준) 또는 http(s) 주소 (여기서 받음)
+	int imgSeq = 0;
+	auto fetchImage = [&](const Json::Value& r) -> CString
+	{
+		CString src = r.Text(isVideo ? L"cover" : L"photo");
+		if (src.IsEmpty())
+			src = r.Text(L"image");
+		if (src.IsEmpty())
+			return CString();
+		if (src.Left(7).CompareNoCase(L"http://") == 0 || src.Left(8).CompareNoCase(L"https://") == 0)
+		{
+			std::vector<BYTE> data;
+			CString ct;
+			if (!Web::HttpGet(src, data, &ct, nullptr, 30 * 1024 * 1024) || data.empty())
+				return CString();
+			ct.MakeLower();
+			CString ext = L".jpg";
+			if (ct.Find(L"png") >= 0) ext = L".png";
+			else if (ct.Find(L"webp") >= 0) ext = L".webp";
+			else if (ct.Find(L"gif") >= 0) ext = L".gif";
+			else if (ct.Find(L"bmp") >= 0) ext = L".bmp";
+			else if (ct.Find(L"jpeg") < 0 && ct.Find(L"jpg") < 0)
+			{
+				CString path = src;
+				const int qm = path.FindOneOf(L"?#");
+				if (qm > 0) path = path.Left(qm);
+				CString e = ::PathFindExtensionW(path);
+				e.MakeLower();
+				if (e == L".png" || e == L".webp" || e == L".gif" || e == L".bmp" || e == L".jpeg") ext = e;
+			}
+			CString file;
+			file.Format(L"%s\\url_%d%s", static_cast<LPCWSTR>(tempDir), ++imgSeq, static_cast<LPCWSTR>(ext));
+			CFile out;
+			if (!out.Open(file, CFile::modeCreate | CFile::modeWrite | CFile::typeBinary))
+				return CString();
+			out.Write(data.data(), static_cast<UINT>(data.size()));
+			out.Close();
+			src = file;
+		}
+		else if (::PathIsRelativeW(src))
+			src = p.dir + L"\\" + src;
+		CImage test;
+		if (!::PathFileExistsW(src) || !LoadImageFile(test, src) || test.IsNull())
+			return CString();   // 이미지가 아님
+		return src;
+	};
+	// 결과 한 편 적용 (false = [취소] 로 그만)
+	auto applyOne = [&](const Json::Value& r) -> bool
+	{
+		if (pick.stop)
+			return false;
+		pick.remaining = (std::max)(0, static_cast<int>(targets.size()) - processed - 1);   // [나머지 n개에도 같은 항목 적용]
+		++processed;
+		pick.applied = false;
+		pick.imagePath.Empty();
+		if (!r.IsObject())
+			return true;
+		// 어느 요청 항목의 결과인지: id → path(영상) / name(배우)
+		int idx = -1;
+		if (r.Get(L"id"))
+		{
+			const int id = static_cast<int>(r.Number(L"id", -1));
+			doneIds.insert(id);
+			if (id >= 0 && id < static_cast<int>(targets.size()))
+				idx = targets[id];
+		}
+		if (isVideo)
+		{
+			const CString path = r.Text(L"path");
+			if (idx >= 0 && idx < static_cast<int>(m_lib.items.size()) && !path.IsEmpty() && m_lib.items[idx].path.CompareNoCase(path) != 0)
+				idx = -1;   // id 와 경로가 다르면 경로를 믿음
+			if (idx < 0 && !path.IsEmpty())
+				for (int t : targets)
+					if (t >= 0 && t < static_cast<int>(m_lib.items.size()) && m_lib.items[t].path.CompareNoCase(path) == 0) { idx = t; break; }
+			if (idx < 0 && targets.size() == 1 && !r.Get(L"id"))
+				idx = targets[0];
+			if (idx < 0 || idx >= static_cast<int>(m_lib.items.size()))
+				return true;
+			// 결과 → "항목: 값" (붙여넣기 해석 결과와 같은 형식) → [웹페이지 내용 붙여넣기] 와 같은 연결 · 확인 창
+			CString info;
+			auto add = [&info](LPCWSTR k, const CString& v) { CString t = v; t.Trim(); if (t.IsEmpty()) return; info += k; info += L": "; info += t; info += L"\r\n"; };
+			add(L"품번", r.Text(L"code"));
+			add(L"제목", r.Text(L"title"));
+			add(L"발매일", r.Text(L"release"));
+			add(L"배우", CVideoLibrary::JoinList(r.List(L"actors")));
+			add(L"제작사", r.Text(L"studio"));
+			add(L"레이블", r.Text(L"label"));
+			add(L"시리즈", r.Text(L"series"));
+			add(L"태그", CVideoLibrary::JoinList(r.List(L"tags")));
+			const CString raw = r.Text(L"text");   // 사이트 화면 글 그대로 (붙여넣기처럼 해석)
+			if (!raw.IsEmpty())
+				info += CVideoLibrary::ParsePastedVideoText(raw);
+			pick.imagePath = fetchImage(r);
+			if (info.IsEmpty() && pick.imagePath.IsEmpty())
+			{
+				++empty;
+				return true;
+			}
+			PasteVideoInfoText(idx, info, true, &pick);
+			++offered;
+			if (pick.applied)
+				++applied;
+		}
+		else if (isActor)
+		{
+			const CString nm = r.Text(L"name");
+			if (r.Get(L"id"))
+			{
+				const int id = static_cast<int>(r.Number(L"id", -1));
+				idx = (id >= 0 && id < static_cast<int>(targetKeys.size())) ? m_lib.FindActor(targetKeys[id]) : -1;
+			}
+			else if (targets.size() == 1)
+				idx = m_lib.FindActor(targetKeys[0]);
+			if (idx < 0 || idx >= static_cast<int>(m_lib.actors.size()))
+				return true;
+			CString info;
+			auto add = [&info](LPCWSTR k, const CString& v) { CString t = v; t.Trim(); if (t.IsEmpty()) return; info += k; info += L": "; info += t; info += L"\r\n"; };
+			add(L"이름", nm);
+			{
+				// 다른 이름: 사이트처럼 오래된 이름부터 (ApplyActorText 가 뒤집어 최근 이름부터)
+				CString al;
+				for (const CString& s : r.List(L"aliases"))
+					al += (al.IsEmpty() ? CString() : CString(L" ")) + L"#" + s;
+				add(L"다른이름", al);
+			}
+			add(L"성별", r.Text(L"gender"));
+			add(L"생년월일", r.Text(L"birth"));
+			add(L"국적", r.Text(L"nationality"));
+			add(L"키", r.Text(L"height"));
+			{
+				const CString b = r.Text(L"bust"), w = r.Text(L"waist"), h = r.Text(L"hip");
+				if (!b.IsEmpty() || !w.IsEmpty() || !h.IsEmpty())
+				{
+					CString m;
+					m.Format(L"B%s / W%s / H%s", static_cast<LPCWSTR>(b), static_cast<LPCWSTR>(w), static_cast<LPCWSTR>(h));
+					add(L"치수", m);
+				}
+			}
+			add(L"컵", r.Text(L"cup"));
+			add(L"데뷔", r.Text(L"debut"));
+			add(L"은퇴", r.Text(L"retire"));
+			for (const CString& u : r.List(L"urls"))
+				add(L"URL", u);
+			const CString raw = r.Text(L"text");   // 프로필 화면 글 그대로 (붙여넣기처럼 해석)
+			if (!raw.IsEmpty())
+				info += CVideoLibrary::ParsePastedActorText(raw);
+			pick.imagePath = fetchImage(r);
+			if (info.IsEmpty() && pick.imagePath.IsEmpty())
+			{
+				++empty;
+				return true;
+			}
+			PasteActorInfoText(idx, info, &pick);
+			++offered;
+			if (pick.applied)
+				++applied;
+		}
+		return !pick.stop;
+	};
+
+	CPluginRunDlg run(p, req, this);
+	run.m_total = static_cast<int>(targets.size());
+	if (isVideo || isActor)
+	{
+		run.m_onItem = [&](const CString& line) -> bool
+		{
+			Json::Value v;
+			if (!Json::Parse(line, v) || !v.IsObject())
+				return true;
+			const Json::Value* item = v.Get(L"item");
+			return (item && item->IsObject()) ? applyOne(*item) : true;
+		};
+	}
+	const INT_PTR runResult = run.DoModal();
+	CString message;
+	if (runResult == IDOK)
+	{
+		Json::Value res;
+		if (!Json::Parse(run.m_resultJson, res) || !res.IsObject())
+			AfxMessageBox(L"플러그인 결과를 읽지 못했습니다.", MB_ICONWARNING);
+		else
+		{
+			message = res.Text(L"message");
+			if (const Json::Value* list = res.Get(L"items"))   // 예전 방식: 끝에 한꺼번에 (한 편씩 받은 것은 건너뜀)
+			{
+				for (const Json::Value& r : list->arr)
+				{
+					if (pick.stop)
+						break;
+					if (r.IsObject() && r.Get(L"id") && doneIds.count(static_cast<int>(r.Number(L"id", -1))))
+						continue;
+					applyOne(r);
+				}
+			}
+		}
+	}
+	CString summary;
+	if (offered > 1 || (runResult != IDOK && offered > 0))
+		summary.Format(L"플러그인 결과 %d개 중 %d개를 적용했습니다.%s", offered, applied,
+			(runResult != IDOK || pick.stop) ? L" (도중에 그만둠)" : L"");
+	if (!message.IsEmpty())
+		AfxMessageBox(summary.IsEmpty() ? message : summary + L"\n\n" + message, MB_ICONINFORMATION);
+	else if (!summary.IsEmpty())
+		AfxMessageBox(summary, MB_ICONINFORMATION);
+	else if (runResult == IDOK && (isVideo || isActor) && offered == 0)
+		AfxMessageBox(L"플러그인 결과에 적용할 정보가 없습니다.", MB_ICONINFORMATION);
+	(void)empty;
+	clearTemp();   // 이미지는 적용할 때 영상 폴더 · DB 폴더로 복사했음
 }
 
 std::vector<CString> CRuliManagerDlg::RemoveVideoFiles(const std::vector<CString>& paths)
@@ -8463,6 +8851,8 @@ void CRuliManagerDlg::OnCheckAll()
 			if (r.kind == CAT_VALUE || r.kind == CAT_LABEL)
 				m_catChecked[m_mode].insert(CatCheckKey(r.kind, r.value));
 		m_catGrid.Invalidate(FALSE);
+		if (m_studioTree.GetSafeHwnd())
+			m_studioTree.Invalidate(FALSE);   // 제작사 [계층] 보기 노드 체크 칸
 		return;
 	}
 	if (IsCategoryListMode() || YearViewActive())
@@ -8546,14 +8936,14 @@ void CRuliManagerDlg::OnVideoPasteInfo()
 	PasteVideoInfoText(idx, dlg.m_text);
 }
 
-void CRuliManagerDlg::PasteVideoInfoText(int idx, const CString& pasted)
+void CRuliManagerDlg::PasteVideoInfoText(int idx, const CString& pasted, bool parsed, PluginPickState* pick)
 {
 	// 웹페이지 붙여넣기 2단계부터: 붙여넣은 글 해석 → 연결 창들 → 확인 창 → 적용 ([웹페이지 내용 붙여넣기] · 텍스트 파일 끌어다 놓기)
 	if (idx < 0 || idx >= static_cast<int>(m_lib.items.size()) || IsItemOffline(idx))
 		return;
 	const CString fileName = m_lib.items[idx].FileName();
-	const CString info = CVideoLibrary::ParsePastedVideoText(pasted);
-	if (info.IsEmpty())
+	const CString info = parsed ? pasted : CVideoLibrary::ParsePastedVideoText(pasted);   // 플러그인 결과는 이미 "항목: 값"
+	if (info.IsEmpty() && !(pick && !pick->imagePath.IsEmpty()))   // 플러그인이 이미지만 준 경우는 계속
 	{
 		AfxMessageBox(L"붙여넣은 내용에서 영상 정보를 찾지 못했습니다.", MB_ICONINFORMATION);
 		return;
@@ -9096,12 +9486,135 @@ void CRuliManagerDlg::PasteVideoInfoText(int idx, const CString& pasted)
 	}
 
 	// 2단계: 읽어낸 결과를 확인 / 수정한 뒤 적용
-	CTextInfoDlg dlg2(L"읽어낸 정보 확인 - " + fileName,
-		L"붙여넣은 내용에서 읽어낸 결과입니다. 확인하고 필요하면 고친 뒤 확인을 누르면 적용됩니다.",
-		CVideoLibrary::VideoInfoText(merged), this);
-	if (dlg2.DoModal() != IDOK)
-		return;
-	ApplyTextToVideo(idx, dlg2.m_text);   // 저장 포함
+	CString confirmed, coverPick;
+	if (pick)
+	{
+		// 플러그인 결과: 확인 창 대신 채울 항목 고르기 (체크한 항목만 바뀌고 나머지는 지금 값 그대로)
+		const VideoItem& curItem = m_lib.items[idx];
+		std::vector<PluginPickRow> rows;
+		auto row = [&rows](LPCWSTR key, LPCWSTR label, const CString& cur, const CString& val, bool provided)
+		{
+			CString v = val, c = cur;
+			v.Trim();
+			c.Trim();
+			if (v.IsEmpty() || (!provided && v == c))
+				return;   // 플러그인이 주지 않은 항목
+			PluginPickRow r;
+			r.key = key;
+			r.label = label;
+			r.cur = c;
+			r.value = v;
+			r.same = (v == c);
+			rows.push_back(r);
+		};
+		row(L"code",        L"품번",        curItem.code,        merged.code,        !fetched.code.IsEmpty());
+		row(L"title",       L"제목",        curItem.title,       merged.title,       !fetched.title.IsEmpty());
+		row(L"release",     L"발매일",      curItem.release,     merged.release,     !fetched.release.IsEmpty());
+		row(L"actors",      L"배우",        curItem.actors,      merged.actors,      !fetched.actors.IsEmpty());
+		row(L"studio",      L"제작사",      curItem.studio,      merged.studio,      !fetched.studio.IsEmpty());
+		row(L"label",       L"레이블",      curItem.label,       merged.label,       !fetched.label.IsEmpty());
+		row(L"series",      L"품번 시리즈", curItem.series,      merged.series,      !fetched.series.IsEmpty());
+		row(L"seriesTitle", L"시리즈",      curItem.seriesTitle, merged.seriesTitle, !fetched.seriesTitle.IsEmpty());
+		row(L"tags",        L"태그",        curItem.tags,        merged.tags,        !fetched.tags.IsEmpty());
+		if (!pick->imagePath.IsEmpty())
+		{
+			// 맨 아래 이미지 줄: 가져온 커버 → 지금 커버 (썸네일 더블클릭 = 원본 보기)
+			PluginPickRow r;
+			r.key = L"cover";
+			r.label = L"커버 이미지";
+			r.cur = FindImageFor(curItem.path);
+			r.value = pick->imagePath;
+			r.image = true;
+			rows.push_back(r);
+		}
+		bool anyDiff = false;
+		for (const PluginPickRow& r : rows)
+			if (!r.same) anyDiff = true;
+		if (rows.empty() || (!anyDiff && pick->applyAll))
+			return;   // 가져온 값이 없음 / 모두 지금 값과 같고 이미 선택을 정함 (첫 결과는 모두 같아도 창을 띄워 선택을 정하게)
+		std::vector<PluginPickRow> chosen = rows;
+		pick->ApplyDefaults(chosen);
+		if (!pick->applyAll)
+		{
+			CPluginPickDlg pickDlg(L"채울 항목 고르기 - " + fileName,
+				L"[" + pick->pluginName + L"] 이 가져온 값입니다. 채울 항목을 체크하세요 (가져온 값은 고칠 수 있음). 체크한 항목만 바뀌고 나머지는 지금 값 그대로입니다.",
+				chosen, pick->remaining, this);
+			pickDlg.DoModal();
+			if (pickDlg.m_result == IDCANCEL)
+			{
+				pick->stop = true;   // 남은 결과도 모두 그만
+				return;
+			}
+			if (pickDlg.m_result != IDOK)
+				return;   // 이 영상만 건너뜀
+			chosen = pickDlg.m_rows;
+			for (const PluginPickRow& r : chosen)
+				pick->states[r.key] = r.check;   // 다음에도 같은 항목 (플러그인별 기억, 같음 줄 포함)
+			pick->SaveRemembered();
+			pick->applyAll = pickDlg.m_applyAll;
+		}
+		VideoItem fin = curItem;
+		bool any = false;
+		for (const PluginPickRow& r : chosen)
+		{
+			if (!r.check)
+				continue;   // 같음 줄도 체크했으면 적용 (고친 값이면 그 값으로)
+			if (r.image)
+			{
+				coverPick = r.value;   // 아래에서 영상 폴더로 복사
+				continue;
+			}
+			any = true;
+			if (r.key == L"code")             fin.code = r.value;
+			else if (r.key == L"title")       fin.title = r.value;
+			else if (r.key == L"release")     fin.release = r.value;
+			else if (r.key == L"actors")      { fin.actors = r.value; fin.actorAliases.Empty(); }   // 과거 이름은 "배우:" 로 정해짐
+			else if (r.key == L"studio")      fin.studio = r.value;
+			else if (r.key == L"label")       fin.label = r.value;
+			else if (r.key == L"series")      fin.series = r.value;
+			else if (r.key == L"seriesTitle") fin.seriesTitle = r.value;
+			else if (r.key == L"tags")        fin.tags = r.value;
+		}
+		if (!any && coverPick.IsEmpty())
+			return;
+		if (any)
+			confirmed = CVideoLibrary::VideoInfoText(fin);
+	}
+	else
+	{
+		CTextInfoDlg dlg2(L"읽어낸 정보 확인 - " + fileName,
+			L"붙여넣은 내용에서 읽어낸 결과입니다. 확인하고 필요하면 고친 뒤 확인을 누르면 적용됩니다.",
+			CVideoLibrary::VideoInfoText(merged), this);
+		if (dlg2.DoModal() != IDOK)
+			return;
+		confirmed = dlg2.m_text;
+	}
+	if (!confirmed.IsEmpty())
+		ApplyTextToVideo(idx, confirmed);   // 저장 포함
+	if (!coverPick.IsEmpty() && idx < static_cast<int>(m_lib.items.size()))
+	{
+		// 가져온 커버: [이미지 검색] 저장과 같이 영상 파일 옆 "영상이름.확장자" (분할 영상은 순번을 뗀 이름, 예전 이미지는 휴지통)
+		const CString vpath = m_lib.items[idx].path;
+		if (ApplyVideoImage(CVideoLibrary::PartGroupPath(vpath), coverPick))
+		{
+			const std::vector<size_t> sibs = m_lib.PartSiblings(static_cast<size_t>(idx));
+			if (!sibs.empty() || CVideoLibrary::PartGroupPath(vpath) != vpath)
+			{
+				std::vector<CString> paths;
+				paths.push_back(vpath);
+				for (size_t si : sibs)
+					paths.push_back(m_lib.items[si].path);
+				RecyclePartImages(paths, CVideoLibrary::PartGroupPath(vpath));
+			}
+			ResetThumbnails();
+			if (m_curItem == idx)
+				UpdatePreview(m_curItem);
+		}
+		else
+			AfxMessageBox(L"가져온 이미지를 영상 폴더에 저장하지 못했습니다.\n\n" + vpath, MB_ICONWARNING);
+	}
+	if (pick)
+		pick->applied = true;
 }
 
 void CRuliManagerDlg::ApplyTextToVideo(int idx, const CString& text)
@@ -9316,7 +9829,15 @@ void CRuliManagerDlg::OnActorPasteInfo()
 	dlg.m_pasteButton = true;   // [공백라인 제거]
 	if (dlg.DoModal() != IDOK)
 		return;
-	const CString info = CVideoLibrary::ParsePastedActorText(dlg.m_text);
+	PasteActorInfoText(idx, CVideoLibrary::ParsePastedActorText(dlg.m_text));
+}
+
+void CRuliManagerDlg::PasteActorInfoText(int idx, const CString& info, PluginPickState* pick)
+{
+	// 배우 정보 "항목: 값" 글 → 읽어낸 항목만 덮어써서 확인 창 → 적용 ([웹페이지 내용 붙여넣기] · 플러그인 결과)
+	if (idx < 0 || idx >= static_cast<int>(m_lib.actors.size()))
+		return;
+	const CString name = m_lib.actors[idx].name;
 	// "이름: …" 줄 (붙여넣은 글 맨 앞의 ":" 없는 줄들 → "한글(English, 日本語)") - ApplyActorText 는 이름을 읽지 않으므로 따로
 	auto nameLineOf = [](const CString& text) -> CString
 	{
@@ -9349,7 +9870,7 @@ void CRuliManagerDlg::OnActorPasteInfo()
 	ActorInfo fetched;
 	fetched.name = pastedName.IsEmpty() ? name : pastedName;   // 다른 이름이 배우 이름과 같으면 빼기 위해
 	const bool anyField = !info.IsEmpty() && CVideoLibrary::ApplyActorText(fetched, info);
-	if (!anyField && pastedName.IsEmpty())
+	if (!anyField && pastedName.IsEmpty() && !(pick && !pick->imagePath.IsEmpty()))   // 플러그인이 사진만 준 경우는 계속
 	{
 		AfxMessageBox(L"붙여넣은 내용에서 배우 정보를 찾지 못했습니다.", MB_ICONINFORMATION);
 		return;
@@ -9418,17 +9939,137 @@ void CRuliManagerDlg::OnActorPasteInfo()
 	}
 
 	// 2단계: 확인 / 수정 후 적용 (텍스트로 정보 입력과 같은 형식 · 같은 적용)
-	CTextInfoDlg dlg2(L"읽어낸 정보 확인 - " + name,
-		L"붙여넣은 내용에서 읽어낸 결과입니다. 확인하고 필요하면 고친 뒤 확인을 누르면 적용됩니다. (\"이름:\" 을 바꾸면 배우 이름도 바뀜, 별점 · 즐겨찾기 · 메모는 그대로)",
-		CVideoLibrary::ActorInfoText(merged), this);
-	if (dlg2.DoModal() != IDOK)
-		return;
+	CString confirmed, photoPick;
+	if (pick)
+	{
+		// 플러그인 결과: 확인 창 대신 채울 항목 고르기
+		const ActorInfo& cur = m_lib.actors[idx];
+		std::vector<PluginPickRow> rows;
+		auto row = [&rows](LPCWSTR key, LPCWSTR label, const CString& c0, const CString& v0, bool provided)
+		{
+			CString v = v0, c = c0;
+			v.Trim();
+			c.Trim();
+			if (v.IsEmpty() || (!provided && v == c))
+				return;
+			PluginPickRow r;
+			r.key = key;
+			r.label = label;
+			r.cur = c;
+			r.value = v;
+			r.same = (v == c);
+			rows.push_back(r);
+		};
+		auto urlText = [](const CString& urls) { CString s; for (const CString& u : CVideoLibrary::SplitUrls(urls)) { if (!s.IsEmpty()) s += L" | "; s += u; } return s; };
+		CString urlsMerged;
+		{
+			std::vector<CString> all = CVideoLibrary::SplitUrls(cur.urls);
+			for (const CString& u : CVideoLibrary::SplitUrls(fetched.urls))
+				all.push_back(u);
+			urlsMerged = CVideoLibrary::JoinUrls(all);   // 지금 링크 + 가져온 링크 (중복 제거)
+		}
+		row(L"name",        L"이름",     cur.name,        merged.name,        !pastedName.IsEmpty());
+		row(L"aliases",     L"다른 이름", cur.aliases,     merged.aliases,     !fetched.aliases.IsEmpty());
+		row(L"gender",      L"성별",     cur.gender,      merged.gender,      !fetched.gender.IsEmpty());
+		row(L"birth",       L"생년월일", cur.birth,       merged.birth,       !fetched.birth.IsEmpty());
+		row(L"nationality", L"국적",     cur.nationality, merged.nationality, !fetched.nationality.IsEmpty());
+		row(L"height",      L"키",       cur.height,      merged.height,      !fetched.height.IsEmpty());
+		row(L"bust",        L"가슴",     cur.bust,        merged.bust,        !fetched.bust.IsEmpty());
+		row(L"waist",       L"허리",     cur.waist,       merged.waist,       !fetched.waist.IsEmpty());
+		row(L"hip",         L"엉덩이",   cur.hip,         merged.hip,         !fetched.hip.IsEmpty());
+		row(L"cup",         L"컵",       cur.cup,         merged.cup,         !fetched.cup.IsEmpty());
+		row(L"debut",       L"데뷔",     cur.debut,       merged.debut,       !fetched.debut.IsEmpty());
+		row(L"retire",      L"은퇴",     cur.retire,      merged.retire,      !fetched.retire.IsEmpty());
+		row(L"urls",        L"링크",     urlText(cur.urls), urlText(urlsMerged), !fetched.urls.IsEmpty());
+		if (!pick->imagePath.IsEmpty())
+		{
+			// 맨 아래 이미지 줄: 가져온 사진 → 지금 사진 (썸네일 더블클릭 = 원본 보기)
+			PluginPickRow r;
+			r.key = L"photo";
+			r.label = L"사진";
+			r.cur = ::PathFileExistsW(cur.photo) ? cur.photo : CString();
+			r.value = pick->imagePath;
+			r.image = true;
+			rows.push_back(r);
+		}
+		bool anyDiff = false;
+		for (const PluginPickRow& r : rows)
+			if (!r.same) anyDiff = true;
+		if (rows.empty() || (!anyDiff && pick->applyAll))
+			return;
+		std::vector<PluginPickRow> chosen = rows;
+		pick->ApplyDefaults(chosen);
+		if (!pick->applyAll)
+		{
+			CPluginPickDlg pickDlg(L"채울 항목 고르기 - " + name,
+				L"[" + pick->pluginName + L"] 이 가져온 값입니다. 채울 항목을 체크하세요 (가져온 값은 고칠 수 있음). 체크한 항목만 바뀌고 나머지는 지금 값 그대로입니다. (이름을 바꾸면 영상의 배우 이름도 바뀜)",
+				chosen, pick->remaining, this);
+			pickDlg.DoModal();
+			if (pickDlg.m_result == IDCANCEL)
+			{
+				pick->stop = true;
+				return;
+			}
+			if (pickDlg.m_result != IDOK)
+				return;
+			chosen = pickDlg.m_rows;
+			for (const PluginPickRow& r : chosen)
+				pick->states[r.key] = r.check;   // 같음 줄 포함
+			pick->SaveRemembered();
+			pick->applyAll = pickDlg.m_applyAll;
+		}
+		ActorInfo fin = cur;
+		bool any = false;
+		for (const PluginPickRow& r : chosen)
+		{
+			if (!r.check)
+				continue;   // 같음 줄도 체크했으면 적용 (고친 값이면 그 값으로)
+			any = true;
+			if (r.image)                      photoPick = r.value;   // 아래에서 DB 폴더(images\actors)로 복사
+			else if (r.key == L"name")        fin.name = r.value;
+			else if (r.key == L"aliases")     fin.aliases = CVideoLibrary::JoinList(CVideoLibrary::SplitList(r.value));
+			else if (r.key == L"gender")      fin.gender = r.value;
+			else if (r.key == L"birth")       fin.birth = r.value;
+			else if (r.key == L"nationality") fin.nationality = r.value;
+			else if (r.key == L"height")      fin.height = r.value;
+			else if (r.key == L"bust")        fin.bust = r.value;
+			else if (r.key == L"waist")       fin.waist = r.value;
+			else if (r.key == L"hip")         fin.hip = r.value;
+			else if (r.key == L"cup")         fin.cup = r.value;
+			else if (r.key == L"debut")       fin.debut = r.value;
+			else if (r.key == L"retire")      fin.retire = r.value;
+			else if (r.key == L"urls")        fin.urls = CVideoLibrary::JoinUrls(CVideoLibrary::SplitUrls(r.value));
+		}
+		if (!any)
+			return;
+		confirmed = CVideoLibrary::ActorInfoText(fin);
+	}
+	else
+	{
+		CTextInfoDlg dlg2(L"읽어낸 정보 확인 - " + name,
+			L"붙여넣은 내용에서 읽어낸 결과입니다. 확인하고 필요하면 고친 뒤 확인을 누르면 적용됩니다. (\"이름:\" 을 바꾸면 배우 이름도 바뀜, 별점 · 즐겨찾기 · 메모는 그대로)",
+			CVideoLibrary::ActorInfoText(merged), this);
+		if (dlg2.DoModal() != IDOK)
+			return;
+		confirmed = dlg2.m_text;
+	}
+	if (pick)
+		pick->applied = true;
 	ActorInfo a = m_lib.actors[idx];
 	CVideoLibrary::ClearActorTextFields(a);
-	CVideoLibrary::ApplyActorText(a, dlg2.m_text);
+	CVideoLibrary::ApplyActorText(a, confirmed);
+	if (!photoPick.IsEmpty())
+	{
+		// 가져온 사진: [사진 검색] 과 같이 DB 폴더(images\actors)에 복사해서 등록
+		const CString copy = CVideoLibrary::StoreImageCopy(photoPick, L"actors");
+		if (!copy.IsEmpty())
+			a.photo = copy;
+		else
+			AfxMessageBox(L"가져온 사진을 DB 폴더로 복사하지 못했습니다.", MB_ICONWARNING);
+	}
 	// 이름이 바뀌었으면 배우 이름 변경 (영상의 배우 이름도, 예전 이름이 언어 단위로도 다르면 다른 이름으로 남김)
 	{
-		const CString newName = nameLineOf(dlg2.m_text);
+		const CString newName = nameLineOf(confirmed);
 		if (!newName.IsEmpty() && newName != a.name)
 		{
 			const int other = m_lib.FindActor(newName);
@@ -13437,6 +14078,10 @@ void CRuliManagerDlg::ActorGridOwner::GridKey(UINT vk)
 	case VK_DELETE: dlg->OnActorDelete(); break;
 	case VK_SPACE: dlg->OnActorShowVideos(); break;
 	case VK_F5:    dlg->OnBnClickedRefresh(); break;
+	case 'A':
+		if ((::GetKeyState(VK_CONTROL) & 0x8000) && dlg->CheckAllCount() > 0)
+			dlg->OnCheckAll();   // Ctrl+A: 지금 보이는 배우 모두 체크
+		break;
 	case 'F':
 		if (::GetKeyState(VK_CONTROL) & 0x8000)
 		{
@@ -14680,6 +15325,7 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 			CString del;
 			del.Format(L"배우 삭제(%d)\tDel", checkedCount);
 			menu.AppendMenu(MF_STRING, ID_ACTOR_DELETECHECKED, del);
+			AppendPluginMenu(menu, L"actor", CheckedActorIndices());   // [플러그인(n) ▸]
 			menu.AppendMenu(MF_SEPARATOR);
 			{
 				const int none = NoVideoActorRows();
@@ -14695,6 +15341,8 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 		menu.AppendMenu(MF_STRING, ID_ACTOR_EDIT,       L"배우 정보 편집...\tF2");
 		menu.AppendMenu(MF_STRING, ID_ACTOR_TEXTINFO,   L"텍스트로 정보 입력...");
 		menu.AppendMenu(MF_STRING, ID_ACTOR_PASTEINFO,  L"웹페이지 내용 붙여넣기...");
+		if (row >= 0 && row < static_cast<int>(m_actorRows.size()))
+			AppendPluginMenu(menu, L"actor", std::vector<int>(1, m_actorRows[row]), 0, false);   // [플러그인 ▸] (배우 플러그인이 있을 때만)
 		menu.AppendMenu(MF_SEPARATOR);
 		menu.AppendMenu(MF_STRING, ID_ACTOR_MERGE,      L"다른 배우와 합치기...");
 		menu.AppendMenu(MF_STRING, ID_ACTOR_DELETE,     L"배우 삭제\tDel");
@@ -14864,6 +15512,13 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 			CString chk;
 			chk.Format(L"영상 검사(%d)", CheckedItemCount());
 			menu.AppendMenu(MF_STRING, ID_VIDEO_CHECKCHECKED, chk);
+			{
+				std::vector<int> checkedItems;
+				for (size_t i = 0; i < m_lib.items.size(); ++i)
+					if (IsItemChecked(static_cast<int>(i)))
+						checkedItems.push_back(static_cast<int>(i));
+				AppendPluginMenu(menu, L"video", checkedItems, 0, false);   // [플러그인(n) ▸]
+			}
 			menu.AppendMenu(MF_SEPARATOR);
 			menu.AppendMenu(MF_STRING, ID_VIDEO_UNCHECKALL, L"체크 모두 해제");
 			DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
@@ -14892,6 +15547,13 @@ void CRuliManagerDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 		CString chk;
 		chk.Format(L"영상 검사(%d)", CheckedItemCount());
 		menu.AppendMenu(MF_STRING, ID_VIDEO_CHECKCHECKED, chk);
+		{
+			std::vector<int> checkedItems;
+			for (size_t i = 0; i < m_lib.items.size(); ++i)
+				if (IsItemChecked(static_cast<int>(i)))
+					checkedItems.push_back(static_cast<int>(i));
+			AppendPluginMenu(menu, L"video", checkedItems, 0, false);   // [플러그인(n) ▸]
+		}
 		menu.AppendMenu(MF_SEPARATOR);
 		menu.AppendMenu(MF_STRING, ID_VIDEO_UNCHECKALL, L"체크 모두 해제");
 		DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
@@ -14927,6 +15589,8 @@ void CRuliManagerDlg::ShowVideoContextMenu(int row, CPoint point)
 		menu.AppendMenu(MF_STRING | ro, ID_VIDEO_MAKEPREVIEW, has ? L"미리보기 다시 만들기" : L"미리보기 만들기");
 	}
 	menu.AppendMenu(MF_STRING | ro, ID_VIDEO_CHECK, L"영상 검사");   // 영상 검사 창 목록에 추가 (분할 영상은 모든 파트)
+	if (row >= 0 && row < static_cast<int>(m_view.size()))
+		AppendPluginMenu(menu, L"video", std::vector<int>(1, m_view[row]), ro, false);   // [플러그인 ▸] (영상 플러그인이 있을 때만)
 	menu.AppendMenu(MF_SEPARATOR);
 	{
 		// [컬렉션에 추가 ▸]: 컬렉션 목록 (이미 들어 있으면 체크 · 누르면 뺌) + [새 컬렉션...]
@@ -15011,7 +15675,7 @@ void CRuliManagerDlg::ShowNewItemMenu(CPoint screenPt)
 	if (const int all = CheckAllCount())
 	{
 		CString t;
-		t.Format(L"전체 체크(%d)", all);
+		t.Format(L"전체 체크(%d)\tCtrl+A", all);
 		if (menu.GetMenuItemCount() > 0)
 			menu.AppendMenu(MF_SEPARATOR);
 		menu.AppendMenu(MF_STRING, ID_CHECK_ALL, t);
