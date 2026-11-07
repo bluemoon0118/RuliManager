@@ -169,8 +169,11 @@ class CDarkDateTime : public CDateTimeCtrl
 {
 public:
 	void SetColors(COLORREF bg, COLORREF text, COLORREF border);
+	void SetMonthOnly(bool on);  // 연-월만 표시 / 입력 (일 모름, SetFormat("yyyy-MM") 과 함께)
+	bool IsMonthOnly() const { return m_monthOnly; }
 
 protected:
+	bool     m_monthOnly = false;
 	COLORREF m_bg     = TCOL(TC_EDIT);
 	COLORREF m_text   = TCOL(TC_TEXT);
 	COLORREF m_border = TCOL(TC_EDGE);
@@ -180,7 +183,7 @@ protected:
 	bool CommitTyped();          // 입력한 글자를 날짜로 (성공하면 true)
 	void CancelTyped();
 	void NotifyChanged(bool valid, const SYSTEMTIME& st);
-	static bool ParseTyped(const CString& text, SYSTEMTIME& st);
+	static bool ParseTyped(const CString& text, SYSTEMTIME& st, bool monthOnly = false);
 
 	afx_msg void OnChar(UINT nChar, UINT nRepCnt, UINT nFlags);
 	afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);

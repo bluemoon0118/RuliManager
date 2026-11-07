@@ -29,6 +29,8 @@ class CVideoCheckDlg;   // 영상 검사 창 (모달리스, OpenVideoCheck)
 #include "PreviewVideo.h"
 #include "TreemapView.h"
 #include "StudioTreeView.h"
+#include "PluginHost.h"
+#include "PluginPickDlg.h"
 
 // 컬렉션 · 제작사 영상 화면 위쪽 정보 (배우 출연작 화면의 배우 정보 자리): 제목(크게) · 정보 줄 · 메모 + (제작사) 하위 레이블 이미지 칸
 //  - 더블클릭 = 편집 (m_onDblClick), 레이블 칸 더블클릭 = 그 레이블 영상 (m_onSubDblClick)
@@ -332,7 +334,7 @@ protected:
 	afx_msg void OnActorDelete();
 	afx_msg void OnVideoTextInfo();
 	afx_msg void OnVideoPasteInfo();
-	void PasteVideoInfoText(int idx, const CString& pasted);   // 웹페이지 붙여넣기 해석 ~ 적용 (붙여넣기 창 · 텍스트 파일 끌어다 놓기)
+	void PasteVideoInfoText(int idx, const CString& pasted, bool parsed = false, PluginPickState* pick = nullptr);   // 웹페이지 붙여넣기 해석 ~ 적용 (붙여넣기 창 · 텍스트 파일 끌어다 놓기), parsed = 이미 "항목: 값" 형식, pick = 플러그인 결과 (확인 창 대신 채울 항목 고르기)
 	bool DropTextOnVideo(const CString& file, CPoint ptDlg);   // .txt 를 영상 카드 · 목록 줄에 놓음 → 그 영상에 웹페이지 붙여넣기 (처리했으면 true)
 	// 격자 빈곳 오른쪽 클릭 → 새 항목
 	afx_msg void OnNewActor();
@@ -345,6 +347,7 @@ protected:
 	afx_msg void OnActorMerge();      // 배우 카드 오른쪽 클릭 → 다른 배우와 합치기
 	void MergeActorInto(int src, int dst, const CString& past);   // src 배우를 dst 배우로 합침 (src 항목 삭제, 영상 참여 별칭 = past, 비우면 그 영상에서 쓰던 이름)
 	afx_msg void OnActorPasteInfo();  // 배우 카드 오른쪽 클릭 → 웹페이지 내용 붙여넣기 (프로필 화면 복사 글)
+	void PasteActorInfoText(int idx, const CString& info, PluginPickState* pick = nullptr);   // 배우 정보 "항목: 값" → 확인 창 (pick = 플러그인: 채울 항목 고르기) → 적용
 	afx_msg void OnActorTextInfo();   // 배우 카드 오른쪽 클릭 → 텍스트로 정보 입력   // 배우 탭 우클릭 → 배우 삭제 (Del)   // 태그 탭 우클릭 → 삭제
 	// 컬렉션 탭
 	std::map<CString, int> m_collectionCover;   // 컬렉션(소문자) → 대표 영상(카드 이미지, 처음 들어 있는 영상)
@@ -1030,6 +1033,14 @@ protected:
 	void OpenVideoCheck(const std::vector<int>* items = nullptr);   // 창을 열고(없으면 만듦) items 를 검사 목록에 추가
 	afx_msg void OnManageCheck();          // [목록 관리 ▾] → 영상 검사
 	afx_msg void OnManageDups();           // [관리 도구 ▾] → 중복 파일 검사 (같은 크기 · 같은 품번)
+	// 플러그인 (외부 프로그램 - PluginHost): 영상 · 배우 오른쪽 클릭 [플러그인 ▸], [관리 도구 ▾] [플러그인 ▸]
+	std::vector<PluginInfo> m_ctxPlugins;    // 마지막 메뉴의 [플러그인 ▸] 항목 순서 (ID_PLUGIN_FIRST + 번호)
+	std::vector<int> m_ctxPluginItems;       // 그 메뉴의 대상 (영상 = 항목 번호, 배우 = 배우 번호, 관리 도구 = 비어 있음)
+	void AppendPluginMenu(CMenu& menu, LPCWSTR target, const std::vector<int>& items, UINT flags = 0, bool separatorBefore = true);
+	void RunPlugin(const PluginInfo& p, LPCWSTR target, const std::vector<int>& items);
+	afx_msg void OnPluginCommand(UINT nID);
+	afx_msg void OnManagePlugins();        // [관리 도구 ▾] → [플러그인 ▸] → 플러그인 관리... (설정 [플러그인] 탭)
+	int  m_settingsStartPage = -1;         // 다음에 여는 설정 창의 처음 탭 (한 번만)
 	std::vector<CString> RemoveVideoFiles(const std::vector<CString>& paths);   // 영상 파일을 휴지통으로 + DB 에서 삭제 (지우지 못한 파일을 돌려줌)
 	afx_msg void OnVideoCheck();           // 영상 오른쪽 클릭 [영상 검사] (분할 영상은 모든 파트)
 	afx_msg void OnVideoCheckChecked();    // 체크한 영상 [영상 검사(n)]

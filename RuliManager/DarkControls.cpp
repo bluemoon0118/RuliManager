@@ -379,7 +379,19 @@ BEGIN_MESSAGE_MAP(CDarkDateTime, CDateTimeCtrl)
 	ON_WM_GETDLGCODE()
 END_MESSAGE_MAP()
 
-bool CDarkDateTime::ParseTyped(const CString& text, SYSTEMTIME& st)
+void CDarkDateTime::SetMonthOnly(bool on)
+{
+	if (m_monthOnly == on)
+		return;
+	m_monthOnly = on;
+	if (GetSafeHwnd())
+	{
+		SetFormat(on ? L"yyyy-MM" : L"yyyy-MM-dd");
+		Invalidate();
+	}
+}
+
+bool CDarkDateTime::ParseTyped(const CString& text, SYSTEMTIME& st, bool monthOnly)
 {
 	// 숫자 묶음으로 나눔: "1998-2-17" → 1998 / 2 / 17, "19980217" → 1998 / 02 / 17
 	std::vector<CString> nums;
@@ -411,8 +423,22 @@ bool CDarkDateTime::ParseTyped(const CString& text, SYSTEMTIME& st)
 		m = _wtoi(nums[1]);
 		d = _wtoi(nums[2]);
 	}
+	else if (monthOnly && nums.size() == 1 && nums[0].GetLength() == 6)   // 연-월만: "201804"
+	{
+		y = _wtoi(nums[0].Left(4));
+		m = _wtoi(nums[0].Mid(4, 2));
+		d = 1;
+	}
+	else if (monthOnly && nums.size() == 2 && nums[0].GetLength() == 4)   // 연-월만: "2018-4"
+	{
+		y = _wtoi(nums[0]);
+		m = _wtoi(nums[1]);
+		d = 1;
+	}
 	else
 		return false;
+	if (monthOnly)
+		d = 1;   // 일은 쓰지 않음
 
 	if (y < 1601 || y > 9999 || m < 1 || m > 12 || d < 1 || d > 31)
 		return false;
@@ -446,7 +472,7 @@ bool CDarkDateTime::CommitTyped()
 	if (!m_typing)
 		return false;
 	SYSTEMTIME st = {};
-	const bool ok = ParseTyped(m_typed, st);
+	const bool ok = ParseTyped(m_typed, st, m_monthOnly);
 	m_typing = false;
 	m_typed.Empty();
 	if (ok)
@@ -487,8 +513,9 @@ void CDarkDateTime::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
 		}
 		if (m_typed.GetLength() < 10)
 			m_typed += c;
-		// 구분자 없이 8자리를 다 치면 바로 확정
-		if (m_typed.GetLength() == 8 && m_typed.SpanIncluding(L"0123456789").GetLength() == 8)
+		// 구분자 없이 8자리(연-월만이면 6자리)를 다 치면 바로 확정
+		const int full = m_monthOnly ? 6 : 8;
+		if (m_typed.GetLength() == full && m_typed.SpanIncluding(L"0123456789").GetLength() == full)
 			CommitTyped();
 		else
 			Invalidate();
@@ -662,7 +689,7 @@ void CDarkDateTime::OnPaint()
 			CString f;
 			for (int i = 0; i < shown.GetLength(); ++i)
 			{
-				if (i == 4 || i == 6) f += L'-';
+				if (i == 4 || (i == 6 && !m_monthOnly)) f += L'-';
 				f += shown[i];
 			}
 			shown = f;
@@ -670,6 +697,8 @@ void CDarkDateTime::OnPaint()
 		text = shown + L"_";
 		drawColor = m_text;
 	}
+	else if (valid && m_monthOnly)
+		text.Format(L"%04d-%02d", st.wYear, st.wMonth);
 	else if (valid)
 		text.Format(L"%04d-%02d-%02d", st.wYear, st.wMonth, st.wDay);
 	mem.SetTextColor(drawColor);
@@ -1553,12 +1582,12 @@ namespace
 	// 메뉴 글자 → 아이콘 (위에서부터 먼저 맞는 것)
 	enum DarkMenuIcon { DMI_NONE = 0, DMI_UNCHECK, DMI_CHECKALL, DMI_TRASH, DMI_MINUS, DMI_ERASER, DMI_MERGE, DMI_PASTE, DMI_TEXT,
 		DMI_PICTURE, DMI_REFRESH, DMI_FOLDER, DMI_PLAY, DMI_COLLECTION, DMI_PLUS, DMI_PENCIL, DMI_GEAR, DMI_MOVIE, DMI_COPY,
-		DMI_ACTOR, DMI_STUDIO, DMI_TAG, DMI_INSPECT, DMI_BARCODE };   // BARCODE: 바코드 (품번 관리)   // INSPECT: 돋보기 (영상 검사)   // 배우 · 제작사 · 태그 탭 상징 (목록 관리 메뉴)
+		DMI_ACTOR, DMI_STUDIO, DMI_TAG, DMI_INSPECT, DMI_BARCODE, DMI_PLUGIN };   // PLUGIN: 퍼즐 조각 (플러그인)   // BARCODE: 바코드 (품번 관리)   // INSPECT: 돋보기 (영상 검사)   // 배우 · 제작사 · 태그 탭 상징 (목록 관리 메뉴)
 	int DarkMenuIconFor(const CString& text)
 	{
 		struct Rule { const wchar_t* word; int icon; };
 		static const Rule rules[] = {
-			{ L"영상 검사", DMI_INSPECT }, { L"중복 파일", DMI_COPY },   // 중복 파일 검사: 겹친 두 장
+			{ L"영상 검사", DMI_INSPECT }, { L"중복 파일", DMI_COPY }, { L"플러그인", DMI_PLUGIN },   // 중복 파일 검사: 겹친 두 장
 			{ L"없는 배우 체크", DMI_CHECKALL },   // 영상 없는 배우 일괄 체크
 			{ L"체크 모두 해제", DMI_UNCHECK }, { L"체크 해제", DMI_UNCHECK }, { L"전체 체크", DMI_CHECKALL },
 			{ L"빼기", DMI_MINUS }, { L"삭제", DMI_TRASH }, { L"모두 지우기", DMI_TRASH },
@@ -1605,6 +1634,7 @@ namespace
 		case DMI_TAG:        VectorIcon::Tag(dc, area, col); break;      // 태그 탭: 꼬리표
 		case DMI_INSPECT:    VectorIcon::Inspect(dc, area, col); break;  // 영상 검사: 돋보기 + 재생
 		case DMI_BARCODE:    VectorIcon::Barcode(dc, area, col); break;  // 품번 관리: 바코드
+		case DMI_PLUGIN:     VectorIcon::Plugin(dc, area, col); break;   // 플러그인: 퍼즐 조각
 		default: break;
 		}
 	}

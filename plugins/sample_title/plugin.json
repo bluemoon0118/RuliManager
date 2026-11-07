@@ -1,0 +1,11 @@
+{
+  "name": "예제 - 파일 이름을 제목으로",
+  "version": "1.0",
+  "author": "RuliManager",
+  "description": "플러그인 동작 확인용 예제. 영상 파일 이름에서 품번을 뺀 나머지를 제목으로 돌려줍니다 (python 필요).",
+  "api": 1,
+  "run": "python plugin.py",
+  "target": "video",
+  "menu": "예제: 파일 이름을 제목으로",
+  "timeout": 30
+}

@@ -3433,18 +3433,25 @@ int CVideoLibrary::FindVideoOnDate(const CString& actorName, const CString& date
 	const std::map<CString, int> index = ActorNameIndex();
 	CString target = actorName;
 	target.MakeLower();
+	// 일 모름("YYYY-MM"): 그 달에 나온 영상 중 가장 이른 것
+	const bool monthOnly = (date.GetLength() == 7);
 	int best = -1;
 	for (size_t i = 0; i < items.size(); ++i)
 	{
 		const VideoItem& v = items[i];
-		if (v.code.IsEmpty() || v.release.CompareNoCase(date) != 0)
+		if (v.code.IsEmpty())
+			continue;
+		if (monthOnly ? (v.release.GetLength() < 7 || v.release.Left(7).CompareNoCase(date) != 0)
+		              : (v.release.CompareNoCase(date) != 0))
 			continue;
 		for (const CString& n : SplitList(v.actors))
 		{
 			if (n.CompareNoCase(actorName) == 0 || ActorKeyOf(index, n) == target)
 			{
-				// 여러 개면 품번 순 첫 번째, 같은 품번(분할 파일)이면 경로 순 첫 번째
-				const int c = (best < 0) ? -1 : v.code.CompareNoCase(items[best].code);
+				// 여러 개면 발매일 → 품번 순 첫 번째, 같은 품번(분할 파일)이면 경로 순 첫 번째
+				int c = (best < 0) ? -1 : v.release.CompareNoCase(items[best].release);
+				if (c == 0)
+					c = v.code.CompareNoCase(items[best].code);
 				if (best < 0 || c < 0 || (c == 0 && v.path.CompareNoCase(items[best].path) < 0))
 					best = static_cast<int>(i);
 				break;
@@ -4869,9 +4876,12 @@ namespace
 	}
 
 	// 날짜 → "YYYY-MM-DD" (1998-02-17 / 1998.2.17 / 1998/02/17 / 1998년 2월 17일 / 19980217 / 1998-02 → 1998-02-01)
-	CString ParseDateText(const CString& s)
+	// keepMonth: 일이 없으면 "YYYY-MM" 그대로 (데뷔일 / 은퇴일의 일 모름)
+	// 두 자리 연도도 받음: "22년 09월" / "22.09.15" → 2022 (올해 끝 두 자리 + 1 이하면 2000년대, 아니면 1900년대)
+	CString ParseDateText(const CString& s, bool keepMonth = false)
 	{
 		std::vector<int> nums;
+		int firstLen = 0;   // 첫 숫자 묶음의 자리 수
 		CString digits;
 		for (int i = 0; i <= s.GetLength(); ++i)
 		{
@@ -4881,6 +4891,8 @@ namespace
 			else if (!digits.IsEmpty())
 			{
 				nums.push_back(_wtoi(digits));
+				if (nums.size() == 1)
+					firstLen = digits.GetLength();
 				if (digits.GetLength() == 8 && nums.size() == 1)
 				{
 					const int v = nums.back();
@@ -4893,11 +4905,23 @@ namespace
 					break;
 			}
 		}
+		if (nums.size() >= 2 && firstLen == 2)
+		{
+			SYSTEMTIME now = {};
+			::GetLocalTime(&now);
+			const int yy = now.wYear % 100;
+			nums[0] += (nums[0] <= yy + 1) ? (now.wYear - yy) : (now.wYear - yy - 100);
+		}
 		if (nums.size() < 2 || nums[0] < 1900 || nums[0] > 2100 || nums[1] < 1 || nums[1] > 12)
 			return CString();
-		const int day = (nums.size() >= 3 && nums[2] >= 1 && nums[2] <= 31) ? nums[2] : 1;
+		const bool hasDay = nums.size() >= 3 && nums[2] >= 1 && nums[2] <= 31;
 		CString r;
-		r.Format(L"%04d-%02d-%02d", nums[0], nums[1], day);
+		if (keepMonth && !hasDay)
+		{
+			r.Format(L"%04d-%02d", nums[0], nums[1]);
+			return r;
+		}
+		r.Format(L"%04d-%02d-%02d", nums[0], nums[1], hasDay ? nums[2] : 1);
 		return r;
 	}
 
@@ -5130,9 +5154,9 @@ bool CVideoLibrary::ApplyActorText(ActorInfo& a, CString text)
 		else if (KeyIs(key, { L"성별", L"gender", L"sex", L"性別" }))
 			setIfEmpty(a.gender, NormalizeGender(val));
 		else if (KeyIs(key, { L"데뷔", L"데뷔일", L"debut", L"careerstart", L"activefrom", L"デビュー", L"デビュー日" }))
-			setIfEmpty(a.debut, ParseDateText(val));
+			setIfEmpty(a.debut, ParseDateText(val, true));
 		else if (KeyIs(key, { L"은퇴", L"은퇴일", L"retire", L"retired", L"careerend", L"引退", L"引退日" }))
-			setIfEmpty(a.retire, ParseDateText(val));
+			setIfEmpty(a.retire, ParseDateText(val, true));
 		else if (KeyIs(key, { L"별칭", L"별명", L"다른이름", L"예명", L"aliases", L"alias", L"aka", L"別名", L"旧芸名" }))
 		{
 			CString v = val;

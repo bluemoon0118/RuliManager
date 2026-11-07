@@ -2,6 +2,7 @@
 #include "RuliManager.h"
 #include "SettingsDlg.h"
 #include <uxtheme.h>
+#include <set>
 #pragma comment(lib, "uxtheme.lib")
 
 #ifdef _DEBUG
@@ -31,6 +32,11 @@ BEGIN_MESSAGE_MAP(CSettingsDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_SET_TAB2, &CSettingsDlg::OnTab2)
 	ON_BN_CLICKED(IDC_SET_TAB3, &CSettingsDlg::OnTab3)
 	ON_BN_CLICKED(IDC_SET_TAB4, &CSettingsDlg::OnTab4)
+	ON_BN_CLICKED(IDC_SET_TAB5, &CSettingsDlg::OnTab5)
+	ON_NOTIFY(LVN_ITEMCHANGED, IDC_SET_PLUGIN_LIST, &CSettingsDlg::OnPluginItemChanged)
+	ON_BN_CLICKED(IDC_SET_PLUGIN_FOLDER, &CSettingsDlg::OnBnClickedPluginFolder)
+	ON_BN_CLICKED(IDC_SET_PLUGIN_RELOAD, &CSettingsDlg::OnBnClickedPluginReload)
+	ON_BN_CLICKED(IDC_SET_PLUGIN_HELP, &CSettingsDlg::OnBnClickedPluginHelp)
 	ON_CBN_SELCHANGE(IDC_SET_THEME, &CSettingsDlg::OnThemeChanged)
 END_MESSAGE_MAP()
 
@@ -170,9 +176,10 @@ namespace
 BOOL CSettingsDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
+	m_pluginList.SubclassDlgItem(IDC_SET_PLUGIN_LIST, this);   // 테마 적용 전에 (목록 머리글도 어두운 색으로)
 	// 탭 버튼: 토글 (선택 = 강조색, 나머지 = 콤보 색) - 테마 적용 전에 연결
-	const UINT tabIds[4] = { IDC_SET_TAB1, IDC_SET_TAB2, IDC_SET_TAB3, IDC_SET_TAB4 };
-	for (int i = 0; i < 4; ++i)
+	const UINT tabIds[kPages] = { IDC_SET_TAB1, IDC_SET_TAB2, IDC_SET_TAB3, IDC_SET_TAB4, IDC_SET_TAB5 };
+	for (int i = 0; i < kPages; ++i)
 	{
 		if (m_tabs[i].Attach(tabIds[i], this))
 		{
@@ -189,12 +196,12 @@ BOOL CSettingsDlg::OnInitDialog()
 		for (CWnd* w = GetWindow(GW_CHILD); w; w = w->GetWindow(GW_HWNDNEXT))
 		{
 			const UINT id = static_cast<UINT>(w->GetDlgCtrlID());
-			if (id == IDOK || id == IDCANCEL || (id >= IDC_SET_TAB1 && id <= IDC_SET_TAB4))
+			if (id == IDOK || id == IDCANCEL || (id >= IDC_SET_TAB1 && id <= IDC_SET_TAB4) || id == IDC_SET_TAB5)
 				continue;
 			CRect r;
 			w->GetWindowRect(&r);
 			ScreenToClient(&r);
-			const int page = (std::max)(0, (std::min)(3, static_cast<int>(r.left) / step));
+			const int page = (std::max)(0, (std::min)(kPages - 1, static_cast<int>(r.left) / step));
 			if (page > 0)
 				w->SetWindowPos(nullptr, r.left - page * step, r.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 			m_pageCtrls.push_back({ w->GetSafeHwnd(), page });
@@ -254,7 +261,21 @@ BOOL CSettingsDlg::OnInitDialog()
 		}
 	}
 
-	ShowPage(g_lastSettingsPage);
+	{
+		// [플러그인] 목록: 이름 · 대상 · 버전 · 상태, 체크 = 사용
+		m_pluginList.SetExtendedStyle(LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP | LVS_EX_CHECKBOXES);
+		CRect lr;
+		m_pluginList.GetClientRect(&lr);
+		const int w = (std::max)(200, static_cast<int>(lr.Width()) - ::GetSystemMetrics(SM_CXVSCROLL));
+		m_pluginList.InsertColumn(0, L"이름", LVCFMT_LEFT, w * 46 / 100);
+		m_pluginList.InsertColumn(1, L"대상", LVCFMT_LEFT, w * 18 / 100);
+		m_pluginList.InsertColumn(2, L"버전", LVCFMT_LEFT, w * 14 / 100);
+		m_pluginList.InsertColumn(3, L"상태", LVCFMT_LEFT, w * 22 / 100);
+		m_plugins = PluginHost::LoadAll();
+		FillPlugins();
+	}
+
+	ShowPage(m_startPage >= 0 ? m_startPage : g_lastSettingsPage);
 	UpdatePreviewButtons();
 	SetTimer(1, 300, nullptr);   // [만들기 중단] 활성 상태 (미리보기를 만드는 중일 때만)
 	return TRUE;
@@ -280,9 +301,9 @@ void CSettingsDlg::OnTimer(UINT_PTR nIDEvent)
 
 void CSettingsDlg::ShowPage(int page)
 {
-	m_page = (std::max)(0, (std::min)(3, page));
+	m_page = (std::max)(0, (std::min)(kPages - 1, page));
 	g_lastSettingsPage = m_page;
-	for (int i = 0; i < 4; ++i)
+	for (int i = 0; i < kPages; ++i)
 		if (m_tabs[i].GetSafeHwnd())
 			m_tabs[i].SetChecked(i == m_page);
 	for (const auto& pc : m_pageCtrls)
@@ -420,7 +441,131 @@ void CSettingsDlg::OnOK()
 	if (CComboBox* combo = static_cast<CComboBox*>(GetDlgItem(IDC_SET_THEME)))
 		if (combo->GetCurSel() >= 0)
 			m_themeIndex = combo->GetCurSel();
+	{
+		// [플러그인] 체크 해제한 것 → 레지스트리 (지금 목록에 없는 폴더의 예전 기록은 그대로 둠)
+		std::set<CString> present;
+		for (const PluginInfo& p : m_plugins)
+		{
+			CString k = p.id;
+			k.MakeLower();
+			present.insert(k);
+		}
+		std::vector<CString> disabled;
+		for (const CString& id : PluginHost::LoadDisabled())
+		{
+			CString k = id;
+			k.MakeLower();
+			if (present.count(k) == 0)
+				disabled.push_back(id);
+		}
+		for (int i = 0; i < m_pluginList.GetItemCount() && i < static_cast<int>(m_plugins.size()); ++i)
+			if (!m_pluginList.GetCheck(i))
+				disabled.push_back(m_plugins[i].id);
+		PluginHost::SaveDisabled(disabled);
+	}
 	CDialogEx::OnOK();
+}
+
+void CSettingsDlg::FillPlugins()
+{
+	m_pluginFilling = true;
+	m_pluginList.SetRedraw(FALSE);
+	m_pluginList.DeleteAllItems();
+	for (size_t i = 0; i < m_plugins.size(); ++i)
+	{
+		const PluginInfo& p = m_plugins[i];
+		const int row = m_pluginList.InsertItem(static_cast<int>(i), p.name);
+		m_pluginList.SetItemText(row, 1, p.TargetName());
+		m_pluginList.SetItemText(row, 2, p.version);
+		m_pluginList.SetItemText(row, 3, !p.error.IsEmpty() ? CString(L"오류") : (p.enabled ? CString(L"사용") : CString(L"꺼짐")));
+		m_pluginList.SetCheck(row, p.enabled ? TRUE : FALSE);
+	}
+	if (!m_plugins.empty())
+		m_pluginList.SetItemState(0, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
+	m_pluginList.SetRedraw(TRUE);
+	m_pluginList.Invalidate();
+	m_pluginFilling = false;
+	UpdatePluginDesc();
+}
+
+void CSettingsDlg::UpdatePluginDesc()
+{
+	CString t;
+	const int row = m_pluginList.GetNextItem(-1, LVNI_SELECTED);
+	if (m_plugins.empty())
+		t = L"플러그인이 없습니다. [폴더 열기] 로 plugins 폴더를 열어 플러그인 폴더를 넣고 [새로 고침] 하세요.";
+	else if (row >= 0 && row < static_cast<int>(m_plugins.size()))
+	{
+		const PluginInfo& p = m_plugins[row];
+		if (!p.error.IsEmpty())
+			t = L"오류: " + p.error + L"  (" + p.id + L"\\plugin.json)";
+		else
+		{
+			t = p.description.IsEmpty() ? CString(L"(설명 없음)") : p.description;
+			if (!p.author.IsEmpty())
+				t += L"  - " + p.author;
+			t += L"  [메뉴: " + p.menu + L"]";
+		}
+	}
+	SetDlgItemText(IDC_SET_PLUGIN_DESC, t);
+}
+
+void CSettingsDlg::OnPluginItemChanged(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	*pResult = 0;
+	if (m_pluginFilling)
+		return;
+	const NMLISTVIEW* nm = reinterpret_cast<const NMLISTVIEW*>(pNMHDR);
+	if (nm->uChanged & LVIF_STATE)
+	{
+		const int row = nm->iItem;
+		if ((nm->uNewState ^ nm->uOldState) & LVIS_STATEIMAGEMASK)
+		{
+			// 체크 바꿈: 상태 칸만 바로 갱신 (저장은 확인을 누를 때)
+			if (row >= 0 && row < static_cast<int>(m_plugins.size()) && m_plugins[row].error.IsEmpty())
+				m_pluginList.SetItemText(row, 3, m_pluginList.GetCheck(row) ? L"사용" : L"꺼짐");
+		}
+		if ((nm->uNewState ^ nm->uOldState) & LVIS_SELECTED)
+			UpdatePluginDesc();
+	}
+}
+
+void CSettingsDlg::OnBnClickedPluginFolder()
+{
+	const CString dir = PluginHost::PluginsDir(true);
+	::ShellExecuteW(GetSafeHwnd(), L"open", dir, nullptr, nullptr, SW_SHOWNORMAL);
+}
+
+void CSettingsDlg::OnBnClickedPluginReload()
+{
+	// 지금 체크 상태는 유지 (같은 폴더 이름), 새로 생긴 플러그인은 기록대로
+	std::map<CString, bool> checks;
+	for (int i = 0; i < m_pluginList.GetItemCount() && i < static_cast<int>(m_plugins.size()); ++i)
+	{
+		CString k = m_plugins[i].id;
+		k.MakeLower();
+		checks[k] = m_pluginList.GetCheck(i) != FALSE;
+	}
+	m_plugins = PluginHost::LoadAll();
+	for (PluginInfo& p : m_plugins)
+	{
+		CString k = p.id;
+		k.MakeLower();
+		const auto it = checks.find(k);
+		if (it != checks.end())
+			p.enabled = it->second;
+	}
+	FillPlugins();
+}
+
+void CSettingsDlg::OnBnClickedPluginHelp()
+{
+	// plugins\README.md (플러그인 만드는 법 - 요청 · 결과 JSON 형식, 예제)
+	const CString file = PluginHost::PluginsDir() + L"\\README.md";
+	if (::PathFileExistsW(file))
+		::ShellExecuteW(GetSafeHwnd(), L"open", file, nullptr, nullptr, SW_SHOWNORMAL);
+	else
+		AfxMessageBox(L"plugins 폴더에 README.md 가 없습니다.\n\n" + file, MB_ICONINFORMATION);
 }
 
 void CSettingsDlg::OnThemeChanged()

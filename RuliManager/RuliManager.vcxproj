@@ -55,7 +55,7 @@
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <PreprocessorDefinitions>_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -136,6 +136,9 @@
     <ClInclude Include="WebHelper.h" />
     <ClInclude Include="ImageSearchDlg.h" />
     <ClInclude Include="DupCheckDlg.h" />
+    <ClInclude Include="PluginHost.h" />
+    <ClInclude Include="PluginRunDlg.h" />
+    <ClInclude Include="PluginPickDlg.h" />
     <ClInclude Include="VideoCheckDlg.h" />
     <ClInclude Include="VideoGrid.h" />
     <ClInclude Include="VideoLibrary.h" />
@@ -184,6 +187,9 @@
     <ClCompile Include="WebHelper.cpp" />
     <ClCompile Include="ImageSearchDlg.cpp" />
     <ClCompile Include="DupCheckDlg.cpp" />
+    <ClCompile Include="PluginHost.cpp" />
+    <ClCompile Include="PluginRunDlg.cpp" />
+    <ClCompile Include="PluginPickDlg.cpp" />
     <ClCompile Include="VideoCheckDlg.cpp" />
     <ClCompile Include="VideoGrid.cpp" />
     <ClCompile Include="VideoLibrary.cpp" />
