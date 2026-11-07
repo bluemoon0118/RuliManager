@@ -619,3 +619,103 @@ def fig_dup_check():
     s.text(22, 357, '같은 크기 · 2.31 GB (2,480,123,904 바이트) · 2개', 12, TEXT, weight='bold')
     s.text(12, 406, '중복 묶음 2개 · 파일 5개 · 삭제할 파일로 체크 2개 (5.39 GB)   카드 더블클릭 = 재생, 왼쪽 위 칸 = 체크', 10, SUB)
     return s.render()
+
+
+def _check(s, x, y, on=True):
+    # 체크 칸 (12×12)
+    if on:
+        s.rect(x, y, 12, 12, ACC, r=2)
+        s.path(f'M{x + 2.5},{y + 6} l2.5,2.5 l4,-5', 'none', TEXT, 1.6)
+    else:
+        s.rect(x, y, 12, 12, EDIT, SUB2, r=2)
+
+
+def fig_plugin_pick():
+    s = Svg(880, 330, '채울 항목 고르기 창')
+    s.window(0, 0, 880, 330, '채울 항목 고르기 - ABC-123.mp4')
+    s.text(12, 46, '[AV 정보 가져오기] 이 가져온 값입니다. 채울 항목을 체크하세요 (가져온 값은 고칠 수 있음). 체크한 항목만 바뀌고 나머지는 지금 값 그대로입니다.', 10, SUB)
+    s.text(34, 70, '항목', 10, SUB)
+    s.text(160, 70, '가져온 값 (고칠 수 있음)', 10, SUB)
+    s.text(530, 70, '지금 값', 10, SUB)
+    rows = [('제목', True, '新人NO.1 STYLE デビュー', '(비어 있음)'),
+            ('배우', True, '葵つかさ, 三上悠亜', '葵つかさ'),
+            ('발매일 (같음)', False, '2021-02-19', '2021-02-19'),
+            ('제작사', False, 'エスワン ナンバーワンスタイル', 'S1')]
+    y = 78
+    for label, on, new, cur in rows:
+        _check(s, 12, y + 4, on)
+        s.text(30, y + 14, label, 10, TEXT)
+        s.edit(155, y, 340, new, 20, 10)
+        if on:
+            s.text(512, y + 15, '→', 13, HOT, 'middle', 'bold')
+        s.edit(530, y, 338, cur, 20, 10)
+        y += 26
+    # 이미지 줄
+    y += 4
+    _check(s, 12, y + 4, True)
+    s.text(30, y + 14, '커버 이미지', 10, TEXT)
+    s.text(30, y + 32, '가져온: 800 × 538', 9, SUB)
+    s.text(30, y + 46, '지금: 없음', 9, SUB)
+    s.text(30, y + 64, '더블클릭 = 원본 보기', 9, SUB2)
+    s.rect(155, y, 340, 92, EDIT, EDGE, r=2)
+    s.rect(240, y + 8, 170, 76, CARD, r=2)
+    s.text(325, y + 50, '가져온 커버', 10, SUB, 'middle')
+    s.text(512, y + 50, '→', 13, HOT, 'middle', 'bold')
+    s.rect(530, y, 338, 92, EDIT, EDGE, r=2)
+    s.text(699, y + 50, '(이미지 없음)', 10, SUB2, 'middle')
+    y += 104
+    _check(s, 12, y + 2, False)
+    s.text(30, y + 12, '나머지 9개에도 같은 항목 적용 (창 없이)', 10, TEXT)
+    s.button(12, 300, 70, '모두 체크', COMBO, 20, 10)
+    s.button(676, 300, 60, '적용', ACC, 20, 10)
+    s.button(742, 300, 60, '건너뛰기', COMBO, 20, 10)
+    s.button(808, 300, 60, '취소', COMBO, 20, 10)
+    return s.render()
+
+
+def fig_plugin_run():
+    s = Svg(560, 250, '플러그인 실행 창')
+    s.window(0, 0, 560, 250, '플러그인 실행 - AV 정보 가져오기')
+    s.text(12, 50, 'ABC-124 받는 중 (2/10) (37초)  · 결과 1 / 10', 10, TEXT)
+    s.rect(12, 60, 536, 12, EDIT, EDGE, r=2)
+    s.rect(13, 61, 105, 10, ACC, r=1)
+    s.rect(12, 82, 536, 124, EDIT, EDGE, r=2)
+    for k, t in enumerate(('[ABC-123] 제목=新人NO.1 STYLE / 출연=葵つかさ 三上悠亜',
+                           '[ABC-123] 커버 https://… (212 KB)',
+                           '[ABC-124] 받는 중...')):
+        s.text(20, 100 + k * 16, t, 10, SUB)
+    s.button(488, 218, 60, '중단', DANGER, 20, 10)
+    return s.render()
+
+
+def fig_settings_plugin():
+    s = Svg(640, 300, '설정 [플러그인] 탭')
+    s.window(0, 0, 640, 300, '설정')
+    x = 12
+    for t, on in (('표시', False), ('상세 화면', False), ('테마', False), ('DB 관리', False), ('플러그인', True)):
+        s.button(x, 36, 112, t, ACC if on else COMBO, 22, 10)
+        x += 118
+    s.text(12, 82, 'plugins 폴더 안 폴더마다 plugin.json 이 있는 것이 플러그인입니다. 체크한 것만 메뉴에 나타납니다.', 10, SUB)
+    s.rect(12, 92, 616, 20, COMBO, r=0)
+    for cx, t in ((36, '이름'), (300, '대상'), (400, '버전'), (480, '상태')):
+        s.text(cx, 106, t, 10, TEXT, weight='bold')
+    rows = [(True, 'AV 정보 가져오기', '영상', '1.0', '사용', TEXT),
+            (True, '예제 - 파일 이름을 제목으로', '영상', '1.0', '사용', TEXT),
+            (False, '예제 - 라이브러리 통계', '관리 도구', '1.0', '꺼짐', SUB),
+            (False, '고장 난 플러그인', '', '', '오류', '#FF7373')]
+    y = 112
+    for i, (on, n, tg, v, st, col) in enumerate(rows):
+        s.rect(12, y, 616, 20, ACC if i == 0 else BACK, r=0, op=0.9 if i == 0 else 1)
+        _check(s, 18, y + 4, on)
+        s.text(36, y + 14, n, 10, TEXT)
+        s.text(300, y + 14, tg, 10, TEXT)
+        s.text(400, y + 14, v, 10, TEXT)
+        s.text(480, y + 14, st, 10, col)
+        y += 20
+    s.text(12, 222, '품번으로 사이트에서 제목 · 배우 · 발매일을 가져옵니다.  [메뉴: 사이트에서 정보 가져오기]', 10, SUB)
+    s.button(12, 236, 90, '폴더 열기', COMBO, 20, 10)
+    s.button(108, 236, 90, '새로 고침', COMBO, 20, 10)
+    s.button(204, 236, 90, '만드는 법', COMBO, 20, 10)
+    s.button(500, 268, 60, '확인', ACC, 20, 10)
+    s.button(568, 268, 60, '취소', COMBO, 20, 10)
+    return s.render()
