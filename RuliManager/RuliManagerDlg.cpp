@@ -50,7 +50,8 @@ namespace
 	};
 	void DrawDefaultActorImage(CDC* dc, const CRect& img, const ActorInfo& a);   // 아래에서 정의 (사진 없는 배우 카드의 기본 이미지)
 	const UINT WM_APP_SHOT_PROGRESS = WM_APP + 4;   // 스크린샷 추출 진행 (wParam = 끝난 장수, lParam = 전체)
-	const UINT WM_APP_SHOT_DONE = WM_APP + 5;       // 스크린샷 추출 끝 (lParam = ShotResult*)
+	const UINT WM_APP_SHOT_DONE = WM_APP + 5;       // 스크린샷 추출 끝 (lParam = ShotResult*)
+
 	const UINT WM_APP_PREVIEW_DONE = WM_APP + 6;    // 미리보기 영상 만들기 끝 (lParam = PreviewVideo::Result*)
 	const UINT WM_APP_COVER_READY = WM_APP + 3;  // 백그라운드에서 영상 카드 이미지를 읽음 (lParam = CoverResult*)
 	struct CoverResult
@@ -697,7 +698,8 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_VIDEO_VIEW_V, &CRuliManagerDlg::OnBnClickedVideoViewV)
 	ON_BN_CLICKED(IDC_VIDEO_MODE_GRID, &CRuliManagerDlg::OnBnClickedVideoModeGrid)
 	ON_BN_CLICKED(IDC_VIDEO_MODE_LIST, &CRuliManagerDlg::OnBnClickedVideoModeList)
-	ON_BN_CLICKED(IDC_VIDEO_MODE_PACKAGE, &CRuliManagerDlg::OnBnClickedVideoModePackage)
+	ON_BN_CLICKED(IDC_VIDEO_MODE_PACKAGE, &CRuliManagerDlg::OnBnClickedVideoModePackage)
+
 	ON_BN_CLICKED(IDC_VIDEO_MODE_WALL, &CRuliManagerDlg::OnBnClickedVideoModeWall)
 	ON_BN_CLICKED(IDC_VIDEO_MODE_LABEL, &CRuliManagerDlg::OnBnClickedVideoModeLabel)
 	ON_NOTIFY(NM_CLICK, IDC_LIST_VIDEOS, &CRuliManagerDlg::OnNmClickList)
@@ -706,7 +708,8 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_COMMAND_RANGE(IDC_ACTOR_VIEW_GRID, IDC_ACTOR_VIEW_TREEMAP, &CRuliManagerDlg::OnActorViewButton)
 	ON_CBN_SELCHANGE(IDC_COMBO_TREEMAP_BASIS, &CRuliManagerDlg::OnCbnSelchangeTreemapBasis)
 	ON_BN_CLICKED(IDC_GENRE_HIDE, &CRuliManagerDlg::OnBnClickedGenreHide)
-	ON_BN_CLICKED(IDC_BTN_COPYCODE, &CRuliManagerDlg::OnBnClickedCopyCode)
+	ON_BN_CLICKED(IDC_BTN_COPYCODE, &CRuliManagerDlg::OnBnClickedCopyCode)
+
 	ON_BN_CLICKED(IDC_DETAIL_BAR, &CRuliManagerDlg::OnBnClickedDetailBar)
 	ON_BN_CLICKED(IDC_GENRE_ALL, &CRuliManagerDlg::OnBnClickedGenreAll)
 	ON_COMMAND(ID_ACTOR_SHOWVIDEOS, &CRuliManagerDlg::OnActorShowVideos)
@@ -992,7 +995,8 @@ BOOL CRuliManagerDlg::OnInitDialog()
 	}
 	CVideoLibrary::SetCensorLang(AfxGetApp()->GetProfileInt(L"Settings", L"CensorLang", 0));          // 검열 정보 표시 언어 (설정 창)
 	FillCensorCombo();
-	m_detailLeft = AfxGetApp()->GetProfileInt(L"Settings", L"DetailLeft", 0) != 0;
+	m_detailLeft = AfxGetApp()->GetProfileInt(L"Settings", L"DetailLeft", 0) != 0;
+
 	m_detailCollapsed = AfxGetApp()->GetProfileInt(L"Settings", L"DetailCollapsed", 0) != 0;   // 상세 화면 접힘 (접기 바)
 	m_shotCols = (std::max)(1, (std::min)(10, static_cast<int>(AfxGetApp()->GetProfileInt(L"Settings", L"ShotCols", 3))));
 	m_shotStrip.Create(this, IDC_SHOT_STRIP);
@@ -5803,9 +5807,12 @@ void CRuliManagerDlg::OnBnClickedSettings()
 	CSettingsDlg dlg(m_lib, this);
 	dlg.m_startPage = m_settingsStartPage;   // [플러그인 관리...] 로 열면 [플러그인] 탭
 	m_settingsStartPage = -1;
-	dlg.m_onDeleteDb = [this](int mask) { DeleteDb(mask); };
-	dlg.m_onMakePreviews = [this, &dlg]() { MakeAllPreviews(&dlg); };
-	dlg.m_onDeletePreviews = [this, &dlg]() { DeleteAllPreviews(&dlg); };
+	dlg.m_onDeleteDb = [this](int mask) { DeleteDb(mask); };
+
+	dlg.m_onMakePreviews = [this, &dlg]() { MakeAllPreviews(&dlg); };
+
+	dlg.m_onDeletePreviews = [this, &dlg]() { DeleteAllPreviews(&dlg); };
+
 	dlg.m_onRegenPreviews = [this, &dlg]() { MakeAllPreviews(&dlg, true); };
 	dlg.m_onStopPreviews = [this]() { StopPreviews(); };
 	dlg.m_isPreviewBusy = [this]() { return m_prevBusy && !m_prevStopped; };
