@@ -20312,6 +20312,7 @@ void CRuliManagerDlg::ShowHelp(HWND active)
 	else if (dynamic_cast<CFileManageDlg*>(w))  topic = L"manage-file";
 	else if (dynamic_cast<CVideoCheckDlg*>(w))  topic = L"video-check";
 	else if (dynamic_cast<CDupCheckDlg*>(w))    topic = L"dup-check";
+	else if (dynamic_cast<CPluginRunDlg*>(w) || dynamic_cast<CPluginPickDlg*>(w)) topic = L"plugin";
 	else if (dynamic_cast<CTextInfoDlg*>(w) || dynamic_cast<CTagLinkDlg*>(w)) topic = L"input";
 	else if (dynamic_cast<CNameListDlg*>(w))
 	{
