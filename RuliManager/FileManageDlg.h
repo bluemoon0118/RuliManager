@@ -66,14 +66,15 @@ protected:
 	bool  m_layoutReady = false;
 
 	void   CheckAll();                                   // DB 영상마다 규칙 검사 → m_entries
-	void   CheckItem(int item, Entry& e, bool keepActor = false) const;   // keepActor: 배우 폴더는 지금 것 그대로 (배우 여러 명 · 없음도 검사) - 아래 [발매일]품번\품번 만
+	void   CheckItem(int item, Entry& e, bool keepActor = false, const CString& forceActor = CString()) const;   // keepActor: 배우 폴더는 지금 것 그대로 (배우 여러 명 · 없음도 검사) - 아래 [발매일]품번\품번 만 / forceActor: 배우 여러 명일 때 이 배우의 폴더로 (오른쪽 클릭 [배우 골라서 고치기])
 	void   BuildTree();
 	int    AddDir(HTREEITEM parent, const CString& dir, int depth);
 	void   ShowDetail();
 	void   UpdateSummary();
 	void   CollectFixable(HTREEITEM h, std::vector<int>& items, bool onlyChecked, bool parentChecked);
-	void   RunFix(const std::vector<int>& items, bool confirm, bool keepActor = false);
-	bool   FixItem(int item, CString& err, bool keepActor = false);
+	void   RunFix(const std::vector<int>& items, bool confirm, bool keepActor = false, const CString& forceActor = CString());
+	bool   FixItem(int item, CString& err, bool keepActor = false, const CString& forceActor = CString());
+	std::vector<CString> PickableActors(int item) const;   // 배우 여러 명이라 복구 불가인 영상의 배우 이름들 (DB 배우 이름, 품번 · 발매일 · 등록 폴더가 있을 때만, 아니면 빈 목록)
 	void   CollectKeepActor(HTREEITEM h, std::vector<int>& items);   // 배우 여러 명이라 복구 불가지만 배우 폴더를 그대로 두면 고칠 수 있는 영상
 	void   Layout();
 
@@ -85,6 +86,8 @@ protected:
 	static CString DirOf(const CString& path);
 	static CString StemOf(const CString& name);
 	static CString FindImage(const CString& videoPath);
+	static CString FindVerticalImage(const CString& videoPath);   // 세로 커버 "이름_V.확장자" (메인 창 FindVerticalImageFor 와 같은 규칙, 없으면 빈칸)
+	static bool    IsVerticalName(const CString& fileName);       // 확장자를 뺀 이름이 "_V" 로 끝남
 	static bool    IsImageExt(const CString& ext);
 	bool   IsDedicatedFolder(const CString& dir, const CString& code, const CString& root, const CString& target) const;
 	void   UpdatePrefix(const CString& oldDir, const CString& newDir);

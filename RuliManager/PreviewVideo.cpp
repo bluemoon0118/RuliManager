@@ -188,7 +188,35 @@ namespace PreviewVideo
 		return GetPreviewDir() + L"\\" + name + L".mp4";
 	}
 
-	Result Make(const CString& ffmpeg, const CString& videoPath, const CString& outFile, double durationSec, const std::atomic<bool>& cancel)
+	Options Options::Standard(bool audio)
+	{
+		Options o;   // 12곳 × 0.75초 · 640px · 원본 fps · CRF 21
+		o.audio = audio;
+		return o;
+	}
+
+	Options Options::Light()
+	{
+		Options o;
+		o.segments = 10;
+		o.segLen = 2.0;
+		o.width = 480;
+		o.fps = 15;
+		o.crf = 28;
+		o.fastDecode = true;
+		o.audio = false;
+		return o;
+	}
+
+	Options Options::FromSettings()
+	{
+		CWinApp* app = AfxGetApp();
+		if (app && app->GetProfileInt(L"Settings", L"PreviewQuality", 0) == 1)
+			return Light();
+		return Standard(app && app->GetProfileInt(L"Settings", L"PreviewAudio", 0) != 0);
+	}
+
+	Result Make(const CString& ffmpeg, const CString& videoPath, const CString& outFile, double durationSec, const std::atomic<bool>& cancel, const Options& opt)
 	{
 		Result r;
 		r.video = videoPath;
@@ -225,42 +253,67 @@ namespace PreviewVideo
 		}
 
 		// 구간: 길이를 (n + 1) 칸으로 나눈 경계마다 segLen 초 (맨 앞 · 맨 뒤는 피함)
-		double segLen = 2.0;
-		int n = 10;
+		double segLen = (opt.segLen > 0.1) ? opt.segLen : 2.0;
+		int n = (std::max)(1, opt.segments);
 		if (durationSec < n * segLen * 3)
 			n = (std::max)(1, static_cast<int>(durationSec / (segLen * 3)));
 		if (n == 1)
 			segLen = (std::min)(6.0, (std::max)(0.5, durationSec * 0.5));
 
-		CString inputs, filter, concatIn;
+		CString inputs, vFilter, vaFilter, concatV, concatVA;
+		CString vf;   // 구간마다 같은 영상 필터: 폭 맞춤 (+ fps)
+		vf.Format(L"scale=%d:-2,setsar=1", (std::max)(64, opt.width));
+		if (opt.fps > 0)
+		{
+			CString f;
+			f.Format(L",fps=%d", opt.fps);
+			vf += f;
+		}
+		vf += L",format=yuv420p";
 		for (int i = 0; i < n; ++i)
 		{
 			double start = durationSec * (i + 1) / (n + 1) - segLen / 2;
 			start = (std::max)(0.0, (std::min)(start, durationSec - segLen));
 			inputs += L" -ss " + Num(start) + L" -t " + Num(segLen) + L" -i \"" + videoPath + L"\"";
-			CString part;
-			part.Format(L"[%d:v:0]scale=480:-2,setsar=1,fps=15,format=yuv420p[v%d];", i, i);   // 초당 15장 (재생 부담 줄임)
-			filter += part;
-			CString lab;
+			CString part, apart, lab, alab;
+			part.Format(L"[%d:v:0]%s[v%d];", i, vf.GetString(), i);
+			apart.Format(L"[%d:a:0]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[a%d];", i, i);
 			lab.Format(L"[v%d]", i);
-			concatIn += lab;
+			alab.Format(L"[a%d]", i);
+			vFilter += part;
+			vaFilter += part + apart;
+			concatV += lab;
+			concatVA += lab + alab;
 		}
-		CString tail;
+		CString tail, atail;
 		tail.Format(L"concat=n=%d:v=1:a=0[out]", n);
-		filter += concatIn + tail;
+		atail.Format(L"concat=n=%d:v=1:a=1[out][aout]", n);
+		vFilter += concatV + tail;
+		vaFilter += concatVA + atail;
 
 		const CString tmp = outFile + L".part";
 		::DeleteFileW(tmp);
-		const CString base = L"\"" + ffmpeg + L"\" -hide_banner -nostdin -loglevel error -y" + inputs +
-			L" -filter_complex \"" + filter + L"\" -map \"[out]\" -an ";
+		const CString head = L"\"" + ffmpeg + L"\" -hide_banner -nostdin -loglevel error -y" + inputs;
+		// 소리 포함이면 소리 있는 명령부터 (영상에 소리가 없어 실패하면 소리 없이 다시)
+		std::vector<CString> bases;
+		if (opt.audio)
+			bases.push_back(head + L" -filter_complex \"" + vaFilter + L"\" -map \"[out]\" -map \"[aout]\" -c:a aac -b:a 128k ");
+		bases.push_back(head + L" -filter_complex \"" + vFilter + L"\" -map \"[out]\" -an ");
 		// H.264 (libx264) 우선, 없는 ffmpeg 이면 MPEG-4 Part 2 로 다시
-		const CString encoders[] = {
-			L"-c:v libx264 -preset veryfast -tune fastdecode -crf 28 -movflags +faststart -f mp4 \"",   // fastdecode: 풀기 쉬운 압축 (월 모드 여러 칸 동시 재생 CPU 줄임)
-			L"-c:v mpeg4 -q:v 6 -movflags +faststart -f mp4 \"" };
-		bool made = false;
-		for (const CString& enc : encoders)
+		CString x264, mpeg4;
+		x264.Format(L"-c:v libx264 -preset veryfast%s -crf %d -movflags +faststart -f mp4 \"",
+			opt.fastDecode ? L" -tune fastdecode" : L"", (std::max)(0, (std::min)(51, opt.crf)));   // fastdecode: 풀기 쉬운 압축 (월 모드 여러 칸 동시 재생 CPU 줄임)
+		mpeg4.Format(L"-c:v mpeg4 -q:v %d -movflags +faststart -f mp4 \"", opt.crf <= 23 ? 3 : 6);
+		std::vector<CString> commands;
+		for (const CString& b : bases)
 		{
-			if (!RunCapture(base + enc + tmp + L"\"", cancel, out, code, canceled))
+			commands.push_back(b + x264);
+			commands.push_back(b + mpeg4);
+		}
+		bool made = false;
+		for (const CString& cmd : commands)
+		{
+			if (!RunCapture(cmd + tmp + L"\"", cancel, out, code, canceled))
 			{
 				r.error = L"ffmpeg.exe 를 실행하지 못했습니다.";
 				return r;

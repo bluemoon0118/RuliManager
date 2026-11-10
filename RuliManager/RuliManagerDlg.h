@@ -27,6 +27,7 @@ class CVideoCheckDlg;   // 영상 검사 창 (모달리스, OpenVideoCheck)
 #include "ScreenshotExtractor.h"
 #include "YearView.h"
 #include "PreviewVideo.h"
+#include "WallRenderer.h"
 #include "TreemapView.h"
 #include "StudioTreeView.h"
 #include "PluginHost.h"
@@ -179,6 +180,13 @@ protected:
 	bool VideoImageCardActive() const { return VideoPortraitActive() || VideoWallActive(); }   // 이미지만 그리는 카드 ([패키지] · [월 모드])
 	// [월 모드] 미리보기 자동 재생: 화면에 보이는 칸마다 미리보기가 있으면 격자의 자식 창으로 재생 (스크롤하면 같이 움직임)
 	std::map<int, std::unique_ptr<CPreviewPlayer>> m_wallPlayers;   // 영상 항목 → 재생 창
+	CWallRenderer m_wallRenderer;      // [월 모드] 통합 렌더러 (D3D11 장치 1개 + 격자 위 투명 레이어 + 칸별 하드웨어 디코딩) - 레지스트리 Settings\WallRenderer (기본 1), 만들기 · 그리기에 실패하면 이번 실행 동안 예전 재생 창(m_wallPlayers)
+	bool m_wallRendererOn = true;      // 렌더러를 씀 (레지스트리 값 · 실패하면 false)
+	bool m_wallRendererTried = false;  // 만들기를 시도함
+	bool m_wallRendererTiles = false;  // 렌더러에 칸을 넘겨 둠 (비울 것이 있음)
+	bool UseWallRenderer();            // 렌더러를 쓸 수 있으면 true (처음 부를 때 만듦)
+	std::map<CString, std::pair<bool, ULONGLONG>> m_previewExists;   // 미리보기 파일(소문자) → (있음, 확인 시각) - 0.5초마다 디스크를 보지 않게 5초 동안 기억, 미리보기를 만들면 비움
+	bool PreviewExistsCached(const CString& file);
 	int  m_wallSyncTick = 0;
 	int  m_wallSelItem = -1;           // 고른 칸 (재생 창을 안쪽으로 줄여 선택 테두리가 보이게)
 	void SyncWallPlayers();
@@ -1003,12 +1011,15 @@ protected:
 	CString           m_shotVideoPath;   // 추출 중인 영상 (그 영상 카드에 진행 표시)
 	int               m_shotDone = 0, m_shotTotal = 0;
 	// 대기열: 추출 중에 더 넣은 영상 (넣은 순서대로 하나씩, 프로그램을 닫으면 버림)
-	struct ShotJob { CString path; int count = 0; };
+	struct ShotJob { CString path; int count = 0; CString folder; };   // folder: 스크린샷 폴더 이름 (ShotFolderName)
+	static CString ShotFolderName(const CString& code);
+	void CarryPreviewFiles(const CString& oldPath, const CString& newPath);   // 영상 경로가 바뀜 → 미리보기 영상 · 이동식 디스크 커버 캐시 파일도 새 경로 이름으로 (경로로 이름이 정해지는 파일)   // 스크린샷 폴더 이름 "품번_Screenshot" (품번이 없으면 "Screenshot")
 	std::deque<ShotJob> m_shotQueue;
 	void StartNextShot();          // 대기열 맨 앞 작업 시작 (비었으면 끝 - 창 제목 되돌림)
 	void UpdateShotTitle();        // 창 제목: "스크린샷 추출 중 (3 / 15) · 대기 2"
 	int  ShotQueuePos(const CString& path) const;   // 대기열 순번 (1부터, 없으면 0)
 	afx_msg void OnVideoScreenshot();
+	afx_msg void OnVideoCoverPick();   // [커버 만들기...]: 장면을 골라 커버 · 스크린샷으로 저장 (CCoverPickDlg)
 	// 미리보기 영상 (오른쪽 클릭 [미리보기 만들기] - ffmpeg, 백그라운드 스레드 하나 · 대기열, 진행은 아래 상태 줄)
 	struct PreviewJob { CString path; CString out; };
 	std::deque<PreviewJob> m_prevQueue;
@@ -1042,6 +1053,7 @@ protected:
 	afx_msg void OnManagePlugins();        // [관리 도구 ▾] → [플러그인 ▸] → 플러그인 관리... (설정 [플러그인] 탭)
 	int  m_settingsStartPage = -1;         // 다음에 여는 설정 창의 처음 탭 (한 번만)
 	std::vector<CString> RemoveVideoFiles(const std::vector<CString>& paths);   // 영상 파일을 휴지통으로 + DB 에서 삭제 (지우지 못한 파일을 돌려줌)
+	CString ReplaceVideoFile(int target, int source);   // 중복 파일 검사 [이 파일로 바꾸기]: target 영상(정보 유지)의 파일을 source 파일로 (실패하면 이유)
 	afx_msg void OnVideoCheck();           // 영상 오른쪽 클릭 [영상 검사] (분할 영상은 모든 파트)
 	afx_msg void OnVideoCheckChecked();    // 체크한 영상 [영상 검사(n)]
 	afx_msg LRESULT OnPreviewDone(WPARAM wParam, LPARAM lParam);

@@ -30,6 +30,7 @@ public:
 		UINT      height = 0;     // 해상도 세로 (자동 선택용)
 		bool      offline = false;
 		CString   image;          // 커버 이미지 경로
+		CString   infoText;       // DB 정보 요약 ("배우 2 · 태그 5 · 별점 3.5", 없으면 "정보 없음") - [이 파일로 바꾸기] 메뉴에 표시
 	};
 	struct Group
 	{
@@ -40,6 +41,7 @@ public:
 	std::function<void(const CString& path)> m_onPlay;
 	std::function<void(const CString& path)> m_onExplore;
 	std::function<void()> m_onCheckChanged;
+	std::function<void(int group, int source, int target)> m_onReplace;   // [이 파일로 바꾸기 ▸]: source 카드 파일로 target 카드 영상의 파일을 바꿈 (카드 번호)
 
 	bool Create(CWnd* parent, const CRect& rc, UINT id);
 	void SetGroups(const std::vector<Group>& groups);
@@ -96,6 +98,7 @@ public:
 	std::function<bool(int item)> m_isOffline;                       // 연결 안 된 이동식 디스크 영상 (삭제 불가)
 	std::function<CString(const CString& videoPath)> m_findImage;     // 커버 이미지 경로
 	std::function<std::vector<CString>(const std::vector<CString>& paths)> m_remove;   // 휴지통 + DB 삭제, 지우지 못한 파일 목록을 돌려줌
+	std::function<CString(int target, int source)> m_replace;   // target 영상(정보 유지)의 파일을 source 파일로 바꿈 (source 항목은 DB 에서 삭제), 실패하면 이유
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);
@@ -110,6 +113,7 @@ protected:
 	void Scan();
 	void UpdateStatus();
 	void LayoutControls(int cx, int cy);
+	void DoReplace(int group, int source, int target);
 
 	afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
 	afx_msg void OnSize(UINT nType, int cx, int cy);

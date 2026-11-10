@@ -96,6 +96,7 @@ protected:
 	afx_msg void OnBnClickedDeletePreviews() { if (m_onDeletePreviews) m_onDeletePreviews(); }
 	afx_msg void OnBnClickedRegenPreviews() { if (m_onRegenPreviews) m_onRegenPreviews(); UpdatePreviewButtons(); }
 	afx_msg void OnBnClickedStopPreviews() { if (m_onStopPreviews) m_onStopPreviews(); UpdatePreviewButtons(); }
+	afx_msg void UpdatePreviewQuality();   // 미리보기 품질 라디오 → [소리 포함] 활성 상태
 	void UpdatePreviewButtons();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	int  SelectedIoKind();

@@ -20,6 +20,7 @@
 #define IDD_DUP_CHECK                   147
 #define IDD_PLUGIN_RUN                  148
 #define IDD_PLUGIN_PICK                 149
+#define IDD_COVER_PICK                  150
 #define IDD_SERIES                      140
 #define IDD_TAG_LINK                    141
 #define IDD_FILE_MANAGE                 145
@@ -323,6 +324,15 @@
 #define IDC_SET_PREVIEW_DEL             1324
 #define IDC_SET_PREVIEW_REGEN           1325
 #define IDC_SET_PREVIEW_STOP            1326
+#define IDC_SET_PREVIEW_STD             1401
+#define IDC_SET_PREVIEW_LIGHT           1402
+#define IDC_SET_PREVIEW_AUDIO           1403
+#define IDC_CP_FRAME                    1404
+#define IDC_CP_SLIDER                   1405
+#define IDC_CP_TIME                     1406
+#define IDC_CP_GUIDE                    1407
+#define IDC_CP_COVER                    1408
+#define IDC_CP_SHOT                     1409
 #define IDC_VIDEO_MODE_WALL             1327
 #define IDC_DETAIL_BAR                  1328
 #define IDC_ACTOR_VIEW_GRID             1329
@@ -399,6 +409,7 @@
 #define ID_ACTOR_CHECKNOVIDEO           33053
 #define ID_MANAGE_DUPS                  33054
 #define ID_MANAGE_PLUGINS               33055
+#define ID_VIDEO_COVERPICK              33056
 #define ID_PLUGIN_FIRST                 33100
 #define ID_PLUGIN_LAST                  33199
 #define ID_CAT_MERGE                    32823
@@ -414,9 +425,9 @@
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        150
-#define _APS_NEXT_COMMAND_VALUE         33056
-#define _APS_NEXT_CONTROL_VALUE         1401
+#define _APS_NEXT_RESOURCE_VALUE        151
+#define _APS_NEXT_COMMAND_VALUE         33057
+#define _APS_NEXT_CONTROL_VALUE         1410
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

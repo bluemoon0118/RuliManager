@@ -1593,7 +1593,7 @@ namespace
 			{ L"빼기", DMI_MINUS }, { L"삭제", DMI_TRASH }, { L"모두 지우기", DMI_TRASH },
 			{ L"비우기", DMI_ERASER }, { L"초기화", DMI_ERASER },
 			{ L"합치기", DMI_MERGE }, { L"병합", DMI_MERGE },
-			{ L"붙여넣기", DMI_PASTE }, { L"텍스트로", DMI_TEXT }, { L"스크린샷", DMI_PICTURE }, { L"새로고침", DMI_REFRESH },
+			{ L"붙여넣기", DMI_PASTE }, { L"텍스트로", DMI_TEXT }, { L"스크린샷", DMI_PICTURE }, { L"커버 만들기", DMI_PICTURE }, { L"새로고침", DMI_REFRESH },
 			{ L"탐색기", DMI_FOLDER }, { L"폴더", DMI_FOLDER }, { L"복사", DMI_COPY },
 			{ L"재생", DMI_PLAY }, { L"컬렉션에 추가", DMI_COLLECTION },
 			{ L"추가", DMI_PLUS }, { L"새 ", DMI_PLUS },

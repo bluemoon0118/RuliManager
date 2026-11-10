@@ -17,6 +17,7 @@
 #include "DupCheckDlg.h"
 #include "PluginRunDlg.h"
 #include "PluginPickDlg.h"
+#include "CoverPickDlg.h"
 #include "WebHelper.h"
 #include "DarkTheme.h"
 #include "CountryCombo.h"
@@ -732,6 +733,7 @@ BEGIN_MESSAGE_MAP(CRuliManagerDlg, CDialogEx)
 	ON_COMMAND(ID_VIDEO_TEXTINFO, &CRuliManagerDlg::OnVideoTextInfo)
 	ON_COMMAND(ID_VIDEO_PASTEINFO, &CRuliManagerDlg::OnVideoPasteInfo)
 	ON_COMMAND(ID_VIDEO_SCREENSHOT, &CRuliManagerDlg::OnVideoScreenshot)
+	ON_COMMAND(ID_VIDEO_COVERPICK, &CRuliManagerDlg::OnVideoCoverPick)
 	ON_COMMAND(ID_VIDEO_REFRESHITEM, &CRuliManagerDlg::OnVideoRefreshItem)
 	ON_MESSAGE(WM_APP_SHOT_PROGRESS, &CRuliManagerDlg::OnShotProgress)
 	ON_MESSAGE(WM_APP_SHOT_DONE, &CRuliManagerDlg::OnShotDone)
@@ -1001,7 +1003,7 @@ BOOL CRuliManagerDlg::OnInitDialog()
 	m_shotCols = (std::max)(1, (std::min)(10, static_cast<int>(AfxGetApp()->GetProfileInt(L"Settings", L"ShotCols", 3))));
 	m_shotStrip.Create(this, IDC_SHOT_STRIP);
 	m_shotStrip.SetColors(kBackColor, TCOL(TC_SUB2), TCOL(TC_THUMB), kScrollColor);
-	m_shotStrip.SetEmptyText(L"스크린샷 없음 (영상 폴더 안 Screenshot 폴더의 이미지)");
+	m_shotStrip.SetEmptyText(L"스크린샷 없음 (영상 폴더 안 품번_Screenshot 또는 Screenshot 폴더의 이미지)");
 	m_shotStrip.SetWrap(true);
 	m_shotStrip.ShowWindow(SW_HIDE);
 	m_shotStrip.m_onDraw = [this](CDC* dc, int i, const CRect& rc, bool hot) { DrawShotCard(dc, i, rc, hot); };
@@ -4151,6 +4153,7 @@ void CRuliManagerDlg::OnDestroy()
 	KillTimer(kGearSpinTimer);
 	StopPreviewPlayer();
 	StopWallPlayers();
+	m_wallRenderer.Destroy();   // 렌더 스레드 · 디코더 정리 (격자 창이 없어지기 전에)
 	if (m_wallOverlay.GetSafeHwnd())
 		m_wallOverlay.DestroyWindow();
 	if (m_gridPartOverlay.GetSafeHwnd())
@@ -6100,6 +6103,7 @@ void CRuliManagerDlg::OnManageDups()
 	dlg.m_isOffline = [this](int item) { return IsItemOffline(item); };
 	dlg.m_findImage = [](const CString& path) { return FindImageFor(path); };
 	dlg.m_remove = [this](const std::vector<CString>& paths) { return RemoveVideoFiles(paths); };
+	dlg.m_replace = [this](int target, int source) { return ReplaceVideoFile(target, source); };
 	dlg.DoModal();
 }
 
@@ -6411,6 +6415,14 @@ void CRuliManagerDlg::RunPlugin(const PluginInfo& p, LPCWSTR target, const std::
 			add(L"은퇴", r.Text(L"retire"));
 			for (const CString& u : r.List(L"urls"))
 				add(L"URL", u);
+			{
+				// 메모: 한 줄로 (줄바꿈은 공백)
+				CString memo = r.Text(L"memo");
+				memo.Replace(L"\r\n", L" ");
+				memo.Replace(L'\r', L' ');
+				memo.Replace(L'\n', L' ');
+				add(L"메모", memo);
+			}
 			const CString raw = r.Text(L"text");   // 프로필 화면 글 그대로 (붙여넣기처럼 해석)
 			if (!raw.IsEmpty())
 				info += CVideoLibrary::ParsePastedActorText(raw);
@@ -6527,6 +6539,171 @@ std::vector<CString> CRuliManagerDlg::RemoveVideoFiles(const std::vector<CString
 	return failed;
 }
 
+CString CRuliManagerDlg::ReplaceVideoFile(int target, int source)
+{
+	// 중복 파일 검사 [이 파일로 바꾸기]: source 파일을 target 영상 자리(같은 폴더 · 같은 이름)로 옮기고 target 의 원래 파일은 휴지통으로
+	//  - DB: target 항목(제목 · 배우 · 태그 · 별점 …)은 그대로 두고 경로 · 크기 · 수정일만 새 파일로, source 항목은 삭제
+	//  - 확장자는 새 파일 것 (A.mp4 + B.mkv → A.mkv), 미리보기 영상은 둘 다 지움 (내용이 바뀜)
+	//  - 순서: 새 파일을 대상 폴더의 임시 이름으로 옮김 → 원래 파일 휴지통 → 임시 이름을 최종 이름으로 (중간에 실패하면 되돌림)
+	const int n = static_cast<int>(m_lib.items.size());
+	if (target < 0 || target >= n || source < 0 || source >= n || target == source)
+		return L"영상을 찾을 수 없습니다.";
+	if (IsItemOffline(target) || IsItemOffline(source))
+		return L"연결되지 않은 이동식 디스크의 영상은 바꿀 수 없습니다.";
+	const CString oldPath = m_lib.items[target].path;
+	const CString srcPath = m_lib.items[source].path;
+	if (!::PathFileExistsW(srcPath))
+		return L"새 파일을 찾을 수 없습니다.\n" + srcPath;
+	auto busy = [this](const CString& path) -> bool
+	{
+		if (m_shotBusy && m_shotVideoPath.CompareNoCase(path) == 0)
+			return true;
+		if (ShotQueuePos(path) > 0)
+			return true;
+		if (m_prevBusy && m_prevBusyPath.CompareNoCase(path) == 0)
+			return true;
+		for (const PreviewJob& j : m_prevQueue)
+			if (j.path.CompareNoCase(path) == 0)
+				return true;
+		return false;
+	};
+	if (busy(oldPath) || busy(srcPath))
+		return L"스크린샷을 뽑거나 미리보기를 만드는 중(또는 대기 중)인 영상입니다. 끝난 뒤에 다시 하세요.";
+
+	CString stem = oldPath;
+	::PathRemoveExtensionW(stem.GetBuffer());
+	stem.ReleaseBuffer();
+	const CString newExt = ::PathFindExtensionW(srcPath);
+	const CString newPath = stem + newExt;
+	const bool inPlace = (newPath.CompareNoCase(srcPath) == 0);   // 새 파일이 이미 그 이름 (같은 폴더의 A.mp4 · A.mkv)
+	if (!inPlace && newPath.CompareNoCase(oldPath) != 0 && ::PathFileExistsW(newPath))
+		return L"옮길 자리에 같은 이름의 파일이 이미 있습니다.\n" + newPath;
+	const CString tmpPath = stem + L".rmswap" + newExt;
+	if (!inPlace && ::PathFileExistsW(tmpPath))
+		return L"임시 파일이 이미 있습니다. 지우고 다시 하세요.\n" + tmpPath;
+
+	CommitDetails();
+	StopPreviewPlayer();   // 재생 중인 미리보기 · 파일 잠김 방지
+	StopWallPlayers();
+	if (m_pkgPopup.GetSafeHwnd()) m_pkgPopup.Hide();
+	if (m_castPopup.GetSafeHwnd()) m_castPopup.Hide();
+	if (target == m_curItem || source == m_curItem)
+		m_preview.Clear();
+	const CString oldImage = FindImageFor(oldPath);
+	const CString prevT = PreviewFileOf(target), prevS = PreviewFileOf(source);
+	const CString oldCache = m_lib.CoverCacheFile(oldPath);
+
+	auto shellOp = [this](UINT func, const CString& from, const CString& to, UINT flags) -> bool
+	{
+		std::vector<wchar_t> f(from.GetString(), from.GetString() + from.GetLength());
+		f.push_back(L'\0');
+		f.push_back(L'\0');   // 이중 NULL 종료
+		std::vector<wchar_t> t(to.GetString(), to.GetString() + to.GetLength());
+		t.push_back(L'\0');
+		t.push_back(L'\0');
+		SHFILEOPSTRUCTW op = {};
+		op.hwnd = m_hWnd;
+		op.wFunc = func;
+		op.pFrom = f.data();
+		op.pTo = to.IsEmpty() ? nullptr : t.data();
+		op.fFlags = static_cast<FILEOP_FLAGS>(flags);
+		return ::SHFileOperationW(&op) == 0 && !op.fAnyOperationsAborted;
+	};
+	// 1) 새 파일 → 대상 폴더의 임시 이름 (다른 드라이브면 복사 - 오래 걸리면 Windows 진행 창)
+	if (!inPlace)
+	{
+		if (!MoveFileWithRetry(srcPath, tmpPath) && ::GetLastError() == ERROR_NOT_SAME_DEVICE)
+			shellOp(FO_MOVE, srcPath, tmpPath, FOF_NOCONFIRMATION | FOF_NOERRORUI);   // 다른 드라이브: 복사 후 삭제
+		if (::PathIsDirectoryW(tmpPath))
+		{
+			::RemoveDirectoryW(tmpPath);
+			return L"새 파일을 옮기지 못했습니다.\n" + srcPath;
+		}
+		if (!::PathFileExistsW(tmpPath) || ::PathFileExistsW(srcPath))
+		{
+			if (::PathFileExistsW(tmpPath) && ::PathFileExistsW(srcPath))
+				::DeleteFileW(tmpPath);   // 복사가 중간에 멈춤 → 남은 임시 파일 정리
+			return L"새 파일을 옮기지 못했습니다 (사용 중이거나 권한이 없을 수 있음).\n" + srcPath;
+		}
+	}
+	// 2) 원래 파일 → 휴지통
+	if (::PathFileExistsW(oldPath))
+	{
+		shellOp(FO_DELETE, oldPath, CString(), FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI);
+		if (::PathFileExistsW(oldPath))
+		{
+			if (!inPlace)
+			{
+				if (!MoveFileWithRetry(tmpPath, srcPath) && ::GetLastError() == ERROR_NOT_SAME_DEVICE)
+					shellOp(FO_MOVE, tmpPath, srcPath, FOF_NOCONFIRMATION | FOF_NOERRORUI);   // 되돌림
+			}
+			return L"원래 파일을 휴지통으로 보내지 못했습니다 (사용 중이거나 권한이 없을 수 있음).\n" + oldPath;
+		}
+	}
+	// 3) 임시 이름 → 최종 이름
+	if (!inPlace && !MoveFileWithRetry(tmpPath, newPath))
+		return L"원래 파일은 휴지통으로 보냈지만 새 파일의 이름을 바꾸지 못했습니다.\n" + tmpPath +
+			L"\n\n이 파일의 이름을 직접 바꾸거나, 휴지통에서 원래 파일을 되살리세요.\n" + LastErrorText(::GetLastError());
+
+	// 커버 "영상.mp4.jpg" 형식은 확장자가 바뀌면 이름도 따라감 ("영상.jpg" · "영상_V.jpg" 는 그대로 맞음)
+	if (!oldImage.IsEmpty() && newPath.CompareNoCase(oldPath) != 0 && oldImage.GetLength() > oldPath.GetLength() &&
+		_wcsnicmp(oldImage, oldPath, oldPath.GetLength()) == 0 && oldImage[oldPath.GetLength()] == L'.')
+	{
+		const CString newImage = newPath + oldImage.Mid(oldPath.GetLength());
+		if (!::PathFileExistsW(newImage))
+			MoveFileWithRetry(oldImage, newImage);
+	}
+	// 이동식 디스크 커버 캐시 (경로로 정해지는 파일)
+	const CString newCache = m_lib.CoverCacheFile(newPath);
+	if (!oldCache.IsEmpty() && !newCache.IsEmpty() && oldCache.CompareNoCase(newCache) != 0 && ::PathFileExistsW(oldCache))
+		::MoveFileExW(oldCache, newCache, MOVEFILE_REPLACE_EXISTING);
+	if (!prevT.IsEmpty())
+		::DeleteFileW(prevT);
+	if (!prevS.IsEmpty())
+		::DeleteFileW(prevS);
+
+	// DB
+	BeginLibraryChange();
+	CString lowOld = oldPath, lowSrc = srcPath, lowNew = newPath;
+	lowOld.MakeLower();
+	lowSrc.MakeLower();
+	lowNew.MakeLower();
+	for (const CString& low : { lowOld, lowSrc, lowNew })
+	{
+		m_cardMedia.erase(low);
+		m_cardMediaRequested.erase(low);
+	}
+	for (const CString& p : { oldPath, srcPath, newPath })
+	{
+		m_thumbIndex.erase(CVideoLibrary::MakeKey(p));
+		m_mediaInfo.Forget(p);
+		CMediaInfoLabel::ForgetDisk(p);
+	}
+	const bool wasChecked = m_videoChecked.erase(lowOld) > 0;
+	m_videoChecked.erase(lowSrc);
+	if (wasChecked)
+		m_videoChecked.insert(lowNew);
+	VideoItem& v = m_lib.items[target];
+	v.path = newPath;
+	WIN32_FILE_ATTRIBUTE_DATA fa = {};
+	if (::GetFileAttributesExW(newPath, GetFileExInfoStandard, &fa))
+	{
+		v.size = (static_cast<ULONGLONG>(fa.nFileSizeHigh) << 32) | fa.nFileSizeLow;
+		v.modified = (static_cast<ULONGLONG>(fa.ftLastWriteTime.dwHighDateTime) << 32) | fa.ftLastWriteTime.dwLowDateTime;
+	}
+	m_lib.items.erase(m_lib.items.begin() + source);
+	if (!m_lib.Save())
+		AfxMessageBox(L"라이브러리 파일을 저장하지 못했습니다.", MB_ICONWARNING);
+	ClearVideoCovers();   // 카드 이미지 다시 (경로가 바뀜)
+	m_shotThumbs.clear();
+	m_shotFiles.clear();
+	m_shotVideo.Empty();
+	m_catsDirty = true;
+	ApplyFilter();
+	MarkCategoriesDirty();
+	return CString();
+}
+
 void CRuliManagerDlg::OnManageCheck()
 {
 	OpenVideoCheck();
@@ -6561,11 +6738,7 @@ void CRuliManagerDlg::OnManageFiles()
 	CFileManageDlg dlg(m_lib, this);
 	dlg.m_onPathChanged = [this](const CString& oldPath, const CString& newPath)
 	{
-		// 미리보기 영상 파일도 새 경로 이름으로 (없으면 그대로)
-		const CString oldPrev = PreviewVideo::PreviewFileFor(oldPath, m_lib.CoverCacheFile(oldPath));
-		const CString newPrev = PreviewVideo::PreviewFileFor(newPath, m_lib.CoverCacheFile(newPath));
-		if (!oldPrev.IsEmpty() && !newPrev.IsEmpty() && oldPrev.CompareNoCase(newPrev) != 0 && ::PathFileExistsW(oldPrev))
-			::MoveFileExW(oldPrev, newPrev, MOVEFILE_REPLACE_EXISTING);
+		CarryPreviewFiles(oldPath, newPath);   // 미리보기 영상 · 커버 캐시도 새 경로 이름으로
 	};
 	dlg.m_isBusy = [this](const CString& path) -> bool
 	{
@@ -9947,6 +10120,8 @@ void CRuliManagerDlg::PasteActorInfoText(int idx, const CString& info, PluginPic
 
 	// 2단계: 확인 / 수정 후 적용 (텍스트로 정보 입력과 같은 형식 · 같은 적용)
 	CString confirmed, photoPick;
+	bool memoPicked = false;   // 플러그인 고르기 창에서 메모를 체크함 (ApplyActorText 는 비어 있을 때만 메모를 채우므로 따로)
+	CString memoPick;
 	if (pick)
 	{
 		// 플러그인 결과: 확인 창 대신 채울 항목 고르기
@@ -9988,6 +10163,7 @@ void CRuliManagerDlg::PasteActorInfoText(int idx, const CString& info, PluginPic
 		row(L"debut",       L"데뷔",     cur.debut,       merged.debut,       !fetched.debut.IsEmpty());
 		row(L"retire",      L"은퇴",     cur.retire,      merged.retire,      !fetched.retire.IsEmpty());
 		row(L"urls",        L"링크",     urlText(cur.urls), urlText(urlsMerged), !fetched.urls.IsEmpty());
+		row(L"memo",        L"메모",     cur.memo,        fetched.memo,       !fetched.memo.IsEmpty());
 		if (!pick->imagePath.IsEmpty())
 		{
 			// 맨 아래 이미지 줄: 가져온 사진 → 지금 사진 (썸네일 더블클릭 = 원본 보기)
@@ -10045,6 +10221,7 @@ void CRuliManagerDlg::PasteActorInfoText(int idx, const CString& info, PluginPic
 			else if (r.key == L"cup")         fin.cup = r.value;
 			else if (r.key == L"debut")       fin.debut = r.value;
 			else if (r.key == L"retire")      fin.retire = r.value;
+			else if (r.key == L"memo")        { memoPicked = true; memoPick = r.value; }
 			else if (r.key == L"urls")        fin.urls = CVideoLibrary::JoinUrls(CVideoLibrary::SplitUrls(r.value));
 		}
 		if (!any)
@@ -10065,6 +10242,8 @@ void CRuliManagerDlg::PasteActorInfoText(int idx, const CString& info, PluginPic
 	ActorInfo a = m_lib.actors[idx];
 	CVideoLibrary::ClearActorTextFields(a);
 	CVideoLibrary::ApplyActorText(a, confirmed);
+	if (memoPicked)
+		a.memo = memoPick;   // 기존 메모를 가져온 메모로 바꿈
 	if (!photoPick.IsEmpty())
 	{
 		// 가져온 사진: [사진 검색] 과 같이 DB 폴더(images\actors)에 복사해서 등록
@@ -12286,7 +12465,7 @@ void CRuliManagerDlg::OnTimer(UINT_PTR nIDEvent)
 		}
 		// [월 모드] 재생 창: 0.5초마다 (새로 만든 미리보기 · 목록 바뀜 · 창 크기) + 고른 칸이 바뀌면 바로 다시 맞춤
 		const int sel = VideoWallActive() ? GridGetSel() : -1;
-		if (++m_wallSyncTick >= 8 || sel != m_wallSelItem || (!VideoWallActive() && !m_wallPlayers.empty()))
+		if (++m_wallSyncTick >= 8 || sel != m_wallSelItem || (!VideoWallActive() && (!m_wallPlayers.empty() || m_wallRendererTiles)))
 		{
 			m_wallSyncTick = 0;
 			SyncWallPlayers();
@@ -15018,6 +15197,7 @@ void CRuliManagerDlg::RenameRow(int row, CString newName)
 	}
 	m_thumbIndex.erase(CVideoLibrary::MakeKey(oldPath));
 	v.path = newPath;
+	CarryPreviewFiles(oldPath, newPath);   // 미리보기 영상 · 커버 캐시는 경로로 이름이 정해지므로 함께 (안 하면 미리보기가 사라진 것처럼 보임)
 
 	// 같은 이름의 이미지 파일도 함께 이름 변경
 	if (!oldImage.IsEmpty())
@@ -15585,6 +15765,7 @@ void CRuliManagerDlg::ShowVideoContextMenu(int row, CPoint point)
 	menu.AppendMenu(MF_STRING | ro, ID_VIDEO_PASTEINFO,  L"웹페이지 내용 붙여넣기...");
 	menu.AppendMenu(MF_SEPARATOR);
 	menu.AppendMenu(MF_STRING | ro, ID_VIDEO_SCREENSHOT, L"스크린샷 추출...");   // 추출 중이면 대기열에
+	menu.AppendMenu(MF_STRING | ro, ID_VIDEO_COVERPICK, L"커버 만들기...");      // 장면을 골라 커버 · 스크린샷으로
 	{
 		// 미리보기 영상 (이미 있으면 "다시 만들기")
 		const int ci = (row >= 0 && row < static_cast<int>(m_view.size())) ? m_view[row] : -1;
@@ -16944,6 +17125,59 @@ void CRuliManagerDlg::UpdateNamedActorStrip(int kind, const CString& name)
 	}
 }
 
+void CRuliManagerDlg::OnVideoCoverPick()
+{
+	// 커버 만들기: 슬라이더로 장면을 골라 커버(영상 옆 "영상이름.jpg", 분할 영상은 묶음 공용) · 스크린샷(<품번>_Screenshot\<영상 이름>_M01.jpg …)으로 저장
+	const int idx = GetSelectedItem();
+	if (idx < 0 || IsItemOffline(idx))
+		return;
+	const CString path = m_lib.items[idx].path;
+	if (!::PathFileExistsW(path))
+	{
+		AfxMessageBox(L"영상 파일이 없습니다.", MB_ICONWARNING);
+		return;
+	}
+	CommitDetails();
+	CCoverPickDlg dlg(path, this);
+	CString dir = path;
+	::PathRemoveFileSpecW(dir.GetBuffer());
+	dir.ReleaseBuffer();
+	dlg.m_shotDir = dir + L"\\" + ShotFolderName(m_lib.items[idx].code) + L"\\";
+	dlg.m_onSaveCover = [this, idx, path](const CString& jpg) -> bool
+	{
+		const CString group = CVideoLibrary::PartGroupPath(path);   // 분할 영상: 순번을 뗀 이름 (묶음 공용 커버)
+		const CString cur = FindImageFor(path);
+		if (!cur.IsEmpty() && AfxMessageBox(L"지금 커버를 이 장면으로 바꿀까요?\n\n지금 커버: " + CString(::PathFindFileNameW(cur)) +
+			L"\n(같은 이름의 예전 이미지는 휴지통으로)", MB_YESNO | MB_ICONQUESTION) != IDYES)
+			return false;
+		if (!ApplyVideoImage(group, jpg))
+		{
+			AfxMessageBox(L"커버를 영상 폴더에 저장하지 못했습니다.", MB_ICONWARNING);
+			return false;
+		}
+		const std::vector<size_t> sibs = m_lib.PartSiblings(static_cast<size_t>(idx));
+		std::vector<CString> paths{ path };
+		for (size_t si : sibs)
+			paths.push_back(m_lib.items[si].path);
+		if (!sibs.empty() || group != path)
+			RecyclePartImages(paths, group);   // 파트별 이미지(ABC-123_2.jpg 등)가 있으면 그쪽이 먼저 보이므로 휴지통으로
+		// 이동식 디스크: 커버 캐시도 새 이미지로 (캐시는 없을 때만 만들어지므로 직접 덮어씀)
+		for (const CString& p : paths)
+		{
+			const CString cache = m_lib.CoverCacheFile(p);
+			const CString img = FindImageFor(p);
+			if (!cache.IsEmpty() && !img.IsEmpty())
+				CVideoLibrary::SaveCoverCache(img, cache);
+		}
+		ResetThumbnails();   // 카드 · 목록 이미지 다시 읽기
+		if (m_curItem >= 0)
+			UpdatePreview(m_curItem);
+		return true;
+	};
+	dlg.m_onShotSaved = [this]() { RefreshShotStrip(); };
+	dlg.DoModal();
+}
+
 void CRuliManagerDlg::OnVideoScreenshot()
 {
 	const int idx = GetSelectedItem();
@@ -16973,7 +17207,7 @@ void CRuliManagerDlg::OnVideoScreenshot()
 	}
 	AfxGetApp()->WriteProfileInt(L"Settings", L"ShotCount", count);
 	// 대기열 맨 뒤에 넣음 → 쉬고 있으면 바로 시작
-	m_shotQueue.push_back({ path, count });
+	m_shotQueue.push_back({ path, count, ShotFolderName(m_lib.items[idx].code) });
 	if (!m_shotBusy)
 	{
 		GetWindowText(m_shotTitleBase);   // 처음 시작할 때의 창 제목 (모두 끝나면 되돌림)
@@ -17041,10 +17275,11 @@ void CRuliManagerDlg::StartNextShot()
 	const HWND hwnd = GetSafeHwnd();
 	const CString path = job.path;
 	const int count = job.count;
+	const CString folder = job.folder;
 	std::atomic<bool>* cancel = &m_shotCancel;   // 창이 닫힐 때 OnDestroy 가 스레드를 기다리므로 유효
-	m_shotThread = std::thread([hwnd, path, count, cancel]()
+	m_shotThread = std::thread([hwnd, path, count, folder, cancel]()
 	{
-		ShotResult* r = new ShotResult(ExtractScreenshots(path, count, *cancel,
+		ShotResult* r = new ShotResult(ExtractScreenshots(path, count, folder, *cancel,
 			[hwnd](int done, int total) { ::PostMessageW(hwnd, WM_APP_SHOT_PROGRESS, static_cast<WPARAM>(done), static_cast<LPARAM>(total)); }));
 		if (!::PostMessageW(hwnd, WM_APP_SHOT_DONE, 0, reinterpret_cast<LPARAM>(r)))
 			delete r;
@@ -17944,7 +18179,61 @@ void CRuliManagerDlg::DrawWallPartZones(CDC* dc, int g, const CRect& card, int h
 void CRuliManagerDlg::StopWallPlayers()
 {
 	m_wallPlayers.clear();   // 각 재생 창은 소멸자에서 멈추고 닫힘
+	if (m_wallRendererTiles)
+	{
+		m_wallRenderer.Clear();   // 칸을 모두 닫고 레이어를 비움 (렌더 스레드에서)
+		m_wallRendererTiles = false;
+	}
 	m_wallSelItem = -1;
+}
+
+bool CRuliManagerDlg::UseWallRenderer()
+{
+	// [월 모드] 통합 렌더러를 쓸 수 있는지 (처음 부를 때 만듦). 끄기: 레지스트리 Settings\WallRenderer = 0
+	if (!m_wallRendererTried)
+		m_wallRendererOn = AfxGetApp()->GetProfileInt(L"Settings", L"WallRenderer", 1) != 0;
+	if (!m_wallRendererOn)
+		return false;
+	if (m_wallRenderer.Failed())
+	{
+		// 장치 분실(절전 복귀 · 드라이버 갱신 · 원격 데스크톱) 등: 이번 실행 동안 예전 재생 창 방식으로
+		TRACE(L"WallRenderer: %s\n", m_wallRenderer.FailReason().GetString());
+		m_wallRenderer.Destroy();
+		m_wallRendererOn = false;
+		m_wallRendererTiles = false;
+		return false;
+	}
+	if (m_wallRenderer.Ready())
+		return true;
+	if (m_wallRendererTried || !m_grid.GetSafeHwnd())
+		return false;
+	m_wallRendererTried = true;
+	CString err;
+	if (!m_wallRenderer.Create(m_grid.GetSafeHwnd(), &err))
+	{
+		TRACE(L"WallRenderer: %s\n", err.GetString());
+		m_wallRendererOn = false;   // 만들 수 없음 (오래된 그래픽 등) → 예전 방식
+		return false;
+	}
+	m_wallRenderer.SetMaxDecode(AfxGetApp()->GetProfileInt(L"Settings", L"WallMaxDecode", 64));   // 동시에 여는 칸 수 상한 (밖의 칸은 커버)
+	m_wallRenderer.SetPlaying(m_wallPlaying);
+	return true;
+}
+
+bool CRuliManagerDlg::PreviewExistsCached(const CString& file)
+{
+	// 미리보기 파일이 있는지 (5초 동안 기억 - 느린 디스크에서 0.5초마다 UI 가 멈추지 않게)
+	CString key = file;
+	key.MakeLower();
+	const ULONGLONG now = ::GetTickCount64();
+	auto it = m_previewExists.find(key);
+	if (it != m_previewExists.end() && now - it->second.second < 5000)
+		return it->second.first;
+	if (m_previewExists.size() > 5000)
+		m_previewExists.clear();
+	const bool exists = ::PathFileExistsW(file) != FALSE;
+	m_previewExists[key] = std::make_pair(exists, now);
+	return exists;
 }
 
 void CRuliManagerDlg::SyncWallPlayers()
@@ -17957,8 +18246,8 @@ void CRuliManagerDlg::SyncWallPlayers()
 		&& m_grid.GetSafeHwnd() && m_grid.IsWindowVisible() && !IsSfwMosaic();
 	if (!on && !(VideoWallActive() && ShowVideoDetail() && !YearViewActive() && !VideoListActive() && m_grid.GetSafeHwnd() && m_grid.IsWindowVisible()))
 	{
-		// 월 모드가 아님: 재생 창 · 글자 창 정리
-		if (!m_wallPlayers.empty())
+		// 월 모드가 아님: 재생 창 · 렌더러 칸 · 글자 창 정리
+		if (!m_wallPlayers.empty() || m_wallRendererTiles)
 			StopWallPlayers();
 		m_wallOverlay.HideOverlay();
 		return;
@@ -17966,10 +18255,16 @@ void CRuliManagerDlg::SyncWallPlayers()
 	UpdateWallOverlay();   // 글자는 SFW 옵션이어도 표시
 	if (!on)
 	{
-		if (!m_wallPlayers.empty())
+		if (!m_wallPlayers.empty() || m_wallRendererTiles)
 			StopWallPlayers();   // SFW: 재생만 안 함
 		return;
 	}
+	const bool useRenderer = UseWallRenderer();   // 통합 렌더러 (안 되면 예전 재생 창)
+	if (useRenderer && !m_wallPlayers.empty())
+		m_wallPlayers.clear();
+	if (!useRenderer)
+		m_wallRendererTiles = false;   // 렌더러가 없거나 방금 실패함 (이미 정리됨)
+	std::vector<WallTileSpec> specs;
 	const int selG = GridGetSel();
 	m_wallSelItem = selG;
 	CRect client;
@@ -18003,7 +18298,7 @@ void CRuliManagerDlg::SyncWallPlayers()
 			if (m_prevBusy && m_lib.items[idx].path.CompareNoCase(m_prevBusyPath) == 0)
 				continue;
 			const CString f = PreviewFileOf(idx);
-			if (::PathFileExistsW(f))
+			if (PreviewExistsCached(f))
 			{
 				item = idx;
 				file = f;
@@ -18016,6 +18311,15 @@ void CRuliManagerDlg::SyncWallPlayers()
 		if (g == selG)
 			pr.DeflateRect(3, 3);   // 선택 테두리 자리
 		keep.insert(item);
+		if (useRenderer)
+		{
+			WallTileSpec spec;
+			spec.item = item;
+			spec.rc = pr;
+			spec.file = file;
+			specs.push_back(spec);   // 렌더러가 열고 그림 (멈춘 동안은 새로 열지 않음)
+			continue;
+		}
 		auto it = m_wallPlayers.find(item);
 		if (it == m_wallPlayers.end())
 		{
@@ -18028,6 +18332,12 @@ void CRuliManagerDlg::SyncWallPlayers()
 		else
 			it->second->MoveTo(pr);
 	}
+	if (useRenderer)
+	{
+		m_wallRenderer.SetTiles(specs, client.Size());   // 같으면 렌더 스레드를 깨우지 않음
+		m_wallRendererTiles = true;
+		return;
+	}
 	for (auto it = m_wallPlayers.begin(); it != m_wallPlayers.end(); )
 	{
 		if (keep.count(it->first))
@@ -18039,14 +18349,35 @@ void CRuliManagerDlg::SyncWallPlayers()
 
 bool CRuliManagerDlg::WallShouldPlay()
 {
-	if (IsIconic() || ::GetForegroundWindow() != GetSafeHwnd())
-		return false;   // 최소화 · 다른 프로그램(또는 설정 같은 대화상자)을 보는 중
-	return ::GetTickCount64() >= m_wallScrollTick + 300;   // 스크롤 중이 아님
+	// 창이 화면에 보이는 동안은 재생 (다른 창에 포커스가 있어도) - 최소화 · 숨김 · 격자가 다른 프로그램 창에 완전히 가려졌을 때만 멈춤
+	if (IsIconic() || !IsWindowVisible() || !m_grid.GetSafeHwnd() || !m_grid.IsWindowVisible())
+		return false;
+	if (::GetTickCount64() < m_wallScrollTick + 300)
+		return false;   // 스크롤 중
+	// 격자 영역의 3 × 3 점 중 하나라도 이 프로그램의 창(주 창 · 격자 · 글자 겹침 창 · 대화 상자 등)이 맨 위면 보이는 것
+	CRect rc;
+	m_grid.GetClientRect(&rc);
+	m_grid.ClientToScreen(&rc);
+	const DWORD myPid = ::GetCurrentProcessId();
+	for (int iy = 1; iy <= 3; ++iy)
+		for (int ix = 1; ix <= 3; ++ix)
+		{
+			const POINT pt = { rc.left + rc.Width() * ix / 4, rc.top + rc.Height() * iy / 4 };
+			const HWND h = ::WindowFromPoint(pt);
+			if (!h)
+				continue;   // 화면 밖
+			DWORD pid = 0;
+			::GetWindowThreadProcessId(h, &pid);
+			if (pid == myPid)
+				return true;
+		}
+	return false;   // 모두 다른 프로그램 창에 가려짐 (또는 화면 밖)
 }
 
 void CRuliManagerDlg::ApplyWallPlayState(bool play)
 {
 	m_wallPlaying = play;
+	m_wallRenderer.SetPlaying(play);   // 통합 렌더러: 멈추면 읽기 요청을 안 함 (마지막 프레임은 그대로)
 	for (auto& kv : m_wallPlayers)
 	{
 		if (play)
@@ -18618,12 +18949,13 @@ void CRuliManagerDlg::StartNextPreview()
 	const HWND hwnd = GetSafeHwnd();
 	const CString ffmpeg = m_ffmpegPath;
 	std::atomic<bool>* cancel = &m_prevCancel;   // 창이 닫힐 때 OnDestroy 가 스레드를 기다리므로 유효
-	m_prevThread = std::thread([hwnd, ffmpeg, job, cancel]()
+	const PreviewVideo::Options opt = PreviewVideo::Options::FromSettings();   // 설정의 미리보기 품질 (UI 스레드에서 읽음)
+	m_prevThread = std::thread([hwnd, ffmpeg, job, cancel, opt]()
 	{
 		const HRESULT co = ::CoInitializeEx(nullptr, COINIT_MULTITHREADED);   // 영상 길이 읽기 (속성 · Media Foundation)
 		const CMediaInfoLabel::Info info = CMediaInfoLabel::ReadInfoCached(job.path);
 		const double dur = info.duration100ns > 0 ? static_cast<double>(info.duration100ns) / 1e7 : 0.0;
-		PreviewVideo::Result* r = new PreviewVideo::Result(PreviewVideo::Make(ffmpeg, job.path, job.out, dur, *cancel));
+		PreviewVideo::Result* r = new PreviewVideo::Result(PreviewVideo::Make(ffmpeg, job.path, job.out, dur, *cancel, opt));
 		if (SUCCEEDED(co))
 			::CoUninitialize();
 		if (!::PostMessageW(hwnd, WM_APP_PREVIEW_DONE, 0, reinterpret_cast<LPARAM>(r)))
@@ -18636,6 +18968,7 @@ LRESULT CRuliManagerDlg::OnPreviewDone(WPARAM, LPARAM lParam)
 	std::unique_ptr<PreviewVideo::Result> r(reinterpret_cast<PreviewVideo::Result*>(lParam));
 	if (m_prevThread.joinable())
 		m_prevThread.join();
+	m_previewExists.clear();   // [월 모드] 새로 만든 미리보기를 바로 보게
 	if (r)
 	{
 		++m_prevDone;
@@ -19759,9 +20092,53 @@ void CRuliManagerDlg::RebuildYearView()
 	m_yearView.SetSelected(GetSelectedRow());
 }
 
+void CRuliManagerDlg::CarryPreviewFiles(const CString& oldPath, const CString& newPath)
+{
+	// 미리보기 영상(<DB 폴더>\previews\<경로 해시>.mp4)과 이동식 디스크 커버 캐시는 영상 경로로 파일 이름이 정해짐
+	//  → 영상 이름을 바꾸거나 옮기면 새 경로 이름으로 따라 옮김 (재생 중이면 먼저 멈춤 - 파일 잠김)
+	const CString oldCache = m_lib.CoverCacheFile(oldPath), newCache = m_lib.CoverCacheFile(newPath);
+	const CString oldPrev = PreviewVideo::PreviewFileFor(oldPath, oldCache);
+	const CString newPrev = PreviewVideo::PreviewFileFor(newPath, newCache);
+	auto carry = [](const CString& from, const CString& to)
+	{
+		if (from.IsEmpty() || to.IsEmpty() || from.CompareNoCase(to) == 0 || !::PathFileExistsW(from))
+			return;
+		for (int i = 0; i < 8; ++i)
+		{
+			if (::MoveFileExW(from, to, MOVEFILE_REPLACE_EXISTING))
+				return;
+			const DWORD e = ::GetLastError();
+			if (e != ERROR_SHARING_VIOLATION && e != ERROR_ACCESS_DENIED)
+				return;
+			::Sleep(150);   // 재생기 · 월 모드 칸이 파일을 놓을 때까지
+		}
+	};
+	if (::PathFileExistsW(oldPrev) && oldPrev.CompareNoCase(newPrev) != 0)
+	{
+		StopPreviewPlayer();
+		StopWallPlayers();   // 월 모드 칸이 미리보기 파일을 열고 있음 (다음 동기화 때 새 이름으로 다시 엶)
+		carry(oldPrev, newPrev);
+	}
+	carry(oldCache, newCache);
+	m_previewExists.clear();
+}
+
+CString CRuliManagerDlg::ShotFolderName(const CString& code)
+{
+	// 스크린샷 폴더 이름: "품번_Screenshot" (한 폴더에 영상이 여러 개여도 영상마다 따로) - 품번이 없으면 예전처럼 "Screenshot"
+	CString c = code;
+	c.Trim();
+	for (int i = 0; i < c.GetLength(); ++i)
+		if (wcschr(L"\\/:*?\"<>|", c[i]))
+			c.SetAt(i, L'_');   // 폴더 이름에 쓸 수 없는 글자
+	c.TrimRight(L". ");
+	return c.IsEmpty() ? CString(L"Screenshot") : c + L"_Screenshot";
+}
+
 void CRuliManagerDlg::RefreshShotStrip()
 {
-	// 영상 스크린샷: <영상 폴더>\Screenshot\ 의 이미지 (파일 이름이 영상 이름으로 시작하는 것이 있으면 그것만, 없으면 폴더 전체)
+	// 영상 스크린샷: <영상 폴더>\<품번>_Screenshot\ 의 이미지 (없으면 예전 <영상 폴더>\Screenshot\)
+	//  - 파일 이름이 영상 이름으로 시작하는 것이 있으면 그것만, 없으면 폴더 전체
 	if (!m_shotStrip.GetSafeHwnd())
 		return;
 	std::vector<CString> list;
@@ -19771,7 +20148,9 @@ void CRuliManagerDlg::RefreshShotStrip()
 		CString dir = v.path;
 		::PathRemoveFileSpecW(dir.GetBuffer());
 		dir.ReleaseBuffer();
-		dir += L"\\Screenshot\\";
+		dir += L"\\";
+		const CString named = dir + ShotFolderName(v.code);
+		dir = ::PathIsDirectoryW(named) ? named + L"\\" : dir + L"Screenshot\\";   // 새 폴더가 없으면 예전 Screenshot 폴더
 		CString stem = v.FileName();
 		::PathRemoveExtensionW(stem.GetBuffer());
 		stem.ReleaseBuffer();
@@ -20320,6 +20699,7 @@ void CRuliManagerDlg::ShowHelp(HWND active)
 	else if (dynamic_cast<CVideoCheckDlg*>(w))  topic = L"video-check";
 	else if (dynamic_cast<CDupCheckDlg*>(w))    topic = L"dup-check";
 	else if (dynamic_cast<CPluginRunDlg*>(w) || dynamic_cast<CPluginPickDlg*>(w)) topic = L"plugin";
+	else if (dynamic_cast<CCoverPickDlg*>(w))   topic = L"cover-pick";
 	else if (dynamic_cast<CTextInfoDlg*>(w) || dynamic_cast<CTagLinkDlg*>(w)) topic = L"input";
 	else if (dynamic_cast<CNameListDlg*>(w))
 	{

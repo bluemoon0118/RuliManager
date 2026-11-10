@@ -8,7 +8,7 @@
 //    예) 3장, 100분 → 20분 간격 → 20 · 40 · 60분 (0~20분, 80~100분 칸은 버림)
 //  - 사람이 없으면(Windows 얼굴 인식으로 얼굴을 못 찾으면) 10초씩 뒤로 다시 찍어 봄 (그 칸이 끝나기 전까지),
 //    끝까지 못 찾으면 칸 시작 시간의 장면을 그대로 저장
-//  - 저장: <영상 폴더>\Screenshot\<영상 이름>_01.jpg ... (같은 이름 규칙의 예전 파일은 먼저 지움)
+//  - 저장: <영상 폴더>\<품번>_Screenshot\<영상 이름>_01.jpg ... (folderName, 품번이 없으면 Screenshot - 같은 이름 규칙의 예전 파일은 먼저 지움)
 //  - 영상 읽기 = Media Foundation, 얼굴 인식 = Windows.Media.FaceAnalysis (C++/WinRT, 이 파일만 C++20 · PCH 없이 빌드)
 //  - 백그라운드 스레드에서 호출 (오래 걸림)
 struct ShotResult
@@ -23,5 +23,5 @@ struct ShotResult
 	CString video;          // 영상 파일 경로
 };
 
-ShotResult ExtractScreenshots(const CString& videoPath, int count, const std::atomic<bool>& cancel,
+ShotResult ExtractScreenshots(const CString& videoPath, int count, const CString& folderName, const std::atomic<bool>& cancel,
 	const std::function<void(int done, int total)>& progress);

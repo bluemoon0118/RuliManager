@@ -294,6 +294,8 @@ CString CFileManageDlg::FindImage(const CString& videoPath)
 	{
 		if (!IsImageExt(::PathFindExtensionW(f)))
 			continue;
+		if (IsVerticalName(f))
+			continue;   // 세로 커버(ABC-123_V.jpg)는 대표 이미지로 보지 않음 (따로 FindVerticalImage)
 		CString k = StemOf(f);
 		const int u2 = k.Find(L'_');
 		if (u2 >= 0)
@@ -305,7 +307,47 @@ CString CFileManageDlg::FindImage(const CString& videoPath)
 	return CString();
 }
 
-void CFileManageDlg::CheckItem(int item, Entry& e, bool keepActor) const
+bool CFileManageDlg::IsVerticalName(const CString& fileName)
+{
+	const CString s = StemOf(fileName);
+	return s.GetLength() > 2 && s.Right(2).CompareNoCase(L"_V") == 0;
+}
+
+CString CFileManageDlg::FindVerticalImage(const CString& videoPath)
+{
+	// 세로 커버: 확장자를 뺀 이름 + "_V" (ABC-123.mp4 → ABC-123_V.jpg), 분할 영상은 파트 번호를 뺀 이름 + "_V" (모든 파트 공용),
+	//  없으면 '_' 왼쪽 이름 + "_V" (ABC-123_1080p.mp4 → ABC-123_V.jpg)
+	static const wchar_t* const kExts[] = { L".jpg", L".jpeg", L".png", L".webp", L".bmp", L".gif", L".tif", L".tiff", L".svg" };
+	const CString dir = DirOf(videoPath);
+	CString name = StemOf(CString(::PathFindFileNameW(videoPath)));
+	CString pk;
+	int num = 0;
+	if (CVideoLibrary::PartGroupKey(videoPath, pk, num) && num > 0)
+	{
+		const int last = name.ReverseFind(L'_');
+		if (last > 0)
+			name = name.Left(last);
+	}
+	std::vector<CString> bases = { name };
+	const int us = name.Find(L'_');
+	if (us > 0)
+	{
+		CString key = name.Left(us);
+		key.Trim();
+		if (!key.IsEmpty())
+			bases.push_back(key);
+	}
+	for (const CString& b : bases)
+		for (const wchar_t* e : kExts)
+		{
+			const CString cand = Join(dir, b + L"_V" + e);
+			if (::PathFileExistsW(cand))
+				return cand;
+		}
+	return CString();
+}
+
+void CFileManageDlg::CheckItem(int item, Entry& e, bool keepActor, const CString& forceActor) const
 {
 	e = Entry();
 	e.item = item;
@@ -357,6 +399,12 @@ void CFileManageDlg::CheckItem(int item, Entry& e, bool keepActor) const
 		if (actorName.IsEmpty())
 			block += L"· 등록 폴더 바로 아래 영상이라 그대로 둘 배우 폴더가 없음\r\n";
 	}
+	else if (!forceActor.IsEmpty())
+	{
+		// 배우 여러 명 중 사용자가 고른 배우의 폴더로
+		const int ai = m_lib.FindActorByAnyName(forceActor);
+		actorName = (ai >= 0) ? m_lib.actors[ai].name : forceActor;
+	}
 	else if (actors.empty())
 		block += L"· 배우 없음 - 자동 복구 불가\r\n";
 	else if (actors.size() > 1)
@@ -376,7 +424,7 @@ void CFileManageDlg::CheckItem(int item, Entry& e, bool keepActor) const
 	{
 		// 배우 여러 명: 지금 배우 폴더가 그 배우 중 하나이고 아래([발매일]품번\품번)가 규칙과 같으면 "규칙 맞음"
 		//  (배우 폴더를 그대로 두고 맞추기로 고친 영상이 계속 빨갛게 남지 않게 - 자동 복구 대상은 그대로 제외)
-		if (!keepActor && actors.size() > 1 && block.Find(L"배우 여러 명") >= 0 && block.Find(L"품번 없음") < 0 && block.Find(L"발매일 없음") < 0 && !e.root.IsEmpty())
+		if (!keepActor && forceActor.IsEmpty() && actors.size() > 1 && block.Find(L"배우 여러 명") >= 0 && block.Find(L"품번 없음") < 0 && block.Find(L"발매일 없음") < 0 && !e.root.IsEmpty())
 		{
 			Entry k;
 			CheckItem(item, k, true);
@@ -703,7 +751,22 @@ void CFileManageDlg::OnTreeRClick(NMHDR* /*pNMHDR*/, LRESULT* pResult)
 	std::vector<int> keepable;   // 배우 여러 명이라 복구 불가 → 배우 폴더 그대로 두고 아래만 맞출 수 있는 영상
 	CollectKeepActor(h, keepable);
 
-	enum { CMD_OPEN = 1, CMD_SELECT, CMD_FIX, CMD_KEEPACTOR };
+	// 배우 여러 명이라 복구 불가인 영상 하나: 배우를 골라 그 배우 폴더로 고치기
+	std::vector<CString> pickActors;
+	std::vector<bool> pickOk;
+	if (!n.dir && n.entry >= 0 && m_entries[n.entry].state == ST_BLOCK)
+	{
+		const int item = m_entries[n.entry].item;
+		pickActors = PickableActors(item);
+		for (const CString& a : pickActors)
+		{
+			Entry k;
+			CheckItem(item, k, false, a);
+			pickOk.push_back(k.state == ST_FIX);
+		}
+	}
+
+	enum { CMD_OPEN = 1, CMD_SELECT, CMD_FIX, CMD_KEEPACTOR, CMD_ACTOR_FIRST = 100 };
 	CMenu menu;
 	menu.CreatePopupMenu();
 	const UINT off = (n.offline || !::PathIsDirectoryW(folder)) ? MF_GRAYED : 0;
@@ -725,6 +788,18 @@ void CFileManageDlg::OnTreeRClick(NMHDR* /*pNMHDR*/, LRESULT* pResult)
 		else
 			keepText = L"배우 폴더는 그대로 두고 아래만 맞추기 ([발매일]품번\\품번)";
 		menu.AppendMenu(MF_STRING, CMD_KEEPACTOR, keepText);
+	}
+	if (!pickActors.empty())
+	{
+		CMenu sub;
+		sub.CreatePopupMenu();
+		for (size_t i = 0; i < pickActors.size(); ++i)
+		{
+			CString label = pickActors[i] + L"   →   " + SafeName(pickActors[i]) + L"\\[발매일]품번";
+			label.Replace(L"&", L"&&");
+			sub.AppendMenu(MF_STRING | (pickOk[i] ? 0 : MF_GRAYED), CMD_ACTOR_FIRST + static_cast<UINT>(i), label);
+		}
+		menu.AppendMenu(MF_POPUP, reinterpret_cast<UINT_PTR>(sub.Detach()), L"배우를 골라서 고치기 (그 배우 폴더로)");
 	}
 	const UINT cmd = DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD | TPM_NONOTIFY, screen.x, screen.y, this);
 	switch (cmd)
@@ -752,8 +827,37 @@ void CFileManageDlg::OnTreeRClick(NMHDR* /*pNMHDR*/, LRESULT* pResult)
 		RunFix(keepable, true, true);
 		break;
 	default:
+		if (cmd >= CMD_ACTOR_FIRST && cmd < CMD_ACTOR_FIRST + pickActors.size() && n.entry >= 0)
+			RunFix({ m_entries[n.entry].item }, true, false, pickActors[cmd - CMD_ACTOR_FIRST]);
 		break;
 	}
+}
+
+std::vector<CString> CFileManageDlg::PickableActors(int item) const
+{
+	std::vector<CString> out;
+	if (item < 0 || item >= static_cast<int>(m_lib.items.size()))
+		return out;
+	const std::vector<CString> actors = CVideoLibrary::SplitList(m_lib.items[item].actors);
+	if (actors.size() < 2)
+		return out;
+	Entry e;
+	CheckItem(item, e);
+	if (e.state != ST_BLOCK || e.problems.Find(L"배우 여러 명") < 0 || e.problems.Find(L"품번 없음") >= 0 ||
+		e.problems.Find(L"발매일 없음") >= 0 || e.problems.Find(L"등록 폴더 밖") >= 0)
+		return out;   // 배우 말고 다른 이유로 막힘
+	for (const CString& a : actors)
+	{
+		const int ai = m_lib.FindActorByAnyName(a);
+		const CString name = (ai >= 0) ? m_lib.actors[ai].name : a;   // 별칭으로 적혀 있어도 배우 이름
+		bool dup = false;
+		for (const CString& o : out)
+			if (o.CompareNoCase(name) == 0)
+				dup = true;
+		if (!dup && !name.IsEmpty())
+			out.push_back(name);
+	}
+	return out;
 }
 
 void CFileManageDlg::CollectKeepActor(HTREEITEM h, std::vector<int>& items)
@@ -853,6 +957,8 @@ void CFileManageDlg::ShowDetail()
 				+ L"(오른쪽 클릭 → [배우 폴더는 그대로 두고 아래만 맞추기])\r\n";
 		else if (k.state == ST_OK || k.state == ST_WARN)
 			t += L"\r\n배우 폴더를 그대로 두면 아래([발매일]품번\\품번)는 규칙과 같음\r\n";
+		if (!PickableActors(e.item).empty())
+			t += L"\r\n배우를 직접 골라 그 배우 폴더로 옮기려면: 오른쪽 클릭 → [배우를 골라서 고치기 ▸]\r\n";
 	}
 	m_detail.SetWindowText(t);
 }
@@ -959,7 +1065,7 @@ void CFileManageDlg::OnBnClickedFixAll()
 	RunFix(items, true);
 }
 
-void CFileManageDlg::RunFix(const std::vector<int>& itemsIn, bool confirm, bool keepActor)
+void CFileManageDlg::RunFix(const std::vector<int>& itemsIn, bool confirm, bool keepActor, const CString& forceActor)
 {
 	std::vector<int> items = itemsIn;
 	std::sort(items.begin(), items.end());
@@ -970,9 +1076,11 @@ void CFileManageDlg::RunFix(const std::vector<int>& itemsIn, bool confirm, bool 
 		if (items.size() == 1)
 		{
 			Entry e;
-			CheckItem(items[0], e, keepActor);
+			CheckItem(items[0], e, keepActor, forceActor);
 			msg = CString(keepActor ? L"배우 폴더는 그대로 두고, 그 아래 [발매일]품번 폴더 · 파일 이름만 규칙에 맞춥니다.\n\n지금: " : L"이 영상의 폴더 · 파일을 규칙에 맞게 옮기거나 이름을 바꿉니다.\n\n지금: ")
 				+ m_lib.items[items[0]].path + L"\n규칙: " + e.targetPath + L"\n\n계속할까요?";
+			if (!forceActor.IsEmpty())
+				msg = L"배우 여러 명 중 '" + e.actorDir + L"' 배우 폴더로 정해서 " + msg;
 		}
 		else
 		{
@@ -993,7 +1101,7 @@ void CFileManageDlg::RunFix(const std::vector<int>& itemsIn, bool confirm, bool 
 			continue;
 		CString err;
 		const CString before = m_lib.items[item].path;
-		if (FixItem(item, err, keepActor))
+		if (FixItem(item, err, keepActor, forceActor))
 			++done;
 		else if (!err.IsEmpty())
 		{
@@ -1167,10 +1275,10 @@ bool CFileManageDlg::IsDedicatedFolder(const CString& dir, const CString& code, 
 	return videos > 0;
 }
 
-bool CFileManageDlg::FixItem(int item, CString& err, bool keepActor)
+bool CFileManageDlg::FixItem(int item, CString& err, bool keepActor, const CString& forceActor)
 {
 	Entry e;
-	CheckItem(item, e, keepActor);
+	CheckItem(item, e, keepActor, forceActor);
 	if (e.state == ST_OK || e.state == ST_WARN)
 		return true;    // 이미 맞음 (같은 묶음을 고치면서 함께 고쳐짐)
 	if (e.state != ST_FIX)
@@ -1282,6 +1390,13 @@ bool CFileManageDlg::FixItem(int item, CString& err, bool keepActor)
 				return false;
 			}
 			const CString sharedImage = FindImage(m_lib.items[item].path);
+			std::vector<CString> verticals;   // 세로 커버 (영상을 옮기기 전에 찾아 둠)
+			for (int g : group)
+			{
+				const CString vi = FindVerticalImage(m_lib.items[g].path);
+				if (!vi.IsEmpty() && std::find_if(verticals.begin(), verticals.end(), [&](const CString& x) { return x.CompareNoCase(vi) == 0; }) == verticals.end())
+					verticals.push_back(vi);
+			}
 			std::vector<CString> subs, files;
 			ListDir(C, subs, files);
 			for (int g : group)
@@ -1318,12 +1433,28 @@ bool CFileManageDlg::FixItem(int item, CString& err, bool keepActor)
 				CString e2;
 				MoveOne(sharedImage, Join(T, ::PathFindFileNameW(sharedImage)), e2);
 			}
+			// 세로 커버(이름_V.jpg)도 원래 자리에 남아 있으면 함께
+			for (const CString& vi : verticals)
+			{
+				if (!::PathFileExistsW(vi) || DirOf(vi).CompareNoCase(C) != 0)
+					continue;
+				CString e2;
+				MoveOne(vi, Join(T, ::PathFindFileNameW(vi)), e2);
+			}
 			RemoveEmptyParents(C, e.root);   // 비었으면 지움
 		}
 	}
 
-	// 3) 규칙 폴더 안에서 이름 맞추기: 영상 · 같은 이름 파일 → 품번(_순번), 이미지 → 품번(_순번).확장자
+	// 3) 규칙 폴더 안에서 이름 맞추기: 영상 · 같은 이름 파일 → 품번(_순번), 이미지 → 품번(_순번).확장자, 세로 커버 → 품번_V.확장자
 	group = groupOf(item);
+	std::vector<CString> verticalsT;   // 이름을 바꾸기 전에 세로 커버를 찾아 둠 (영상 이름이 바뀌면 못 찾음)
+	for (int g : group)
+	{
+		const CString vi = FindVerticalImage(m_lib.items[g].path);
+		if (!vi.IsEmpty() && DirOf(vi).CompareNoCase(T) == 0 &&
+			std::find_if(verticalsT.begin(), verticalsT.end(), [&](const CString& x) { return x.CompareNoCase(vi) == 0; }) == verticalsT.end())
+			verticalsT.push_back(vi);
+	}
 	for (int g : group)
 	{
 		const CString vp = m_lib.items[g].path;
@@ -1346,6 +1477,8 @@ bool CFileManageDlg::FixItem(int item, CString& err, bool keepActor)
 		for (const CString& f : files)
 		{
 			CString target;
+			if (IsVerticalName(f))
+				continue;   // 세로 커버는 아래에서 따로
 			if (StemOf(f).CompareNoCase(vstem) == 0)
 				target = newStem + CString(::PathFindExtensionW(f));            // 같은 이름 (영상 · 이미지 · 자막 · txt)
 			else if (StartsNoCase(f, vname + L".") && IsImageExt(::PathFindExtensionW(f)))
@@ -1368,6 +1501,18 @@ bool CFileManageDlg::FixItem(int item, CString& err, bool keepActor)
 			}
 		}
 	}
+	for (const CString& vi : verticalsT)
+	{
+		if (!::PathFileExistsW(vi))
+			continue;
+		const CString to = Join(T, SafeName(e.code) + L"_V" + CString(::PathFindExtensionW(vi)));
+		if (to == vi)
+			continue;
+		if (to.CompareNoCase(vi) != 0 && ::PathFileExistsW(to))
+			continue;   // 이미 그 이름의 세로 커버가 있음 → 그대로
+		CString e2;
+		MoveOne(vi, to, e2);
+	}
 	// 디스크 이름은 이미 맞는데 DB 경로만 대소문자가 다르면 DB 를 실제로
 	for (int g : group)
 	{
@@ -1388,8 +1533,8 @@ bool CFileManageDlg::FixItem(int item, CString& err, bool keepActor)
 		{
 			for (const CString& f : files)
 			{
-				if (!IsImageExt(::PathFindExtensionW(f)))
-					continue;
+				if (!IsImageExt(::PathFindExtensionW(f)) || IsVerticalName(f))
+					continue;   // 세로 커버는 대표 이미지로 바꾸지 않음
 				CString k = StemOf(f);
 				const int us = k.Find(L'_');
 				if (us >= 0)
@@ -1404,7 +1549,7 @@ bool CFileManageDlg::FixItem(int item, CString& err, bool keepActor)
 		}
 	}
 	Entry after;
-	CheckItem(item, after, keepActor);
+	CheckItem(item, after, keepActor, forceActor);
 	if (after.state == ST_FIX)
 	{
 		err = L"일부만 고침 (이름이 겹치는 파일 등 - 상세 정보 확인)";

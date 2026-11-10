@@ -71,6 +71,7 @@ namespace
 	}
 
 	const UINT kCmdPlay = 1, kCmdExplore = 2, kCmdCheck = 3;
+	const UINT kCmdReplaceFirst = 100;   // + 대상 카드 번호
 }
 
 // ===========================================================================
@@ -370,6 +371,27 @@ void CDupGrid::OnContextMenu(CWnd* /*pWnd*/, CPoint point)
 	menu.AppendMenu(MF_STRING | (c.offline ? MF_GRAYED : 0), kCmdExplore, L"탐색기에서 보기");
 	menu.AppendMenu(MF_SEPARATOR);
 	menu.AppendMenu(MF_STRING | (c.offline ? MF_GRAYED : 0) | (IsChecked(c.path) ? MF_CHECKED : 0), kCmdCheck, L"삭제할 파일로 체크");
+	// 이 파일로 같은 묶음의 다른 영상 파일을 바꿈 (그 영상의 정보는 그대로)
+	const Group& grp = m_groups[m_slots[s].g];
+	if (m_onReplace && grp.cards.size() >= 2)
+	{
+		CMenu sub;
+		sub.CreatePopupMenu();
+		for (size_t k = 0; k < grp.cards.size(); ++k)
+		{
+			if (static_cast<int>(k) == m_slots[s].c)
+				continue;
+			const Card& t = grp.cards[k];
+			CString res;
+			if (t.height > 0)
+				res.Format(L"%up · ", t.height);
+			CString label = t.name + L"   (" + res + t.sizeText + L" · " + t.infoText + L")";
+			label.Replace(L"&", L"&&");
+			sub.AppendMenu(MF_STRING | (t.offline ? MF_GRAYED : 0), kCmdReplaceFirst + static_cast<UINT>(k), label);
+		}
+		menu.AppendMenu(MF_SEPARATOR);
+		menu.AppendMenu(MF_POPUP | (c.offline ? MF_GRAYED : 0), reinterpret_cast<UINT_PTR>(sub.Detach()), L"이 파일로 바꾸기 (정보는 고른 영상 것 유지)");
+	}
 	const UINT cmd = static_cast<UINT>(DarkMenu::Track(menu, TPM_LEFTALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD | TPM_NONOTIFY, point.x, point.y, this));
 	if (cmd == kCmdPlay && m_onPlay)
 		m_onPlay(c.path);
@@ -377,6 +399,8 @@ void CDupGrid::OnContextMenu(CWnd* /*pWnd*/, CPoint point)
 		m_onExplore(c.path);
 	else if (cmd == kCmdCheck)
 		ToggleSlot(s);
+	else if (cmd >= kCmdReplaceFirst && cmd < kCmdReplaceFirst + static_cast<UINT>(grp.cards.size()) && m_onReplace)
+		m_onReplace(m_slots[s].g, m_slots[s].c, static_cast<int>(cmd - kCmdReplaceFirst));
 }
 
 HBITMAP CDupGrid::Thumb(const Card& c, int w, int h)
@@ -588,6 +612,8 @@ BOOL CDupCheckDlg::OnInitDialog()
 		::ShellExecuteW(GetSafeHwnd(), L"open", L"explorer.exe", L"/select,\"" + path + L"\"", nullptr, SW_SHOWNORMAL);
 	};
 	m_grid.m_onCheckChanged = [this]() { UpdateStatus(); };
+	if (m_replace)
+		m_grid.m_onReplace = [this](int group, int source, int target) { DoReplace(group, source, target); };
 
 	CRect wr;
 	GetWindowRect(&wr);
@@ -750,6 +776,32 @@ void CDupCheckDlg::Scan()
 		c.sizeText = SizeText(v.size);
 		c.offline = m_isOffline ? m_isOffline(i) : false;
 		c.dateText = DateText(v.modified);
+		{
+			// DB 정보 요약 ([이 파일로 바꾸기] 메뉴 - 어느 쪽에 정보가 있는지)
+			auto countList = [](const CString& s)
+			{
+				int n = 0, pos = 0;
+				CString t = s.Tokenize(L",", pos);
+				while (pos >= 0)
+				{
+					t.Trim();
+					if (!t.IsEmpty()) ++n;
+					t = s.Tokenize(L",", pos);
+				}
+				return n;
+			};
+			std::vector<CString> parts;
+			CString p;
+			if (const int a = countList(v.actors)) { p.Format(L"배우 %d", a); parts.push_back(p); }
+			if (const int t = countList(v.tags)) { p.Format(L"태그 %d", t); parts.push_back(p); }
+			if (v.rating > 0) { p.Format(L"별점 %.1f", v.rating / 2.0); parts.push_back(p); }
+			if (!v.title.IsEmpty()) parts.push_back(L"제목");
+			if (!v.studio.IsEmpty()) parts.push_back(L"제작사");
+			for (size_t k = 0; k < parts.size(); ++k)
+				c.infoText += (k ? L" · " : L"") + parts[k];
+			if (c.infoText.IsEmpty())
+				c.infoText = L"정보 없음";
+		}
 		if (!c.offline)
 		{
 			const CMediaInfoLabel::Info info = CMediaInfoLabel::ReadInfoCached(v.path);
@@ -877,6 +929,52 @@ void CDupCheckDlg::OnClearChecks()
 	m_grid.Checked().clear();
 	m_grid.Invalidate(FALSE);
 	UpdateStatus();
+}
+
+void CDupCheckDlg::DoReplace(int group, int source, int target)
+{
+	// [이 파일로 바꾸기]: target 영상의 정보(제목 · 배우 · 태그 · 별점 · 커버)는 그대로, 파일만 source 파일로
+	const auto& groups = m_grid.Groups();
+	if (group < 0 || group >= static_cast<int>(groups.size()) || !m_replace)
+		return;
+	const auto& cards = groups[group].cards;
+	if (source < 0 || source >= static_cast<int>(cards.size()) || target < 0 || target >= static_cast<int>(cards.size()) || source == target)
+		return;
+	const CDupGrid::Card src = cards[source];
+	const CDupGrid::Card dst = cards[target];
+	if (src.offline || dst.offline)
+	{
+		MessageBox(L"연결되지 않은 이동식 디스크의 영상은 바꿀 수 없습니다.", L"이 파일로 바꾸기", MB_ICONINFORMATION);
+		return;
+	}
+	CString stem = dst.path;
+	::PathRemoveExtensionW(stem.GetBuffer());
+	stem.ReleaseBuffer();
+	const CString newPath = stem + ::PathFindExtensionW(src.path);
+	auto describe = [](const CDupGrid::Card& c)
+	{
+		return L"  " + c.path + L"\n  " + c.resText + L" · " + c.timeText + L" · " + c.sizeText + L" · " + c.infoText + L"\n";
+	};
+	CString msg = L"정보를 남길 영상 (이 영상의 파일은 휴지통으로):\n" + describe(dst) +
+		L"\n새 파일 (이 파일을 위 영상 자리로 옮김):\n" + describe(src) +
+		L"\n옮긴 뒤 이름: " + newPath + L"\n\n" +
+		L"· 위 영상의 제목 · 배우 · 태그 · 별점 · 커버는 그대로 두고, 새 파일의 DB 항목은 삭제합니다.\n" +
+		L"· 두 영상의 미리보기 영상은 지웁니다 (필요하면 다시 만드세요).\n" +
+		L"· 새 파일 옆의 커버 이미지 · 정보 txt 는 그대로 둡니다.\n\n바꿀까요?";
+	if (MessageBox(msg, L"이 파일로 바꾸기", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
+		return;
+	m_grid.ClearImages();
+	const CString err = m_replace(dst.item, src.item);
+	if (!err.IsEmpty())
+	{
+		Scan();
+		MessageBox(err, L"이 파일로 바꾸기", MB_ICONWARNING);
+		return;
+	}
+	m_grid.SetChecked(src.path, false);
+	m_grid.SetChecked(dst.path, false);
+	Scan();
+	MessageBox(L"파일을 바꿨습니다.\n\n" + newPath, L"이 파일로 바꾸기", MB_ICONINFORMATION);
 }
 
 void CDupCheckDlg::OnRemove()

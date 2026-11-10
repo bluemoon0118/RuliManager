@@ -150,12 +150,24 @@ BOOL CPluginPickDlg::OnInitDialog()
 		HWND chk = make(L"BUTTON", r.same ? r.label + L" (같음)" : r.label, WS_TABSTOP | BS_AUTOCHECKBOX, du(colLabel, y + 1, wLabel, 11), id);
 		if (chk)
 			::SendMessageW(chk, BM_SETCHECK, r.check ? BST_CHECKED : BST_UNCHECKED, 0);
-		make(L"EDIT", r.value, WS_BORDER | WS_TABSTOP | ES_AUTOHSCROLL, du(colNew, y, wNew, 12), id + 2);
-		HWND arrow = make(L"STATIC", L"→", SS_CENTER | SS_NOPREFIX, du(colArrow, y + 1, wArrow, 11), id + 3);   // 체크하면 보임 (가져온 값 → 지금 값)
+		// 메모는 여러 줄 칸 (높게, 세로 스크롤 - Enter 로 줄바꿈)
+		const bool multi = (r.key == L"memo");
+		const int editH = multi ? 48 : 12;
+		auto crlf = [](CString s)
+		{
+			s.Replace(L"\r\n", L"\n");
+			s.Replace(L'\r', L'\n');
+			s.Replace(L"\n", L"\r\n");   // 여러 줄 에디트는 CRLF 로만 줄을 나눔
+			return s;
+		};
+		const DWORD lineStyle = multi ? (ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN | WS_VSCROLL) : ES_AUTOHSCROLL;
+		make(L"EDIT", multi ? crlf(r.value) : r.value, WS_BORDER | WS_TABSTOP | lineStyle, du(colNew, y, wNew, editH), id + 2);
+		HWND arrow = make(L"STATIC", L"→", SS_CENTER | SS_NOPREFIX, du(colArrow, y + (editH - 11) / 2 + 1, wArrow, 11), id + 3);   // 체크하면 보임 (가져온 값 → 지금 값)
 		if (arrow && !r.check)
 			::ShowWindow(arrow, SW_HIDE);
-		make(L"EDIT", r.cur.IsEmpty() ? CString(L"(비어 있음)") : r.cur, WS_BORDER | ES_AUTOHSCROLL | ES_READONLY, du(colCur, y, wCur, 12), id + 1);
-		y += 15;
+		const CString curText = r.cur.IsEmpty() ? CString(L"(비어 있음)") : (multi ? crlf(r.cur) : r.cur);
+		make(L"EDIT", curText, WS_BORDER | ES_READONLY | lineStyle, du(colCur, y, wCur, editH), id + 1);
+		y += editH + 3;
 	}
 
 	// 아래쪽: [나머지에도 적용] · [모두 체크] · [적용] [건너뛰기] [취소]

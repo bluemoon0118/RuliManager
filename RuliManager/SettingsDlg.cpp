@@ -23,6 +23,8 @@ BEGIN_MESSAGE_MAP(CSettingsDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_SET_PREVIEW_DEL, &CSettingsDlg::OnBnClickedDeletePreviews)
 	ON_BN_CLICKED(IDC_SET_PREVIEW_REGEN, &CSettingsDlg::OnBnClickedRegenPreviews)
 	ON_BN_CLICKED(IDC_SET_PREVIEW_STOP, &CSettingsDlg::OnBnClickedStopPreviews)
+	ON_BN_CLICKED(IDC_SET_PREVIEW_STD, &CSettingsDlg::UpdatePreviewQuality)
+	ON_BN_CLICKED(IDC_SET_PREVIEW_LIGHT, &CSettingsDlg::UpdatePreviewQuality)
 	ON_WM_TIMER()
 	ON_BN_CLICKED(IDC_SET_DEL_VIDEO, &CSettingsDlg::OnCheckChanged)
 	ON_BN_CLICKED(IDC_SET_DEL_ACTOR, &CSettingsDlg::OnCheckChanged)
@@ -216,6 +218,11 @@ BOOL CSettingsDlg::OnInitDialog()
 	CheckDlgButton(IDC_SET_SFW, m_sfw ? BST_CHECKED : BST_UNCHECKED);
 	CheckDlgButton(IDC_SET_MERGE_PARTS, m_mergeParts ? BST_CHECKED : BST_UNCHECKED);
 	CheckRadioButton(IDC_SET_RATING_ONE, IDC_SET_RATING_TEN, m_ratingMode == 2 ? IDC_SET_RATING_TEN : (m_ratingMode == 1 ? IDC_SET_RATING_HALF : IDC_SET_RATING_ONE));
+	// 미리보기 영상 품질 (만들 때 적용 - 이미 만든 미리보기는 [재생성] 으로 다시)
+	CheckRadioButton(IDC_SET_PREVIEW_STD, IDC_SET_PREVIEW_LIGHT,
+		AfxGetApp()->GetProfileInt(L"Settings", L"PreviewQuality", 0) == 1 ? IDC_SET_PREVIEW_LIGHT : IDC_SET_PREVIEW_STD);
+	CheckDlgButton(IDC_SET_PREVIEW_AUDIO, AfxGetApp()->GetProfileInt(L"Settings", L"PreviewAudio", 0) ? BST_CHECKED : BST_UNCHECKED);
+	UpdatePreviewQuality();
 	if (CComboBox* combo = static_cast<CComboBox*>(GetDlgItem(IDC_SET_IO_KIND)))
 	{
 		// 텍스트 내보내기 / 가져오기 대상 (탭 · DB 삭제와 같은 순서: 영상 / 배우 / 제작사 / 태그)
@@ -463,7 +470,16 @@ void CSettingsDlg::OnOK()
 				disabled.push_back(m_plugins[i].id);
 		PluginHost::SaveDisabled(disabled);
 	}
+	AfxGetApp()->WriteProfileInt(L"Settings", L"PreviewQuality", IsDlgButtonChecked(IDC_SET_PREVIEW_LIGHT) == BST_CHECKED ? 1 : 0);
+	AfxGetApp()->WriteProfileInt(L"Settings", L"PreviewAudio", IsDlgButtonChecked(IDC_SET_PREVIEW_AUDIO) == BST_CHECKED ? 1 : 0);
 	CDialogEx::OnOK();
+}
+
+void CSettingsDlg::UpdatePreviewQuality()
+{
+	// 소리 포함은 [기본] 품질에서만
+	if (CWnd* a = GetDlgItem(IDC_SET_PREVIEW_AUDIO))
+		a->EnableWindow(IsDlgButtonChecked(IDC_SET_PREVIEW_STD) == BST_CHECKED);
 }
 
 void CSettingsDlg::FillPlugins()

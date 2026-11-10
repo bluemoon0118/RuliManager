@@ -93,7 +93,7 @@ plugins\
 { "ok": true, "items": [
   { "id": 0, "name": "홍길동(Hong Gildong, 洪吉童)", "aliases": ["예전 이름"], "gender": "여성",
     "birth": "1998-02-17", "nationality": "일본", "height": 160, "bust": 88, "waist": 58, "hip": 86, "cup": "E",
-    "debut": "2018-04", "retire": "", "urls": ["https://..."], "text": "(선택)",
+    "debut": "2018-04", "retire": "", "urls": ["https://..."], "memo": "배우 메모 (선택 - 고르기 창에서 체크하면 지금 메모를 바꿈)", "text": "(선택)",
     "photo": "https://example.com/photo.jpg" } ] }
 ```
 

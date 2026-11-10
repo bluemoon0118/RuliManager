@@ -20,6 +20,7 @@
 #include <mferror.h>
 #include <propvarutil.h>
 #include "ScreenshotExtractor.h"
+#include "FrameReader.h"
 
 #pragma comment(lib, "windowsapp.lib")
 #pragma comment(lib, "mfplat.lib")
@@ -32,147 +33,7 @@ namespace
 	const LONGLONG kSecond = 10000000LL;   // 100ns 단위 1초
 	const LONGLONG kRetryStep = 10 * kSecond;   // 얼굴을 못 찾으면 이만큼 뒤로 다시 찍어 봄 (10초)
 
-	// 한 장면 (BGRA, 위에서 아래로, 한 줄 = w * 4 바이트)
-	struct Frame
-	{
-		int w = 0, h = 0;
-		std::vector<BYTE> bgra;
-	};
-
-	// Media Foundation 으로 영상을 열어 원하는 시간의 장면을 RGB32 로 꺼냄
-	class CFrameReader
-	{
-	public:
-		bool Open(const CString& path)
-		{
-			CComPtr<IMFAttributes> attr;
-			if (FAILED(::MFCreateAttributes(&attr, 2)))
-				return false;
-			attr->SetUINT32(MF_SOURCE_READER_ENABLE_VIDEO_PROCESSING, TRUE);   // 디코더 출력 → RGB32 변환
-			if (FAILED(::MFCreateSourceReaderFromURL(path, attr, &m_reader)))
-				return false;
-			m_reader->SetStreamSelection(static_cast<DWORD>(MF_SOURCE_READER_ALL_STREAMS), FALSE);
-			m_reader->SetStreamSelection(static_cast<DWORD>(MF_SOURCE_READER_FIRST_VIDEO_STREAM), TRUE);
-			CComPtr<IMFMediaType> type;
-			if (FAILED(::MFCreateMediaType(&type)))
-				return false;
-			type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
-			type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_RGB32);
-			if (FAILED(m_reader->SetCurrentMediaType(static_cast<DWORD>(MF_SOURCE_READER_FIRST_VIDEO_STREAM), nullptr, type)))
-				return false;
-			if (!UpdateFormat())
-				return false;
-			PROPVARIANT var;
-			::PropVariantInit(&var);
-			if (SUCCEEDED(m_reader->GetPresentationAttribute(static_cast<DWORD>(MF_SOURCE_READER_MEDIASOURCE), MF_PD_DURATION, &var)) && var.vt == VT_UI8)
-				m_duration = static_cast<LONGLONG>(var.uhVal.QuadPart);
-			::PropVariantClear(&var);
-			return m_duration > 0;
-		}
-
-		LONGLONG Duration() const { return m_duration; }
-
-		// t(100ns) 의 장면: 가장 가까운 앞쪽 키프레임으로 이동한 뒤 t 에 닿을 때까지 디코딩
-		bool Grab(LONGLONG t, Frame& out)
-		{
-			if (!m_reader)
-				return false;
-			PROPVARIANT pos;
-			if (FAILED(::InitPropVariantFromInt64(t, &pos)))
-				return false;
-			const HRESULT seek = m_reader->SetCurrentPosition(GUID_NULL, pos);
-			::PropVariantClear(&pos);
-			if (FAILED(seek))
-				return false;
-			bool have = false;
-			for (int i = 0; i < 900; ++i)   // 키프레임 간격이 길어도 최대 900장까지만 앞으로
-			{
-				DWORD flags = 0;
-				LONGLONG ts = 0;
-				CComPtr<IMFSample> sample;
-				if (FAILED(m_reader->ReadSample(static_cast<DWORD>(MF_SOURCE_READER_FIRST_VIDEO_STREAM), 0, nullptr, &flags, &ts, &sample)))
-					break;
-				if (flags & MF_SOURCE_READERF_CURRENTMEDIATYPECHANGED)
-					UpdateFormat();
-				if (flags & MF_SOURCE_READERF_ENDOFSTREAM)
-					break;
-				if (!sample)
-					continue;
-				if (CopySample(sample, out))
-					have = true;
-				if (ts >= t - kSecond / 10)   // 목표 시간에 닿음 (0.1초 오차 허용)
-					break;
-			}
-			return have;
-		}
-
-	private:
-		CComPtr<IMFSourceReader> m_reader;
-		LONGLONG m_duration = 0;
-		UINT32 m_w = 0, m_h = 0;      // 디코더 출력 크기 (가장자리 여백 포함일 수 있음)
-		CRect  m_crop;                // 실제로 보이는 영역
-		LONG   m_stride = 0;
-
-		bool UpdateFormat()
-		{
-			CComPtr<IMFMediaType> cur;
-			if (FAILED(m_reader->GetCurrentMediaType(static_cast<DWORD>(MF_SOURCE_READER_FIRST_VIDEO_STREAM), &cur)))
-				return false;
-			if (FAILED(::MFGetAttributeSize(cur, MF_MT_FRAME_SIZE, &m_w, &m_h)) || m_w == 0 || m_h == 0)
-				return false;
-			UINT32 stride = 0;
-			m_stride = SUCCEEDED(cur->GetUINT32(MF_MT_DEFAULT_STRIDE, &stride)) ? static_cast<LONG>(stride) : static_cast<LONG>(m_w * 4);
-			m_crop = CRect(0, 0, static_cast<int>(m_w), static_cast<int>(m_h));
-			MFVideoArea area = {};
-			if (SUCCEEDED(cur->GetBlob(MF_MT_MINIMUM_DISPLAY_APERTURE, reinterpret_cast<UINT8*>(&area), sizeof(area), nullptr)) &&
-				area.Area.cx > 0 && area.Area.cy > 0)
-			{
-				const CRect r(CPoint(area.OffsetX.value, area.OffsetY.value), CSize(area.Area.cx, area.Area.cy));
-				CRect clip;
-				if (clip.IntersectRect(r, m_crop))
-					m_crop = clip;
-			}
-			return true;
-		}
-
-		bool CopySample(IMFSample* sample, Frame& out)
-		{
-			CComPtr<IMFMediaBuffer> buf;
-			if (FAILED(sample->ConvertToContiguousBuffer(&buf)))
-				return false;
-			BYTE* base = nullptr;
-			LONG pitch = 0;
-			CComPtr<IMF2DBuffer> buf2d;
-			bool locked2d = false;
-			if (SUCCEEDED(buf->QueryInterface(IID_PPV_ARGS(&buf2d))) && SUCCEEDED(buf2d->Lock2D(&base, &pitch)))
-				locked2d = true;
-			else
-			{
-				DWORD maxLen = 0, len = 0;
-				if (FAILED(buf->Lock(&base, &maxLen, &len)))
-					return false;
-				pitch = m_stride;
-				if (pitch < 0)   // 아래에서 위로 저장된 영상: 첫 줄은 버퍼 끝쪽
-					base += static_cast<LONG_PTR>(-pitch) * (m_h - 1);
-			}
-			out.w = m_crop.Width();
-			out.h = m_crop.Height();
-			out.bgra.resize(static_cast<size_t>(out.w) * out.h * 4);
-			for (int y = 0; y < out.h; ++y)
-			{
-				const BYTE* src = base + static_cast<LONG_PTR>(pitch) * (m_crop.top + y) + m_crop.left * 4;
-				BYTE* dst = out.bgra.data() + static_cast<size_t>(y) * out.w * 4;
-				memcpy(dst, src, static_cast<size_t>(out.w) * 4);
-				for (int x = 0; x < out.w; ++x)
-					dst[x * 4 + 3] = 255;   // 알파 (RGB32 는 의미 없는 값)
-			}
-			if (locked2d)
-				buf2d->Unlock2D();
-			else
-				buf->Unlock();
-			return out.w > 0 && out.h > 0;
-		}
-	};
+	using Frame = VideoFrame;   // 장면 · 장면 읽기는 FrameReader.h/.cpp (커버 만들기 창과 공용)
 
 	// Windows 얼굴 인식: 장면에 얼굴이 하나라도 있으면 true
 	class CFaceChecker
@@ -269,7 +130,7 @@ namespace
 	}
 }
 
-ShotResult ExtractScreenshots(const CString& videoPath, int count, const std::atomic<bool>& cancel,
+ShotResult ExtractScreenshots(const CString& videoPath, int count, const CString& folderName, const std::atomic<bool>& cancel,
 	const std::function<void(int done, int total)>& progress)
 {
 	ShotResult res;
@@ -295,7 +156,7 @@ ShotResult ExtractScreenshots(const CString& videoPath, int count, const std::at
 			CString dir = videoPath;
 			::PathRemoveFileSpecW(dir.GetBuffer());
 			dir.ReleaseBuffer();
-			dir += L"\\Screenshot\\";
+			dir += L"\\" + (folderName.IsEmpty() ? CString(L"Screenshot") : folderName) + L"\\";   // <품번>_Screenshot
 			res.folder = dir;
 			::SHCreateDirectoryExW(nullptr, dir, nullptr);
 			CString stem = ::PathFindFileNameW(videoPath);
@@ -327,7 +188,7 @@ ShotResult ExtractScreenshots(const CString& videoPath, int count, const std::at
 				bool found = faces.HasFace(first);
 				for (LONGLONG t = segStart + kRetryStep; !found && t < segEnd && !cancel; t += kRetryStep)   // 사람이 없으면 10초씩 뒤로
 				{
-					if (reader.Grab(t, later) && faces.HasFace(later))
+					if (reader.Grab(t, later) && faces.HasFace(later))   // 10초 뒤는 이어서 디코딩하는 것보다 키프레임으로 이동하는 쪽이 빠름 (키프레임 간격이 보통 10초보다 짧음)
 					{
 						chosen = &later;
 						found = true;

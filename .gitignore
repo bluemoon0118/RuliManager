@@ -361,6 +361,8 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-/plugins/avdbs
-/plugins/avwiki
-/plugins/avfan
+# plugins: only the samples and the guide go to GitHub (other plugins live in D:\Project\plugins)
+/plugins/*
+!/plugins/README.md
+!/plugins/sample_title/
+!/plugins/sample_stats/

@@ -4,7 +4,8 @@
 #include <functional>
 
 // 미리보기 영상 (영상 카드 오른쪽 클릭 [미리보기 만들기], 영상 상세 커버 이미지에 마우스를 올리면 재생)
-//  - 만들기: ffmpeg.exe 로 영상의 여러 구간(기본 10곳 × 2초)을 잘라 이어 붙인 소리 없는 짧은 mp4 (폭 480px)
+//  - 만들기: ffmpeg.exe 로 영상의 여러 구간을 잘라 이어 붙인 짧은 mp4 - 품질은 설정 [DB 관리] (Options)
+//    · 기본: 12곳 × 0.75초 · 폭 640px · 원본 fps · x264 CRF 21 · 소리 선택 / 간소화: 10곳 × 2초 · 폭 480px · 15fps · x264 fastdecode CRF 28 · 소리 없음
 //    · ffmpeg.exe 찾는 순서: <실행 폴더>\ffmpeg.exe → <실행 폴더>\ffmpeg\bin\ffmpeg.exe → <DB 폴더>\ffmpeg.exe → PATH
 //    · 저장: <DB 폴더>\previews\<키>.mp4 (키는 커버 캐시와 같은 규칙 - 이동식 디스크는 드라이브 문자가 바뀌어도 같음)
 //    · 백그라운드 스레드에서 호출 (오래 걸림, cancel 이 켜지면 ffmpeg 를 끝내고 돌아옴)
@@ -24,8 +25,22 @@ namespace PreviewVideo
 		CString file;       // 만든 미리보기 파일
 		CString error;      // 실패 이유
 	};
+	// 만들기 설정 (설정 창 [DB 관리] → 미리보기 영상 품질)
+	struct Options
+	{
+		int    segments = 12;       // 구간 수
+		double segLen = 0.75;       // 구간 길이 (초)
+		int    width = 640;         // 폭 (px, 높이는 비율)
+		int    fps = 0;             // 0 = 원본 fps
+		int    crf = 21;            // x264 품질 (낮을수록 좋음)
+		bool   fastDecode = false;  // x264 -tune fastdecode (월 모드 여러 칸 동시 재생 부담 줄임)
+		bool   audio = false;       // 소리 포함 (영상에 소리가 없으면 소리 없이)
+		static Options Standard(bool audio);   // 기본
+		static Options Light();                // 간소화 (예전 설정)
+		static Options FromSettings();         // 레지스트리 Settings\PreviewQuality (0 = 기본, 1 = 간소화) · PreviewAudio - UI 스레드에서 읽어 작업에 넘길 것
+	};
 	// durationSec: 영상 길이 (0 이하면 ffmpeg 로 알아냄)
-	Result Make(const CString& ffmpeg, const CString& videoPath, const CString& outFile, double durationSec, const std::atomic<bool>& cancel);
+	Result Make(const CString& ffmpeg, const CString& videoPath, const CString& outFile, double durationSec, const std::atomic<bool>& cancel, const Options& opt);
 }
 
 // ---------------------------------------------------------------------------
