@@ -71,6 +71,12 @@ class Svg:
         self.path(f'M{cx - r * 0.3},{cy - r * 0.45} L{cx + r * 0.5},{cy} L{cx - r * 0.3},{cy + r * 0.45} Z', fill)
         return self.add('</g>')
 
+    def playcount(self, cx, cy, r, fill=SUB, hole=CARD):
+        # 재생 횟수 아이콘: 꽉 찬 원 + 배경색으로 뚫은 삼각형 (영상 카드 아래 · 영상 상세)
+        self.circle(cx, cy, r, fill)
+        t = r * 0.52
+        return self.path(f'M{cx - t * 0.62},{cy - t} L{cx + t * 0.95},{cy} L{cx - t * 0.62},{cy + t} Z', hole)
+
     def person(self, cx, cy, s, fill=TEXT, op=0.8):
         # 사람 실루엣 (머리 + 어깨)
         self.add(f'<g opacity="{op}">')
@@ -93,7 +99,7 @@ class Svg:
         return self
 
     def video_card(self, x, y, w, title='제목', code='ABC-123', res='1080p', grade='FHD', time='2:03:15',
-                   stars=0, actors=2, tags=5, drops=0, cover=None, check=False, temp=False):
+                   stars=0, actors=2, tags=5, drops=0, cover=None, check=False, temp=False, plays=0):
         ih = w * 9 / 16
         self.rect(x, y, w, ih + 58, CARD, r=4)
         self.rect(x, y, w, ih, cover or '#3B5163', r=4)
@@ -126,6 +132,10 @@ class Svg:
             cx += 30
             self.path(f'M{cx + 4},{ty + 29} q5,7 0,11 q-5,-4 0,-11 Z', BLUE)
             self.text(cx + 12, ty + 38, str(drops), 9, SUB)
+        if plays:
+            cx += 30
+            self.playcount(cx + 4, ty + 35, 4.5, SUB, CARD)
+            self.text(cx + 12, ty + 38, str(plays), 9, SUB)
         return ih + 58
 
     def render(self):

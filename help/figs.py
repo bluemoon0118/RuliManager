@@ -64,7 +64,7 @@ def fig_main():
 def fig_card():
     s = Svg(560, 220, '영상 카드 각 부분')
     s.add('<g transform="translate(190,16) scale(1.45)">')
-    s.video_card(0, 0, 130, '영상 제목', 'ABC-123', stars=4, actors=2, tags=6, drops=3, check=True)
+    s.video_card(0, 0, 130, '영상 제목', 'ABC-123', stars=4, actors=2, tags=6, drops=3, check=True, plays=12)
     s.add('</g>')
     pts = [((200, 30), (120, 30), ''), ((215, 40), (120, 70), ''), ((370, 116), (470, 112), ''),
            ((240, 140), (120, 136), ''), ((230, 162), (120, 166), ''), ((350, 160), (470, 160), ''),
@@ -174,7 +174,10 @@ def detail_panel(s, x0, y0, w, compact=False):
     s.text(x0, y + 12, '별점', fs, SUB)
     s.stars(x0 + lw, y + 13, 3, fs + 4)
     s.path(f'M{x0 + lw + 92},{y + 2} q6,8 0,12 q-6,-4 0,-12 Z', BLUE)
-    s.text(x0 + lw + 102, y + 13, '0', fs, SUB)
+    s.text(x0 + lw + 102, y + 13, '3', fs, SUB)
+    s.playcount(x0 + lw + 120, y + 9, 5, SUB, '#1D272E')   # 재생 기록: 아이콘 + 횟수 + 날짜
+    s.text(x0 + lw + 128, y + 13, '12', fs, TEXT)
+    s.text(x0 + lw + 141, y + 13, '· 2026-11-17', fs - 1, SUB2)
     s.button(x0 + w - 54, y, 54, '저장', SAVE, rh, fs)
     ys['rating'] = y + 8
     y += rh + 4
@@ -229,7 +232,7 @@ def fig_detail():
              ('file', '파일 이름 · 재생 시간 · fps · 해상도'),
              ('image', '이미지 검색 (품번으로 인터넷에서) · 이미지 변경'),
              ('code', '품번 - 옆 단추로 복사, 품번으로 제작사 · 레이블 자동 연결'),
-             ('rating', '별점 · 물방울 (누르면 바로 저장), [저장]'),
+             ('rating', '별점 · 물방울 · 재생 기록 (횟수 · 날짜), [저장]'),
              ('release', '발매일 (숫자만 쳐도 됨) · 검열 정보'),
              ('actors', '배우 칩 - 오른쪽 클릭 = 별칭, 더블클릭 = 배우로 이동'),
              ('studio', '제작사 카드 - 더블클릭 = 바꾸기'),
@@ -692,9 +695,9 @@ def fig_settings_plugin():
     s = Svg(640, 300, '설정 [플러그인] 탭')
     s.window(0, 0, 640, 300, '설정')
     x = 12
-    for t, on in (('표시', False), ('상세 화면', False), ('테마', False), ('DB 관리', False), ('플러그인', True)):
-        s.button(x, 36, 112, t, ACC if on else COMBO, 22, 10)
-        x += 118
+    for t, on in (('표시', False), ('상세 화면', False), ('플레이어', False), ('테마', False), ('DB 관리', False), ('플러그인', True)):
+        s.button(x, 36, 96, t, ACC if on else COMBO, 22, 10)
+        x += 102
     s.text(12, 82, 'plugins 폴더 안 폴더마다 plugin.json 이 있는 것이 플러그인입니다. 체크한 것만 메뉴에 나타납니다.', 10, SUB)
     s.rect(12, 92, 616, 20, COMBO, r=0)
     for cx, t in ((36, '이름'), (300, '대상'), (400, '버전'), (480, '상태')):

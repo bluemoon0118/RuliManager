@@ -49,10 +49,10 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 </style>
 </head>
 <body>
-<nav><div class="brand">RuliManager<small>설명서 · v0.91</small></div><a class="lv1" href="#start">시작하기</a><a class="lv1" href="#layout">화면 구성</a><a class="lv1" href="#video">영상 탭</a><a class="lv1" href="#detail">영상 상세</a><a class="lv1" href="#player">내장 플레이어</a><a class="lv1" href="#input">정보 입력 (txt · 붙여넣기)</a><a class="lv1" href="#preview">미리보기 영상</a><a class="lv1" href="#actor">배우 탭</a><a class="lv2" href="#actor-drill">배우 출연작 화면</a><a class="lv1" href="#studio">제작사 탭</a><a class="lv2" href="#studio-drill">제작사 영상 화면</a><a class="lv1" href="#tag">태그 탭</a><a class="lv1" href="#collection">컬렉션 탭</a><a class="lv1" href="#series">품번 관리</a><a class="lv2" href="#manage-actor">배우 관리</a><a class="lv2" href="#manage-studio">제작사 관리</a><a class="lv2" href="#manage-tag">태그 관리</a><a class="lv2" href="#manage-file">파일 관리</a><a class="lv2" href="#video-check">영상 검사</a><a class="lv2" href="#dup-check">중복 파일 검사</a><a class="lv1" href="#plugin">플러그인</a><a class="lv1" href="#settings">설정</a><a class="lv1" href="#data">데이터와 백업</a><a class="lv1" href="#keys">단축키</a></nav>
+<nav><div class="brand">RuliManager<small>설명서 · v0.92</small></div><a class="lv1" href="#start">시작하기</a><a class="lv1" href="#layout">화면 구성</a><a class="lv1" href="#video">영상 탭</a><a class="lv1" href="#detail">영상 상세</a><a class="lv1" href="#player">내장 플레이어</a><a class="lv2" href="#play-count">재생 기록</a><a class="lv1" href="#input">정보 입력 (txt · 붙여넣기)</a><a class="lv1" href="#preview">미리보기 영상</a><a class="lv1" href="#actor">배우 탭</a><a class="lv2" href="#actor-drill">배우 출연작 화면</a><a class="lv1" href="#studio">제작사 탭</a><a class="lv2" href="#studio-drill">제작사 영상 화면</a><a class="lv1" href="#tag">태그 탭</a><a class="lv1" href="#collection">컬렉션 탭</a><a class="lv1" href="#series">품번 관리</a><a class="lv2" href="#manage-actor">배우 관리</a><a class="lv2" href="#manage-studio">제작사 관리</a><a class="lv2" href="#manage-tag">태그 관리</a><a class="lv2" href="#manage-file">파일 관리</a><a class="lv2" href="#video-check">영상 검사</a><a class="lv2" href="#dup-check">중복 파일 검사</a><a class="lv1" href="#plugin">플러그인</a><a class="lv1" href="#settings">설정</a><a class="lv1" href="#data">데이터와 백업</a><a class="lv1" href="#keys">단축키</a></nav>
 <main>
 <h1>RuliManager 설명서</h1>
-<p class="hint">v0.91 기준 · 그림은 실제 화면을 단순하게 그린 것이라 세부 모양은 다를 수 있습니다 · 어느 화면에서든 <kbd>F1</kbd> 을 누르면 그 화면의 장이 열립니다.</p>
+<p class="hint">v0.92 기준 · 그림은 실제 화면을 단순하게 그린 것이라 세부 모양은 다를 수 있습니다 · 어느 화면에서든 <kbd>F1</kbd> 을 누르면 그 화면의 장이 열립니다.</p>
 <section id="start"><h2>시작하기</h2>
 <p>RuliManager 는 PC 에 있는 영상 파일을 배우 · 제작사 · 태그 · 컬렉션으로 정리해서 보는 프로그램입니다.
 영상 파일은 그대로 두고, 정보(제목 · 배우 · 별점 등)는 프로그램 DB 에 따로 저장합니다.</p>
@@ -364,7 +364,11 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 <text x="0" y="246.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">별점</text>
 <text x="40" y="247.2" font-size="13" fill="#F2B824" text-anchor="start" font-weight="normal">★★★☆☆</text>
 <path d="M132,236.2 q6,8 0,12 q-6,-4 0,-12 Z" fill="#48AFF0"/>
-<text x="142" y="247.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">0</text>
+<text x="142" y="247.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">3</text>
+<circle cx="160" cy="243.2" r="5" fill="#A7B6C2"/>
+<path d="M158.388,240.6 L162.47,243.2 L158.388,245.79999999999998 Z" fill="#1D272E"/>
+<text x="168" y="247.2" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="normal">12</text>
+<text x="181" y="247.2" font-size="8" fill="#738694" text-anchor="start" font-weight="normal">· 2026-11-17</text>
 <rect x="266" y="234.2" width="54" height="16" rx="3" fill="#0F9960"/>
 <text x="293.0" y="245.44" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">저장</text>
 <text x="0" y="266.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">발매일</text>
@@ -473,6 +477,9 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 <text x="52" y="125.125" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">6</text>
 <path d="M72,116.125 q5,7 0,11 q-5,-4 0,-11 Z" fill="#48AFF0"/>
 <text x="80" y="125.125" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">3</text>
+<circle cx="102" cy="122.125" r="4.5" fill="#A7B6C2"/>
+<path d="M100.5492,119.785 L104.223,122.125 L100.5492,124.465 Z" fill="#30404D"/>
+<text x="110" y="125.125" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">12</text>
 </g>
 <line x1="200" y1="30" x2="120" y2="30" stroke="#F29D49" stroke-width="1" stroke-dasharray="3 2"/>
 <circle cx="120" cy="30" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
@@ -845,7 +852,11 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 <text x="10" y="275.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">별점</text>
 <text x="56" y="276.6" font-size="14" fill="#F2B824" text-anchor="start" font-weight="normal">★★★☆☆</text>
 <path d="M148,265.6 q6,8 0,12 q-6,-4 0,-12 Z" fill="#48AFF0"/>
-<text x="158" y="276.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">0</text>
+<text x="158" y="276.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">3</text>
+<circle cx="176" cy="272.6" r="5" fill="#A7B6C2"/>
+<path d="M174.388,270.0 L178.47,272.6 L174.388,275.20000000000005 Z" fill="#1D272E"/>
+<text x="184" y="276.6" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">12</text>
+<text x="197" y="276.6" font-size="9" fill="#738694" text-anchor="start" font-weight="normal">· 2026-11-17</text>
 <rect x="276" y="263.6" width="54" height="18" rx="3" fill="#0F9960"/>
 <text x="303.0" y="276.20000000000005" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">저장</text>
 <text x="10" y="297.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">발매일</text>
@@ -917,8 +928,8 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 <line x1="334" y1="271.6" x2="352" y2="271.6" stroke="#F29D49" stroke-width="1"/>
 <circle cx="362" cy="271.6" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
 <text x="362" y="275.6" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">5</text>
-<text x="378" y="275.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">별점 · 물방울 (누르면 바로</text>
-<text x="378" y="288.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">저장), [저장]</text>
+<text x="378" y="275.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">별점 · 물방울 · 재생 기록 (횟수</text>
+<text x="378" y="288.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">· 날짜), [저장]</text>
 <line x1="334" y1="293.6" x2="352" y2="301.6" stroke="#F29D49" stroke-width="1"/>
 <circle cx="362" cy="301.6" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
 <text x="362" y="305.6" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">6</text>
@@ -1074,8 +1085,8 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 <p class="tip"><b>팁</b> 글자 입력 칸(제목 · 태그 등)에 커서가 있으면 키는 그 칸에 들어갑니다. 영상이나 컨트롤 줄을 한 번 누르면 다시 단축키가 동작합니다.</p>
 <h3>설정 [플레이어] 탭</h3>
 <ul><li><b>영상을 열면 바로 재생</b> - 끄면 첫 장면 (또는 이어 볼 위치) 에서 멈춘 채로 열립니다.</li><li><b>보던 위치부터 이어서 재생</b> - 끄면 늘 처음부터 (위치도 저장하지 않음).</li><li><b>하드웨어 디코딩 (GPU)</b> - 영상이 깨지거나 검게 나오면 끄세요.</li><li><b>같은 이름의 자막 자동 불러오기</b> - <code>영상이름.srt</code> · <code>.ass</code> 등.</li><li><b>← → 이동 초 · Shift + ← → 초</b> (1 ~ 600).</li><li><b>영상이 끝나면</b> - 마지막 장면에서 멈춤 / 목록으로 돌아가기 / 처음부터 반복.</li><li><b>전체 화면 컨트롤</b> - 마우스가 몇 초 멈추면 숨길지 (1 ~ 10초).</li><li>설정은 다음에 영상을 열 때부터 적용됩니다.</li></ul>
-<h3 id="play-count">재생 기록</h3>
-<p>영상마다 <b>재생 횟수</b>와 <b>마지막 재생 날짜</b>를 저장합니다.</p>
+</section><section id="play-count"><h2>재생 기록</h2>
+<p>영상마다 <b>재생 횟수</b>와 <b>마지막 재생 날짜</b>를 저장합니다. 내장 플레이어를 쓰지 않아도 기록됩니다.</p>
 <ul><li><b>내장 플레이어</b> - 한 번 열어서 실제로 재생한 시간(일시정지 · 건너뛴 구간 빼고)이 1분 또는 영상 길이의 10% 를 넘으면 1회.</li><li><b>외부 플레이어</b> - 열 때 1회.</li><li>분할 영상은 어느 파트를 재생해도 묶음 전체가 1회입니다. 정보를 저장하기 전인 <span class="temp">● 임시</span> 영상은 기록하지 않습니다.</li><li><b>보는 곳</b> - 영상 카드 아래 ▶ 원 아이콘, <a href="#detail">영상 상세</a> 물방울 오른쪽, [리스트] 의 [재생] 열. 정렬 [재생 횟수] · [최근 재생] (많이 본 순 · 최근 본 순).</li><li><b>지우기</b> - 영상 상세 재생 기록 오른쪽 클릭 [초기화], 영상 오른쪽 클릭 [재생 기록 지우기], 체크한 영상 [재생 기록 지우기(n)].</li></ul>
 </section><section id="input"><h2>정보 입력 (txt · 붙여넣기)</h2>
 <p>영상 정보를 하나하나 치지 않고 한 번에 채우는 방법이 세 가지 있습니다.</p>
@@ -1524,7 +1535,11 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 <text x="0" y="246.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">별점</text>
 <text x="40" y="247.2" font-size="13" fill="#F2B824" text-anchor="start" font-weight="normal">★★★☆☆</text>
 <path d="M132,236.2 q6,8 0,12 q-6,-4 0,-12 Z" fill="#48AFF0"/>
-<text x="142" y="247.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">0</text>
+<text x="142" y="247.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">3</text>
+<circle cx="160" cy="243.2" r="5" fill="#A7B6C2"/>
+<path d="M158.388,240.6 L162.47,243.2 L158.388,245.79999999999998 Z" fill="#1D272E"/>
+<text x="168" y="247.2" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="normal">12</text>
+<text x="181" y="247.2" font-size="8" fill="#738694" text-anchor="start" font-weight="normal">· 2026-11-17</text>
 <rect x="266" y="234.2" width="54" height="16" rx="3" fill="#0F9960"/>
 <text x="293.0" y="245.44" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">저장</text>
 <text x="0" y="266.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">발매일</text>
@@ -1942,7 +1957,11 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 <text x="0" y="246.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">별점</text>
 <text x="40" y="247.2" font-size="13" fill="#F2B824" text-anchor="start" font-weight="normal">★★★☆☆</text>
 <path d="M132,236.2 q6,8 0,12 q-6,-4 0,-12 Z" fill="#48AFF0"/>
-<text x="142" y="247.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">0</text>
+<text x="142" y="247.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">3</text>
+<circle cx="160" cy="243.2" r="5" fill="#A7B6C2"/>
+<path d="M158.388,240.6 L162.47,243.2 L158.388,245.79999999999998 Z" fill="#1D272E"/>
+<text x="168" y="247.2" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="normal">12</text>
+<text x="181" y="247.2" font-size="8" fill="#738694" text-anchor="start" font-weight="normal">· 2026-11-17</text>
 <rect x="266" y="234.2" width="54" height="16" rx="3" fill="#0F9960"/>
 <text x="293.0" y="245.44" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">저장</text>
 <text x="0" y="266.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">발매일</text>
@@ -2443,16 +2462,18 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 <text x="580" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">—</text>
 <text x="600" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">☐</text>
 <text x="620" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">✕</text>
-<rect x="12" y="36" width="112" height="22" rx="3" fill="#394B59"/>
-<text x="68.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">표시</text>
-<rect x="130" y="36" width="112" height="22" rx="3" fill="#394B59"/>
-<text x="186.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">상세 화면</text>
-<rect x="248" y="36" width="112" height="22" rx="3" fill="#394B59"/>
-<text x="304.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">테마</text>
-<rect x="366" y="36" width="112" height="22" rx="3" fill="#394B59"/>
-<text x="422.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">DB 관리</text>
-<rect x="484" y="36" width="112" height="22" rx="3" fill="#137CBD"/>
-<text x="540.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">플러그인</text>
+<rect x="12" y="36" width="96" height="22" rx="3" fill="#394B59"/>
+<text x="60.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">표시</text>
+<rect x="114" y="36" width="96" height="22" rx="3" fill="#394B59"/>
+<text x="162.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">상세 화면</text>
+<rect x="216" y="36" width="96" height="22" rx="3" fill="#394B59"/>
+<text x="264.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">플레이어</text>
+<rect x="318" y="36" width="96" height="22" rx="3" fill="#394B59"/>
+<text x="366.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">테마</text>
+<rect x="420" y="36" width="96" height="22" rx="3" fill="#394B59"/>
+<text x="468.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">DB 관리</text>
+<rect x="522" y="36" width="96" height="22" rx="3" fill="#137CBD"/>
+<text x="570.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">플러그인</text>
 <text x="12" y="82" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">plugins 폴더 안 폴더마다 plugin.json 이 있는 것이 플러그인입니다. 체크한 것만 메뉴에 나타납니다.</text>
 <rect x="12" y="92" width="616" height="20" rx="0" fill="#394B59"/>
 <text x="36" y="106" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="bold">이름</text>

@@ -16,7 +16,7 @@
 
 ## v0.92 (현재)
 - 버전 0.91 → 0.92 (Version.h: APP_VERSION_MINOR 92, APP_VERSION_STR "0.92" → 창 제목 "RuliManager v0.92", 파일 버전 0.92.0.0)
-- 설명서(help\index.html)를 v0.91 기준으로 갱신 (`python build.py 0.91`, build.py 기본 VERSION 0.91): 새 장 [내장 플레이어](id player - 켜기 · 화면 · 단축키 · 설정 [플레이어] 탭, 절 [재생 기록] id play-count), 영상 카드 · 영상 상세 재생 횟수, 영상 [리스트] 열 · 정렬 [재생 횟수] [최근 재생] · 오른쪽 클릭 메뉴, Ctrl + 클릭 체크(카드 · 단축키 표), 제작사 [리스트] 표, 설정 탭 6개. 내장 플레이어 화면에서 F1 = [내장 플레이어] 장 (ShowHelp)
+- 설명서(help\index.html)를 v0.92 로 갱신 (`python build.py 0.92`, build.py 기본 VERSION 0.92 - 설명서 머리 "설명서 · v0.92" · "v0.92 기준", 내용은 v0.91 섹션 항목 반영): 새 장 [내장 플레이어](id player - 켜기 · 화면 · 단축키 · 설정 [플레이어] 탭) · 그 아래 장 [재생 기록](id play-count, 왼쪽 목차에 보임 - 처음에는 내장 플레이어 장 안의 소제목이라 목차에 없었음), 영상 카드 · 영상 상세 재생 횟수, 영상 [리스트] 열 · 정렬 [재생 횟수] [최근 재생] · 오른쪽 클릭 메뉴, Ctrl + 클릭 체크(카드 · 단축키 표), 제작사 [리스트] 표, 설정 탭 6개. 그림: 영상 카드(fig_card - 아래 줄 끝에 재생 아이콘 + 12), 영상 상세(detail_panel - 물방울 오른쪽 재생 아이콘 + 12 · 날짜, 설명 ⑤ 에 재생 기록, 제작사 · 배우 출연작 그림의 상세에도), 설정 탭 줄(fig_settings_plugin - [플레이어] 탭 포함 6개) (svg.py `playcount` · video_card plays). 내장 플레이어 화면에서 F1 = [내장 플레이어] 장 (ShowHelp)
 
 ## v0.91
 - 버전 0.9 → 0.91 (Version.h: APP_VERSION_MINOR 91, APP_VERSION_STR "0.91" → 창 제목 "RuliManager v0.91", 파일 버전 0.91.0.0)
