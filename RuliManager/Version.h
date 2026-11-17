@@ -10,8 +10,8 @@
 #define APP_NAME_STR        "RuliManager"
 
 #define APP_VERSION_MAJOR   0
-#define APP_VERSION_MINOR   91
+#define APP_VERSION_MINOR   92
 #define APP_VERSION_PATCH   0
 #define APP_VERSION_BUILD   0
 
-#define APP_VERSION_STR     "0.91"
+#define APP_VERSION_STR     "0.92"

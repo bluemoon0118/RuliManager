@@ -14,6 +14,7 @@ public:
 	void SetColors(COLORREF back, COLORREF normal, COLORREF hover);
 	void SetCount(int count);
 	int  GetCount() const { return m_count; }
+	int  NeededWidth(int height) const;   // 아이콘(높이 크기 정사각형) + 숫자에 꼭 맞는 폭 - 메인 창이 이 폭으로 배치 (여백 없이)
 
 protected:
 	int  m_count = 0;
@@ -25,6 +26,9 @@ protected:
 	CToolTipCtrl m_tip;
 
 	void Change(int count);
+	CRect ContentRect() const;   // 아이콘 + 숫자 자리 (창은 칸 폭만큼 넓지만 마우스 오버 · 클릭 · 손 모양 커서는 이 자리만)
+	bool InContent(CPoint pt) const { return ContentRect().PtInRect(pt) != FALSE; }
+	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
 	afx_msg void OnPaint();
 	afx_msg BOOL OnEraseBkgnd(CDC*) { return TRUE; }
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);

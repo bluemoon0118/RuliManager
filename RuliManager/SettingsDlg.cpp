@@ -1,6 +1,7 @@
 ﻿#include "pch.h"
 #include "RuliManager.h"
 #include "SettingsDlg.h"
+#include "MpvPlayer.h"
 #include <uxtheme.h>
 #include <set>
 #pragma comment(lib, "uxtheme.lib")
@@ -23,7 +24,8 @@ BEGIN_MESSAGE_MAP(CSettingsDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_SET_PREVIEW_DEL, &CSettingsDlg::OnBnClickedDeletePreviews)
 	ON_BN_CLICKED(IDC_SET_PREVIEW_REGEN, &CSettingsDlg::OnBnClickedRegenPreviews)
 	ON_BN_CLICKED(IDC_SET_PREVIEW_STOP, &CSettingsDlg::OnBnClickedStopPreviews)
-	ON_BN_CLICKED(IDC_SET_PREVIEW_STD, &CSettingsDlg::UpdatePreviewQuality)
+	ON_BN_CLICKED(IDC_SET_PREVIEW_STD, &CSettingsDlg::UpdatePreviewQuality)
+	ON_BN_CLICKED(IDC_SET_PLAYER_BUILTIN, &CSettingsDlg::OnPlayerBuiltin)
 	ON_BN_CLICKED(IDC_SET_PREVIEW_LIGHT, &CSettingsDlg::UpdatePreviewQuality)
 	ON_WM_TIMER()
 	ON_BN_CLICKED(IDC_SET_DEL_VIDEO, &CSettingsDlg::OnCheckChanged)
@@ -35,6 +37,7 @@ BEGIN_MESSAGE_MAP(CSettingsDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_SET_TAB3, &CSettingsDlg::OnTab3)
 	ON_BN_CLICKED(IDC_SET_TAB4, &CSettingsDlg::OnTab4)
 	ON_BN_CLICKED(IDC_SET_TAB5, &CSettingsDlg::OnTab5)
+	ON_BN_CLICKED(IDC_SET_TAB6, &CSettingsDlg::OnTab6)
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_SET_PLUGIN_LIST, &CSettingsDlg::OnPluginItemChanged)
 	ON_BN_CLICKED(IDC_SET_PLUGIN_FOLDER, &CSettingsDlg::OnBnClickedPluginFolder)
 	ON_BN_CLICKED(IDC_SET_PLUGIN_RELOAD, &CSettingsDlg::OnBnClickedPluginReload)
@@ -180,7 +183,7 @@ BOOL CSettingsDlg::OnInitDialog()
 	CDialogEx::OnInitDialog();
 	m_pluginList.SubclassDlgItem(IDC_SET_PLUGIN_LIST, this);   // 테마 적용 전에 (목록 머리글도 어두운 색으로)
 	// 탭 버튼: 토글 (선택 = 강조색, 나머지 = 콤보 색) - 테마 적용 전에 연결
-	const UINT tabIds[kPages] = { IDC_SET_TAB1, IDC_SET_TAB2, IDC_SET_TAB3, IDC_SET_TAB4, IDC_SET_TAB5 };
+	const UINT tabIds[kPages] = { IDC_SET_TAB1, IDC_SET_TAB2, IDC_SET_TAB3, IDC_SET_TAB4, IDC_SET_TAB5, IDC_SET_TAB6 };
 	for (int i = 0; i < kPages; ++i)
 	{
 		if (m_tabs[i].Attach(tabIds[i], this))
@@ -198,7 +201,7 @@ BOOL CSettingsDlg::OnInitDialog()
 		for (CWnd* w = GetWindow(GW_CHILD); w; w = w->GetWindow(GW_HWNDNEXT))
 		{
 			const UINT id = static_cast<UINT>(w->GetDlgCtrlID());
-			if (id == IDOK || id == IDCANCEL || (id >= IDC_SET_TAB1 && id <= IDC_SET_TAB4) || id == IDC_SET_TAB5)
+			if (id == IDOK || id == IDCANCEL || (id >= IDC_SET_TAB1 && id <= IDC_SET_TAB4) || id == IDC_SET_TAB5 || id == IDC_SET_TAB6)
 				continue;
 			CRect r;
 			w->GetWindowRect(&r);
@@ -223,6 +226,32 @@ BOOL CSettingsDlg::OnInitDialog()
 		AfxGetApp()->GetProfileInt(L"Settings", L"PreviewQuality", 0) == 1 ? IDC_SET_PREVIEW_LIGHT : IDC_SET_PREVIEW_STD);
 	CheckDlgButton(IDC_SET_PREVIEW_AUDIO, AfxGetApp()->GetProfileInt(L"Settings", L"PreviewAudio", 0) ? BST_CHECKED : BST_UNCHECKED);
 	UpdatePreviewQuality();
+	{
+		// 내장 플레이어: DLL 이 있으면 찾은 위치, 없으면 둘 위치를 안내
+		CString dll;
+		const bool has = CMpvPlayer::DllExists(&dll);
+		CheckDlgButton(IDC_SET_PLAYER_BUILTIN, (has && AfxGetApp()->GetProfileInt(L"Settings", L"BuiltinPlayer", 0)) ? BST_CHECKED : BST_UNCHECKED);
+		SetDlgItemText(IDC_SET_PLAYER_INFO, has
+			? L"libmpv 찾음: " + dll + L"\n끄면 지금처럼 기본 플레이어로 엽니다."
+			: L"실행 파일 폴더에 libmpv-2.dll 을 두면 쓸 수 있습니다: " + CMpvPlayer::DllFolder());
+		// [플레이어] 탭 재생 설정
+		CWinApp* app = AfxGetApp();
+		CheckDlgButton(IDC_SET_PLAYER_AUTOPLAY, app->GetProfileInt(L"Settings", L"PlayerAutoPlay", 1) ? BST_CHECKED : BST_UNCHECKED);
+		CheckDlgButton(IDC_SET_PLAYER_RESUME, app->GetProfileInt(L"Settings", L"PlayerResumeOn", 1) ? BST_CHECKED : BST_UNCHECKED);
+		CheckDlgButton(IDC_SET_PLAYER_HWDEC, app->GetProfileInt(L"Settings", L"PlayerHwdec", 1) ? BST_CHECKED : BST_UNCHECKED);
+		CheckDlgButton(IDC_SET_PLAYER_SUBAUTO, app->GetProfileInt(L"Settings", L"PlayerSubAuto", 1) ? BST_CHECKED : BST_UNCHECKED);
+		SetDlgItemInt(IDC_SET_PLAYER_SEEK, app->GetProfileInt(L"Settings", L"PlayerSeek", 5), FALSE);
+		SetDlgItemInt(IDC_SET_PLAYER_SEEKBIG, app->GetProfileInt(L"Settings", L"PlayerSeekBig", 30), FALSE);
+		SetDlgItemInt(IDC_SET_PLAYER_HIDE, app->GetProfileInt(L"Settings", L"PlayerHideSec", 3), FALSE);
+		if (CComboBox* end = static_cast<CComboBox*>(GetDlgItem(IDC_SET_PLAYER_END)))
+		{
+			end->AddString(L"마지막 장면에서 멈춤");
+			end->AddString(L"목록으로 돌아가기");
+			end->AddString(L"처음부터 반복");
+			const int e = app->GetProfileInt(L"Settings", L"PlayerEndAction", 0);
+			end->SetCurSel((e >= 0 && e <= 2) ? e : 0);
+		}
+	}
 	if (CComboBox* combo = static_cast<CComboBox*>(GetDlgItem(IDC_SET_IO_KIND)))
 	{
 		// 텍스트 내보내기 / 가져오기 대상 (탭 · DB 삭제와 같은 순서: 영상 / 배우 / 제작사 / 태그)
@@ -472,7 +501,47 @@ void CSettingsDlg::OnOK()
 	}
 	AfxGetApp()->WriteProfileInt(L"Settings", L"PreviewQuality", IsDlgButtonChecked(IDC_SET_PREVIEW_LIGHT) == BST_CHECKED ? 1 : 0);
 	AfxGetApp()->WriteProfileInt(L"Settings", L"PreviewAudio", IsDlgButtonChecked(IDC_SET_PREVIEW_AUDIO) == BST_CHECKED ? 1 : 0);
+	AfxGetApp()->WriteProfileInt(L"Settings", L"BuiltinPlayer", IsDlgButtonChecked(IDC_SET_PLAYER_BUILTIN) == BST_CHECKED ? 1 : 0);
+	{
+		// [플레이어] 탭 (숫자는 범위 안으로 맞춤)
+		CWinApp* app = AfxGetApp();
+		auto clampInt = [this](UINT id, int lo, int hi, int def)
+		{
+			BOOL ok = FALSE;
+			const int v = static_cast<int>(GetDlgItemInt(id, &ok, FALSE));
+			return ok ? (std::max)(lo, (std::min)(hi, v)) : def;
+		};
+		app->WriteProfileInt(L"Settings", L"PlayerAutoPlay", IsDlgButtonChecked(IDC_SET_PLAYER_AUTOPLAY) == BST_CHECKED ? 1 : 0);
+		app->WriteProfileInt(L"Settings", L"PlayerResumeOn", IsDlgButtonChecked(IDC_SET_PLAYER_RESUME) == BST_CHECKED ? 1 : 0);
+		app->WriteProfileInt(L"Settings", L"PlayerHwdec", IsDlgButtonChecked(IDC_SET_PLAYER_HWDEC) == BST_CHECKED ? 1 : 0);
+		app->WriteProfileInt(L"Settings", L"PlayerSubAuto", IsDlgButtonChecked(IDC_SET_PLAYER_SUBAUTO) == BST_CHECKED ? 1 : 0);
+		app->WriteProfileInt(L"Settings", L"PlayerSeek", clampInt(IDC_SET_PLAYER_SEEK, 1, 600, 5));
+		app->WriteProfileInt(L"Settings", L"PlayerSeekBig", clampInt(IDC_SET_PLAYER_SEEKBIG, 1, 600, 30));
+		app->WriteProfileInt(L"Settings", L"PlayerHideSec", clampInt(IDC_SET_PLAYER_HIDE, 1, 10, 3));
+		if (CComboBox* end = static_cast<CComboBox*>(GetDlgItem(IDC_SET_PLAYER_END)))
+			app->WriteProfileInt(L"Settings", L"PlayerEndAction", (std::max)(0, end->GetCurSel()));
+	}
 	CDialogEx::OnOK();
+}
+
+void CSettingsDlg::OnPlayerBuiltin()
+{
+	if (IsDlgButtonChecked(IDC_SET_PLAYER_BUILTIN) != BST_CHECKED)
+		return;
+	// 체크할 때 실제로 DLL 을 읽어 봄 (이름만 같은 다른 파일 · 32/64비트가 다른 DLL 도 걸러냄)
+	CString dll;
+	if (CMpvPlayer::Available(&dll))
+	{
+		SetDlgItemText(IDC_SET_PLAYER_INFO, L"libmpv 찾음: " + dll + L"\n끄면 지금처럼 기본 플레이어로 엽니다.");
+		return;
+	}
+	CheckDlgButton(IDC_SET_PLAYER_BUILTIN, BST_UNCHECKED);
+	CString msg;
+	if (CMpvPlayer::DllExists(&dll))
+		msg.Format(L"libmpv 를 읽지 못했습니다.\n%s\n\n이 프로그램과 같은 64비트용 libmpv-2.dll 인지 확인하세요.", static_cast<LPCWSTR>(dll));
+	else
+		msg.Format(L"libmpv-2.dll 을 찾지 못했습니다.\n\n아래 폴더(실행 파일 폴더)에 두고 다시 체크하세요.\n%s", static_cast<LPCWSTR>(CMpvPlayer::DllFolder()));
+	AfxMessageBox(msg, MB_ICONINFORMATION);
 }
 
 void CSettingsDlg::UpdatePreviewQuality()

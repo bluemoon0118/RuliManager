@@ -23,6 +23,8 @@ struct VideoItem
 	CString   tags;          // 쉼표로 구분된 태그
 	CString   memo;          // 메모 (여러 줄)
 	CString   collections;   // 이 영상이 들어 있는 컬렉션 (쉼표 구분, DB V 줄 19번째 칸)
+	int       playCount = 0; // 재생 횟수 (DB V 줄 20번째 칸) - 내장 플레이어는 1분 또는 길이 10% 넘게 재생하면 1회, 외부 플레이어는 열 때 1회
+	CString   lastPlayed;    // 마지막 재생 "YYYY-MM-DD HH:MM" (DB V 줄 21번째 칸, 없으면 빈 문자열)
 	bool      pending = false; // 임시 항목: 스캔으로 찾았지만 아직 정보를 저장하지 않음 (pending.tsv 에 기록)
 
 	CString FileName() const { return CString(::PathFindFileNameW(path)); }

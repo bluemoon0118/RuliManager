@@ -333,6 +333,19 @@
 #define IDC_CP_GUIDE                    1407
 #define IDC_CP_COVER                    1408
 #define IDC_CP_SHOT                     1409
+#define IDC_PLAYER_VIEW                 1410
+#define IDC_SET_PLAYER_BUILTIN          1411
+#define IDC_SET_PLAYER_INFO             1412
+#define IDC_SET_TAB6                    1413
+#define IDC_SET_PLAYER_RESUME           1414
+#define IDC_SET_PLAYER_HWDEC            1415
+#define IDC_SET_PLAYER_SEEK             1416
+#define IDC_SET_PLAYER_SEEKBIG          1417
+#define IDC_SET_PLAYER_END              1418
+#define IDC_SET_PLAYER_HIDE             1419
+#define IDC_SET_PLAYER_SUBAUTO          1420
+#define IDC_SET_PLAYER_AUTOPLAY         1421
+#define IDC_STATIC_PLAYINFO             1422
 #define IDC_VIDEO_MODE_WALL             1327
 #define IDC_DETAIL_BAR                  1328
 #define IDC_ACTOR_VIEW_GRID             1329
@@ -410,6 +423,9 @@
 #define ID_MANAGE_DUPS                  33054
 #define ID_MANAGE_PLUGINS               33055
 #define ID_VIDEO_COVERPICK              33056
+#define ID_VIDEO_PLAY_EXTERNAL          33057
+#define ID_VIDEO_CLEARPLAY              33058
+#define ID_VIDEO_CLEARPLAYCHECKED       33059
 #define ID_PLUGIN_FIRST                 33100
 #define ID_PLUGIN_LAST                  33199
 #define ID_CAT_MERGE                    32823
@@ -426,8 +442,8 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        151
-#define _APS_NEXT_COMMAND_VALUE         33057
-#define _APS_NEXT_CONTROL_VALUE         1410
+#define _APS_NEXT_COMMAND_VALUE         33060
+#define _APS_NEXT_CONTROL_VALUE         1423
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

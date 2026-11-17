@@ -332,7 +332,7 @@ void CDupGrid::OnLButtonDown(UINT /*nFlags*/, CPoint point)
 	CRect cr = CheckRect(m_slots[s].rc);
 	cr.OffsetRect(0, -m_scroll);
 	cr.InflateRect(3, 3);
-	if (cr.PtInRect(point))
+	if (cr.PtInRect(point) || (::GetKeyState(VK_CONTROL) & 0x8000))   // Ctrl + 클릭 = 카드 어디를 눌러도 체크
 		ToggleSlot(s);
 	else
 		Invalidate(FALSE);
@@ -346,9 +346,9 @@ void CDupGrid::OnLButtonDblClk(UINT /*nFlags*/, CPoint point)
 	CRect cr = CheckRect(m_slots[s].rc);
 	cr.OffsetRect(0, -m_scroll);
 	cr.InflateRect(3, 3);
-	if (cr.PtInRect(point))
+	if (cr.PtInRect(point) || (::GetKeyState(VK_CONTROL) & 0x8000))
 	{
-		ToggleSlot(s);   // 체크 칸을 빠르게 두 번: 두 번째도 체크 전환 (재생하지 않음)
+		ToggleSlot(s);   // 체크 칸을 빠르게 두 번 (또는 Ctrl + 두 번): 두 번째도 체크 전환 (재생하지 않음)
 		return;
 	}
 	if (m_onPlay)

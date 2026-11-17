@@ -108,6 +108,8 @@
     <ClInclude Include="ScreenshotExtractor.h" />
     <ClInclude Include="PreviewVideo.h" />
     <ClInclude Include="WallRenderer.h" />
+    <ClInclude Include="MpvPlayer.h" />
+    <ClInclude Include="PlayerView.h" />
     <ClInclude Include="FrameReader.h" />
     <ClInclude Include="CoverPickDlg.h" />
     <ClInclude Include="TreemapView.h" />
@@ -176,6 +178,8 @@
     <ClCompile Include="VectorIcons.cpp" />
     <ClCompile Include="PreviewVideo.cpp" />
     <ClCompile Include="WallRenderer.cpp" />
+    <ClCompile Include="MpvPlayer.cpp" />
+    <ClCompile Include="PlayerView.cpp" />
     <ClCompile Include="FrameReader.cpp" />
     <ClCompile Include="CoverPickDlg.cpp" />
     <ClCompile Include="TreemapView.cpp" />

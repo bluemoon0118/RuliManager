@@ -26,6 +26,7 @@ class CVideoCheckDlg;   // 영상 검사 창 (모달리스, OpenVideoCheck)
 #include "DropCounter.h"
 #include "ScreenshotExtractor.h"
 #include "YearView.h"
+#include "PlayerView.h"   // 내장 플레이어 (libmpv)
 #include "PreviewVideo.h"
 #include "WallRenderer.h"
 #include "TreemapView.h"
@@ -142,6 +143,21 @@ protected:
 	afx_msg void OnBnClickedStudioViewTree();
 	// [계층] 보기: 제작사 격자(m_catGrid)의 자식, 도구줄 아래 전체 - 노드는 m_catRows 의 제작사 (페이지 없이 전체)
 	CStudioTreeView m_studioTree;
+	// 내장 플레이어 (설정 [표시] 내장 플레이어 사용 + libmpv-2.dll): 영상 더블클릭 · 재생 → 왼쪽 격자 자리가 플레이어 View
+	//  - [◀ 목록] · Esc · 탭 이동 = 끄고 목록으로 (보던 위치 저장 → 다음에 이어서 재생)
+	CPlayerView m_player;
+	bool m_playerOn = false;
+	int  m_playerItem = -1;
+	std::vector<HWND> m_playerHidden;   // 플레이어가 덮어서 숨긴 왼쪽 컨트롤 (돌아올 때 다시 보임)
+	bool BuiltinPlayerEnabled() const;
+	void EnterPlayer(int idx);
+	void ExitPlayer();
+	void ApplyPlayerPane();             // 플레이어 자리 안의 다른 컨트롤 숨김 (LayoutControls 끝)
+	void OpenExternal(int idx);         // 기본 플레이어(연결 프로그램)로 열기
+	static CString ResumeKey(const CString& path);
+	double LoadResume(const CString& path);
+	void SaveResume(int idx, double pos, double dur);
+	afx_msg void OnVideoPlayExternal();
 	void LayoutStudioTree();
 	void RebuildStudioTree();
 	void DrawStudioTreeNode(CDC* dc, int row, const CRect& rc, bool selected, bool hot);
@@ -207,6 +223,9 @@ protected:
 	int    m_gridPartG = -1;          // 파트 칸을 그릴 카드
 	CRect  m_gridPartCard;            // 그 카드 이미지 영역 (글자 창 좌표)
 	size_t m_gridPartSig = 0;         // 내용 (카드 · 자리 · 올라간 파트 · 고른 파트) - 바뀌면 다시 그림
+	bool   m_gridPartShowZones = false;   // 글자 창에 파트 칸을 그림 (분할 영상, 마우스가 움직이는 중)
+	bool   m_gridPartShowCheck = false;   // 글자 창에 체크 칸을 그림 (미리보기가 카드 왼쪽 위 체크 칸을 가림)
+	void   DrawGridHoverOverlay(CDC* dc);   // m_gridPartOverlay 내용: 파트 칸 + 체크 칸
 	void UpdateGridPartOverlay();
 	CPoint    m_gridPartMouse;            // 마지막 마우스 위치 (화면 좌표) - 멈춰 있으면 파트 칸을 숨김
 	ULONGLONG m_gridPartMoveTick = 0;     // 마우스가 마지막으로 움직인 시각
@@ -243,6 +262,13 @@ protected:
 	bool  m_labelActorPopupOn = false;
 	CRect m_labelChipScreen;
 	void  CheckLabelActorHover();
+	CDarkHeader m_catListHeader;       // 제작사 [리스트] 열 머리글 (영상 [리스트]와 같은 어두운 머리글 + 정렬 삼각형)
+	CImageList  m_catRowImages;        // 제작사 [리스트] 줄 높이 · 첫 열 로고 자리용 빈 이미지 목록
+	int  m_catLogoW = 96, m_catLogoH = 54;   // 제작사 [리스트] 로고 칸 (16:9)
+	enum { CC_NAME = 0, CC_COUNT = 1, CC_MEMO = 2, CC_PARENT = 3, CC_ACTORS = 4 };   // m_listCat 열 (앞 3개는 다른 탭과 같음)
+	afx_msg void OnNmCustomDrawCat(NMHDR* pNMHDR, LRESULT* pResult);   // 제작사 [리스트]: 첫 열에 로고, 이름 굵게
+	void AutoSizeCatListColumns();     // 제작사 [리스트] 열 폭: 목록 폭에 꽉 차게
+	void UpdateCatSortArrows();        // 제작사 [리스트] 머리글 정렬 삼각형 (이름 / 영상 수)
 	CDarkHeader m_listHeader;          // [리스트] 열 머리글 (어두운 색 + 정렬 삼각형)
 	// 영상 화면별 보기: 0 = [격자] (가로 카드), 1 = [리스트] (스프레드시트), 2 = [패키지] (세로 카드, 이미지만), 3 = [월 모드] (16:9 이미지만 빈틈없이 + 미리보기 자동 재생)
 	//  [0] 영상 탭, [1] 배우 출연작, [2] 제작사 · 레이블 영상, [3] 태그 영상, [4] 컬렉션 영상 - 레지스트리 Settings\VideoViewMode / …Actor / …Studio / …Tag / …Collection
@@ -372,6 +398,16 @@ protected:
 	void ToggleTagFavorite(const CString& tag);   // 태그 즐겨찾기 (태그 목록에 없으면 추가)
 	bool IsTagFavorite(const CString& tag) const;
 	CDropCounter m_dropCounter;      // 영상 상세 정보: 별점 오른쪽 물방울 카운트
+	CStatic m_playInfo;              // 영상 상세 정보: 물방울 오른쪽 "▶ 12회 · 2026-11-17" (재생 기록, 없으면 빈칸)
+	void UpdatePlayInfo();
+	void RelayoutDropCounter();
+	bool m_playInfoHover = false;    // 재생 기록 위에 마우스 (아이콘 + 횟수를 물방울처럼 강조색으로)
+	bool m_playInfoTracking = false;
+	int  m_playInfoContentW = 0;     // 아이콘 + 횟수 + 날짜 폭 (OnDrawItem 이 셈 - 이 자리만 마우스 오버)      // 물방울 카운트 자릿수가 바뀌면 폭(숫자에 꼭 맞게) · 재생 기록 자리 다시 배치
+	void RecordPlay(int idx);        // 재생 1회 기록 (분할 영상은 묶음 전체) + 저장
+	void ClearPlayRecords(const std::vector<int>& items);
+	afx_msg void OnVideoClearPlay();
+	afx_msg void OnVideoClearPlayChecked();
 	CMediaInfoLabel m_mediaInfo;     // 영상 상세 정보: [이미지 변경] 위 "fps: 29.97 | 1080p"
 	CActorStrip m_actorStrip;        // 영상 상세 정보 메모 아래: 출연 배우 카드 (가로 한 줄)
 	// 영상 상세 태그 아래 영역: 0 = 출연 배우 카드 (기본), 1 = 영상 스크린샷 (영상 폴더의 Screenshot 폴더 이미지 격자) - 설정 창, 레지스트리 Settings\DetailStrip

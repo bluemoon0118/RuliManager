@@ -66,7 +66,7 @@ protected:
 
 	void UpdateCounts();        // 체크박스 글자에 개수 표시
 	// 탭: [표시] [상세 화면] [테마] [DB 관리] [플러그인] - 리소스에서 페이지마다 x 400 DLU 씩 떨어뜨려 둔 컨트롤을 첫 페이지 자리로 옮기고 탭마다 보이기 / 숨기기
-	static const int kPages = 5;
+	static const int kPages = 6;   // [플레이어] 탭은 리소스 x 2000 대 (페이지 5), 탭 버튼은 [상세 화면] 오른쪽
 	CDarkButton m_tabs[kPages];
 	std::vector<std::pair<HWND, int>> m_pageCtrls;   // (컨트롤, 페이지 번호)
 	int  m_page = 0;
@@ -77,6 +77,7 @@ protected:
 	afx_msg void OnTab3() { ShowPage(2); }
 	afx_msg void OnTab4() { ShowPage(3); }
 	afx_msg void OnTab5() { ShowPage(4); }
+	afx_msg void OnTab6() { ShowPage(5); }
 	// [플러그인] 탭: plugins 폴더의 플러그인 목록 (체크 = 사용, 확인을 누르면 저장)
 	CListCtrl m_pluginList;
 	std::vector<PluginInfo> m_plugins;
@@ -96,6 +97,7 @@ protected:
 	afx_msg void OnBnClickedDeletePreviews() { if (m_onDeletePreviews) m_onDeletePreviews(); }
 	afx_msg void OnBnClickedRegenPreviews() { if (m_onRegenPreviews) m_onRegenPreviews(); UpdatePreviewButtons(); }
 	afx_msg void OnBnClickedStopPreviews() { if (m_onStopPreviews) m_onStopPreviews(); UpdatePreviewButtons(); }
+	afx_msg void OnPlayerBuiltin();        // [내장 플레이어 사용] 체크: libmpv-2.dll 이 없으면 안내하고 체크를 풂
 	afx_msg void UpdatePreviewQuality();   // 미리보기 품질 라디오 → [소리 포함] 활성 상태
 	void UpdatePreviewButtons();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);

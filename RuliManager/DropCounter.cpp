@@ -18,11 +18,12 @@ BEGIN_MESSAGE_MAP(CDropCounter, CWnd)
 	ON_WM_MOUSEMOVE()
 	ON_MESSAGE(WM_MOUSELEAVE, &CDropCounter::OnMouseLeave)
 	ON_WM_ENABLE()
+	ON_WM_SETCURSOR()
 END_MESSAGE_MAP()
 
 bool CDropCounter::Create(CWnd* parent, UINT id)
 {
-	const CString cls = AfxRegisterWndClass(CS_DBLCLKS, ::LoadCursor(nullptr, IDC_HAND), nullptr);
+	const CString cls = AfxRegisterWndClass(CS_DBLCLKS, ::LoadCursor(nullptr, IDC_ARROW), nullptr);   // 손 모양은 아이콘 + 숫자 위에서만 (OnSetCursor)
 	if (!CWnd::Create(cls, L"", WS_CHILD | WS_TABSTOP, CRect(0, 0, 60, 20), parent, id))
 		return false;
 	if (m_tip.Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX))
@@ -56,8 +57,56 @@ void CDropCounter::Change(int count)
 		return;
 	m_count = count;
 	Invalidate(FALSE);
+	UpdateWindow();   // 숫자를 바로 그림 (m_onChanged 가 DB 저장으로 시간이 걸려도 클릭 즉시 보임)
 	if (m_onChanged)
 		m_onChanged(m_count);
+}
+
+int CDropCounter::NeededWidth(int height) const
+{
+	int textW = 0;
+	if (GetSafeHwnd())
+		if (CWnd* parent = GetParent())
+		{
+			CClientDC dc(const_cast<CDropCounter*>(this));
+			CFont* old = dc.SelectObject(parent->GetFont());
+			CString t;
+			t.Format(L"%d", m_count);
+			textW = dc.GetTextExtent(t).cx;
+			dc.SelectObject(old);
+		}
+	return height + 3 + textW + 2;   // 아이콘 + 간격 3 + 숫자 + 끝 2
+}
+
+CRect CDropCounter::ContentRect() const
+{
+	CRect rc;
+	GetClientRect(&rc);
+	const int side = rc.Height();
+	int textW = 0;
+	if (CWnd* parent = GetParent())
+	{
+		CClientDC dc(const_cast<CDropCounter*>(this));
+		CFont* old = dc.SelectObject(parent->GetFont());
+		CString t;
+		t.Format(L"%d", m_count);
+		textW = dc.GetTextExtent(t).cx;
+		dc.SelectObject(old);
+	}
+	return CRect(rc.left, rc.top, (std::min)(static_cast<int>(rc.right), static_cast<int>(rc.left) + side + 3 + textW + 4), rc.bottom);
+}
+
+BOOL CDropCounter::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
+{
+	CPoint pt;
+	::GetCursorPos(&pt);
+	ScreenToClient(&pt);
+	if (nHitTest == HTCLIENT && IsWindowEnabled() && InContent(pt))
+	{
+		::SetCursor(::LoadCursor(nullptr, IDC_HAND));
+		return TRUE;
+	}
+	return CWnd::OnSetCursor(pWnd, nHitTest, message);
 }
 
 void CDropCounter::OnPaint()
@@ -95,7 +144,7 @@ void CDropCounter::OnPaint()
 
 void CDropCounter::OnLButtonDown(UINT nFlags, CPoint point)
 {
-	if (IsWindowEnabled())
+	if (IsWindowEnabled() && InContent(point))
 		Change(m_count + 1);
 	CWnd::OnLButtonDown(nFlags, point);
 }
@@ -103,7 +152,7 @@ void CDropCounter::OnLButtonDown(UINT nFlags, CPoint point)
 void CDropCounter::OnLButtonDblClk(UINT nFlags, CPoint point)
 {
 	// 빠르게 두 번 눌러도 두 번 증가
-	if (IsWindowEnabled())
+	if (IsWindowEnabled() && InContent(point))
 		Change(m_count + 1);
 	CWnd::OnLButtonDblClk(nFlags, point);
 }
@@ -130,9 +179,10 @@ void CDropCounter::OnMouseMove(UINT nFlags, CPoint point)
 		TRACKMOUSEEVENT tme = { sizeof(tme), TME_LEAVE, m_hWnd, 0 };
 		m_tracking = ::TrackMouseEvent(&tme) != FALSE;
 	}
-	if (!m_hover)
+	const bool over = InContent(point);   // 숫자 오른쪽 빈 자리는 마우스 오버 아님
+	if (m_hover != over)
 	{
-		m_hover = true;
+		m_hover = over;
 		Invalidate(FALSE);
 	}
 	CWnd::OnMouseMove(nFlags, point);

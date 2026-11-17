@@ -24,6 +24,8 @@
     <ClInclude Include="ImagePreview.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="PreviewVideo.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="WallRenderer.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="MpvPlayer.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="PlayerView.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="FrameReader.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="CoverPickDlg.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="TreemapView.h"><Filter>헤더 파일</Filter></ClInclude>
@@ -81,6 +83,8 @@
     <ClCompile Include="ImagePreview.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="PreviewVideo.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="WallRenderer.cpp"><Filter>소스 파일</Filter></ClCompile>
+    <ClCompile Include="MpvPlayer.cpp"><Filter>소스 파일</Filter></ClCompile>
+    <ClCompile Include="PlayerView.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="FrameReader.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="CoverPickDlg.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="TreemapView.cpp"><Filter>소스 파일</Filter></ClCompile>

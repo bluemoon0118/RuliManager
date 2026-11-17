@@ -49,10 +49,10 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 </style>
 </head>
 <body>
-<nav><div class="brand">RuliManager<small>설명서 · v0.9</small></div><a class="lv1" href="#start">시작하기</a><a class="lv1" href="#layout">화면 구성</a><a class="lv1" href="#video">영상 탭</a><a class="lv1" href="#detail">영상 상세</a><a class="lv1" href="#input">정보 입력 (txt · 붙여넣기)</a><a class="lv1" href="#preview">미리보기 영상</a><a class="lv1" href="#actor">배우 탭</a><a class="lv2" href="#actor-drill">배우 출연작 화면</a><a class="lv1" href="#studio">제작사 탭</a><a class="lv2" href="#studio-drill">제작사 영상 화면</a><a class="lv1" href="#tag">태그 탭</a><a class="lv1" href="#collection">컬렉션 탭</a><a class="lv1" href="#series">품번 관리</a><a class="lv2" href="#manage-actor">배우 관리</a><a class="lv2" href="#manage-studio">제작사 관리</a><a class="lv2" href="#manage-tag">태그 관리</a><a class="lv2" href="#manage-file">파일 관리</a><a class="lv2" href="#video-check">영상 검사</a><a class="lv2" href="#dup-check">중복 파일 검사</a><a class="lv1" href="#plugin">플러그인</a><a class="lv1" href="#settings">설정</a><a class="lv1" href="#data">데이터와 백업</a><a class="lv1" href="#keys">단축키</a></nav>
+<nav><div class="brand">RuliManager<small>설명서 · v0.91</small></div><a class="lv1" href="#start">시작하기</a><a class="lv1" href="#layout">화면 구성</a><a class="lv1" href="#video">영상 탭</a><a class="lv1" href="#detail">영상 상세</a><a class="lv1" href="#player">내장 플레이어</a><a class="lv1" href="#input">정보 입력 (txt · 붙여넣기)</a><a class="lv1" href="#preview">미리보기 영상</a><a class="lv1" href="#actor">배우 탭</a><a class="lv2" href="#actor-drill">배우 출연작 화면</a><a class="lv1" href="#studio">제작사 탭</a><a class="lv2" href="#studio-drill">제작사 영상 화면</a><a class="lv1" href="#tag">태그 탭</a><a class="lv1" href="#collection">컬렉션 탭</a><a class="lv1" href="#series">품번 관리</a><a class="lv2" href="#manage-actor">배우 관리</a><a class="lv2" href="#manage-studio">제작사 관리</a><a class="lv2" href="#manage-tag">태그 관리</a><a class="lv2" href="#manage-file">파일 관리</a><a class="lv2" href="#video-check">영상 검사</a><a class="lv2" href="#dup-check">중복 파일 검사</a><a class="lv1" href="#plugin">플러그인</a><a class="lv1" href="#settings">설정</a><a class="lv1" href="#data">데이터와 백업</a><a class="lv1" href="#keys">단축키</a></nav>
 <main>
 <h1>RuliManager 설명서</h1>
-<p class="hint">v0.9 기준 · 그림은 실제 화면을 단순하게 그린 것이라 세부 모양은 다를 수 있습니다 · 어느 화면에서든 <kbd>F1</kbd> 을 누르면 그 화면의 장이 열립니다.</p>
+<p class="hint">v0.91 기준 · 그림은 실제 화면을 단순하게 그린 것이라 세부 모양은 다를 수 있습니다 · 어느 화면에서든 <kbd>F1</kbd> 을 누르면 그 화면의 장이 열립니다.</p>
 <section id="start"><h2>시작하기</h2>
 <p>RuliManager 는 PC 에 있는 영상 파일을 배우 · 제작사 · 태그 · 컬렉션으로 정리해서 보는 프로그램입니다.
 영상 파일은 그대로 두고, 정보(제목 · 배우 · 별점 등)는 프로그램 DB 에 따로 저장합니다.</p>
@@ -442,7 +442,7 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 <circle cx="12" cy="500" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
 <text x="12" y="504" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">8</text>
 </svg><figcaption>메인 화면 (영상 탭)</figcaption></figure>
-<ol class="callouts"><li><b>폴더 · 새로고침</b> - [폴더 관리] 로 등록 폴더 추가 · 제거, [새로고침] <kbd>F5</kbd> 은 새 파일 찾기, [재 스캔] 은 저장된 영상에도 폴더 구조를 다시 적용해 빈 배우 · 제작사 · 발매일을 채웁니다.</li><li><b>[목록 관리 ▾] · [관리 도구 ▾] · 검색</b> - [목록 관리 ▾] 는 배우 / 제작사 / 태그 / 품번 관리 창, [관리 도구 ▾] 는 파일 관리 · 영상 검사 · 중복 파일 검사 · 플러그인을 엽니다. 검색 칸은 이름 · 품번 · 제목 · 배우 · 제작사 · 태그를 바로 찾습니다 (띄어 쓰면 모두 포함하는 것만).</li><li><b>설정 (톱니바퀴)</b> - <a href="#settings">설정 창</a>. 미리보기를 만드는 동안에는 톱니바퀴가 돌고, 오른쪽 클릭으로 만들기를 멈출 수 있습니다.</li><li><b>탭</b> - <a href="#video">영상</a> · <a href="#actor">배우</a> · <a href="#studio">제작사</a> · <a href="#tag">태그</a> · <a href="#collection">컬렉션</a>.</li><li><b>도구줄</b> - 정렬 · 방향, 보기 방식, 확대 슬라이더, 장르 칩, 페이지 단추. 카드와 함께 스크롤됩니다.</li><li><b>카드 격자</b> - 고르면 오른쪽에 상세 정보, 더블클릭 · <kbd>Enter</kbd> · <kbd>Space</kbd> 는 재생(영상) 또는 들어가기(<a href="#actor-drill">배우 출연작</a> · <a href="#studio-drill">제작사 영상 화면</a> · 태그 · 컬렉션).</li><li><b>상세 화면</b> - 고른 항목의 정보. <a href="#detail">영상 상세</a> 참고. 격자와 사이의 얇은 바를 누르면 접고 펼 수 있고, 설정에서 왼쪽 / 오른쪽 위치를 바꿀 수 있습니다.</li><li><b>아래 단추</b> - 재생, DB 에서 삭제 (파일은 지우지 않음), 탐색기에서 보기, DB 폴더 열기, DB 반영, 정보 txt 생성.</li></ol>
+<ol class="callouts"><li><b>폴더 · 새로고침</b> - [폴더 관리] 로 등록 폴더 추가 · 제거, [새로고침] <kbd>F5</kbd> 은 새 파일 찾기, [재 스캔] 은 저장된 영상에도 폴더 구조를 다시 적용해 빈 배우 · 제작사 · 발매일을 채웁니다.</li><li><b>[목록 관리 ▾] · [관리 도구 ▾] · 검색</b> - [목록 관리 ▾] 는 배우 / 제작사 / 태그 / 품번 관리 창, [관리 도구 ▾] 는 파일 관리 · 영상 검사 · 중복 파일 검사 · 플러그인을 엽니다. 검색 칸은 이름 · 품번 · 제목 · 배우 · 제작사 · 태그를 바로 찾습니다 (띄어 쓰면 모두 포함하는 것만).</li><li><b>설정 (톱니바퀴)</b> - <a href="#settings">설정 창</a>. 미리보기를 만드는 동안에는 톱니바퀴가 돌고, 오른쪽 클릭으로 만들기를 멈출 수 있습니다.</li><li><b>탭</b> - <a href="#video">영상</a> · <a href="#actor">배우</a> · <a href="#studio">제작사</a> · <a href="#tag">태그</a> · <a href="#collection">컬렉션</a>.</li><li><b>도구줄</b> - 정렬 · 방향, 보기 방식, 확대 슬라이더, 장르 칩, 페이지 단추. 카드와 함께 스크롤됩니다.</li><li><b>카드 격자</b> - 고르면 오른쪽에 상세 정보, 더블클릭 · <kbd>Enter</kbd> · <kbd>Space</kbd> 는 재생(영상 - <a href="#player">내장 플레이어</a>를 켰으면 프로그램 안에서) 또는 들어가기(<a href="#actor-drill">배우 출연작</a> · <a href="#studio-drill">제작사 영상 화면</a> · 태그 · 컬렉션).</li><li><b>상세 화면</b> - 고른 항목의 정보. <a href="#detail">영상 상세</a> 참고. 격자와 사이의 얇은 바를 누르면 접고 펼 수 있고, 설정에서 왼쪽 / 오른쪽 위치를 바꿀 수 있습니다.</li><li><b>아래 단추</b> - 재생, DB 에서 삭제 (파일은 지우지 않음), 탐색기에서 보기, DB 폴더 열기, DB 반영, 정보 txt 생성.</li></ol>
 <h3>영상 카드</h3>
 <figure><svg viewBox="0 0 560 220" role="img" aria-label="영상 카드 각 부분" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
 <g transform="translate(190,16) scale(1.45)">
@@ -496,9 +496,9 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 <circle cx="120" cy="200" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
 <text x="120" y="204" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">7</text>
 </svg><figcaption>영상 카드 각 부분</figcaption></figure>
-<ol class="callouts"><li><b>체크 칸</b> - 마우스를 올리면 나타남. 여러 영상을 체크해서 한 번에 삭제 · 미리보기 만들기 · 플러그인 실행 등을 합니다. <kbd>Ctrl</kbd>+<kbd>A</kbd> (또는 빈 곳 오른쪽 클릭 [전체 체크]) 는 지금 페이지의 카드를 모두 체크합니다.</li><li><b>별점 리본</b> - 별점이 있는 영상만.</li><li><b>재생 시간</b></li><li><b>제목</b> (최대 3줄)</li><li><b>품번</b></li><li><b>해상도 · 등급</b> 표시 (예: 1080p | FHD)</li><li><b>배우 수 · 태그 수 · 물방울</b> - 숫자에 마우스를 올려 두면 출연 배우 카드 / 태그 칩이 팝업으로 나옵니다.</li></ol>
+<ol class="callouts"><li><b>체크 칸</b> - 마우스를 올리면 나타남. 여러 영상을 체크해서 한 번에 삭제 · 미리보기 만들기 · 플러그인 실행 등을 합니다. <kbd>Ctrl</kbd> 을 누른 채 카드 아무 곳이나 누르면 체크가 바뀝니다 (배우 · 제작사 · 태그 · 컬렉션 카드, 제작사 [계층] 노드, 중복 파일 검사 카드도 같음). <kbd>Ctrl</kbd>+<kbd>A</kbd> (또는 빈 곳 오른쪽 클릭 [전체 체크]) 는 지금 페이지의 카드를 모두 체크합니다.</li><li><b>별점 리본</b> - 별점이 있는 영상만.</li><li><b>재생 시간</b></li><li><b>제목</b> (최대 3줄)</li><li><b>품번</b></li><li><b>해상도 · 등급</b> 표시 (예: 1080p | FHD)</li><li><b>태그 수 · 배우 수 · 물방울 · 재생 횟수</b> - 0 인 것은 생략. 태그 · 배우 숫자에 마우스를 올려 두면 태그 칩 / 출연 배우 카드가 팝업으로 나옵니다. 재생 횟수는 ▶ 원 아이콘 (<a href="#play-count">재생 기록</a>).</li></ol>
 </section><section id="video"><h2>영상 탭</h2>
-<p>등록된 모든 영상을 카드로 봅니다. 위 도구줄에서 정렬(이름 · 제목 · 크기 · 수정일 · 별점 · 발매일 · 배우 · 제작사 · 품번 · 재생 시간 · 해상도 등)과 방향 [▲▼] 을 고릅니다.</p>
+<p>등록된 모든 영상을 카드로 봅니다. 위 도구줄에서 정렬(이름 · 제목 · 크기 · 수정일 · 별점 · 발매일 · 배우 · 제작사 · 품번 · 재생 시간 · 해상도 · 재생 횟수 · 최근 재생 등)과 방향 [▲▼] 을 고릅니다.</p>
 <h3>보기 방식</h3>
 <figure><svg viewBox="0 0 880 190" role="img" aria-label="영상 보기 방식 네 가지" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
 <rect x="10" y="10" width="204" height="140" rx="4" fill="#1D272E" stroke="#394B59" stroke-width="1"/>
@@ -710,9 +710,9 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 </g>
 <text x="360" y="150" font-size="10" fill="#738694" text-anchor="start" font-weight="normal">미리보기 영상은 오른쪽 클릭 [미리보기 만들기] 로 만든 것만</text>
 </svg><figcaption><span class="badge">움직이는 그림</span> 카드에 마우스를 올리면 미리보기 재생</figcaption></figure>
-<ul><li><b>격자</b> - 기본 카드. 카드 이미지에 마우스를 올리면 미리보기 영상(만들어 둔 경우)이 그 자리에서 재생됩니다.</li><li><b>리스트</b> - 표 형태. 열 머리글을 누르면 정렬됩니다.</li><li><b>패키지</b> - 세로 커버만 촘촘히. 마우스를 올려 두면 격자 카드가 팝업으로 나옵니다.</li><li><b>월 모드</b> - 화면에 보이는 칸이 모두 동시에 미리보기를 재생합니다. 다른 창을 쓰고 있어도 RuliManager 가 화면에 보이면 계속 재생하고, 최소화하거나 다른 창에 완전히 가려지면 · 스크롤하는 동안은 멈춥니다. 미리보기 파일이 아직 없는 칸은 커버가 보입니다.</li></ul>
+<ul><li><b>격자</b> - 기본 카드. 카드 이미지에 마우스를 올리면 미리보기 영상(만들어 둔 경우)이 그 자리에서 재생됩니다.</li><li><b>리스트</b> - 표 형태 (커버 · 품번 · 날짜 · 별점 · 길이 · 재생 횟수 · 제작사 / 레이블 · 배우 · 태그). 열 머리글을 누르면 정렬됩니다.</li><li><b>패키지</b> - 세로 커버만 촘촘히. 마우스를 올려 두면 격자 카드가 팝업으로 나옵니다.</li><li><b>월 모드</b> - 화면에 보이는 칸이 모두 동시에 미리보기를 재생합니다. 다른 창을 쓰고 있어도 RuliManager 가 화면에 보이면 계속 재생하고, 최소화하거나 다른 창에 완전히 가려지면 · 스크롤하는 동안은 멈춥니다. 미리보기 파일이 아직 없는 칸은 커버가 보입니다.</li></ul>
 <h3>그 밖의 도구</h3>
-<ul><li><b>확대 슬라이더</b> - 카드 크기. 끌기 · 클릭 · 휠 · ← → 로 바꾸고 탭마다 따로 기억합니다.</li><li><b>장르(태그) 칩</b> - 칩을 누르면 그 태그가 있는 영상만. [장르숨김] 은 칩 줄을 숨깁니다.</li><li><b>페이지</b> - 한 페이지 개수(전체 / 50 / 100 / 250 / 500 / 1000)는 탭마다 따로 저장됩니다.</li><li><b>[가로 | 세로]</b> - 카드 이미지 방향.</li><li><b>오른쪽 클릭 메뉴</b> - 재생, 이 영상 새로고침, 탐색기에서 보기, 텍스트로 정보 입력, 웹페이지 내용 붙여넣기, 스크린샷 추출, 커버 만들기, 미리보기 만들기, 컬렉션에 추가, DB 에서 삭제.</li></ul>
+<ul><li><b>확대 슬라이더</b> - 카드 크기. 끌기 · 클릭 · 휠 · ← → 로 바꾸고 탭마다 따로 기억합니다.</li><li><b>장르(태그) 칩</b> - 칩을 누르면 그 태그가 있는 영상만. [장르숨김] 은 칩 줄을 숨깁니다.</li><li><b>페이지</b> - 한 페이지 개수(전체 / 50 / 100 / 250 / 500 / 1000)는 탭마다 따로 저장됩니다.</li><li><b>[가로 | 세로]</b> - 카드 이미지 방향.</li><li><b>오른쪽 클릭 메뉴</b> - 재생 (내장 플레이어를 켰으면 [외부 플레이어로 재생] 도), 재생 기록 지우기, 이 영상 새로고침, 탐색기에서 보기, 텍스트로 정보 입력, 웹페이지 내용 붙여넣기, 스크린샷 추출, 커버 만들기, 미리보기 만들기, 컬렉션에 추가, DB 에서 삭제.</li></ul>
 <h3 id="cover-pick">커버 만들기</h3>
 <p>영상 오른쪽 클릭 <b>[커버 만들기...]</b>. 영상 속 장면을 골라 커버나 스크린샷으로 저장합니다 (재생은 하지 않고 장면 한 장씩 봅니다).</p>
 <ul><li><b>장면 고르기</b> - 슬라이더를 끄는 동안은 빠른 보기, 놓으면 그 시각의 정확한 장면이 나옵니다. <kbd>←</kbd> <kbd>→</kbd> 1초, <kbd>Shift</kbd> + <kbd>←</kbd> <kbd>→</kbd> 10초, <kbd>.</kbd> 다음 장면. 처음에는 영상 길이의 20% 지점을 보여 줍니다.</li><li><b>[커버로 저장]</b> (<kbd>Enter</kbd>) - 원본 해상도로 영상 옆에 "영상이름.jpg" 로 저장합니다. 지금 커버가 있으면 먼저 물어보고, 같은 이름의 예전 이미지는 휴지통으로 갑니다. 분할 영상은 묶음 공용 "ABC-123.jpg" 로 저장합니다.</li><li><b>[스크린샷으로 저장]</b> - 스크린샷 폴더에 "영상이름_M01.jpg" 부터 다음 번호로 저장합니다 (스크린샷 추출을 다시 해도 지워지지 않음).</li></ul>
@@ -953,7 +953,7 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 <text x="378" y="507.8" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">스크린샷으로 바꿀 수 있음)</text>
 </svg><figcaption>영상 상세 화면</figcaption></figure>
 <p>고친 내용은 <b>[저장]</b> 을 누르거나 다른 영상을 고를 때 저장됩니다. 별점과 물방울은 누르는 즉시 저장됩니다.</p>
-<ul><li><b>이미지</b> - [이미지 변경] 으로 파일을 고르거나 탐색기에서 이미지를 끌어다 놓습니다. [이미지 검색] 은 품번으로 인터넷 이미지를 찾습니다.</li><li><b>제목</b> - 여러 줄로 보입니다.</li><li><b>별점</b> - 별 위에 마우스를 올리면 미리 보이고 누르면 확정, 같은 별을 다시 누르면 0점. 물방울은 누를 때마다 +1, 오른쪽 클릭 [초기화].</li><li><b>발매일</b> - <code>19980217</code> 처럼 숫자만 쳐도 됩니다. 오른쪽 콤보는 검열 정보(해당없음 · 검열됨 · 모자이크파괴 · 무수정 · 무수정-유출).</li><li><b>배우 · 태그 칩</b> - 글자를 치면 자동 완성 목록이 나옵니다. 칩의 × 로 빼고, ⌄ 로 목록 창에서 고릅니다. 목록에 없는 이름은 새로 추가됩니다. 태그 칩에 마우스를 올리면 태그 카드가 팝업으로 나옵니다.</li><li><b>제작사 · 레이블 카드</b> - 로고와 이름. 품번으로 자동으로 정해지고, 제작사 카드를 더블클릭하면 다른 제작사로 바꿉니다.</li><li><b>시리즈</b> - 작품의 시리즈 이름을 자유롭게 적습니다 (검색에 포함).</li><li><b>맨 아래 띠</b> - 출연 배우 카드(더블클릭 = 배우 출연작으로). 설정 [상세 화면] 에서 스크린샷(오른쪽 클릭 [스크린샷 추출] 로 만든 장면)으로 바꿀 수 있습니다. 스크린샷은 영상 폴더 안 <code>품번_Screenshot</code> 폴더에 저장됩니다 (품번이 없으면 <code>Screenshot</code>, 예전 Screenshot 폴더도 그대로 보임).</li></ul>
+<ul><li><b>이미지</b> - [이미지 변경] 으로 파일을 고르거나 탐색기에서 이미지를 끌어다 놓습니다. [이미지 검색] 은 품번으로 인터넷 이미지를 찾습니다.</li><li><b>제목</b> - 여러 줄로 보입니다.</li><li><b>별점</b> - 별 위에 마우스를 올리면 미리 보이고 누르면 확정, 같은 별을 다시 누르면 0점. 물방울은 누를 때마다 +1, 오른쪽 클릭 [초기화].</li><li><b>재생 기록</b> - 물방울 오른쪽에 ▶ 원 아이콘 + 재생 횟수 + 마지막 재생 날짜 (재생한 적이 없으면 빈칸). 오른쪽 클릭 [초기화] 로 지웁니다 (<a href="#play-count">재생 기록</a>).</li><li><b>발매일</b> - <code>19980217</code> 처럼 숫자만 쳐도 됩니다. 오른쪽 콤보는 검열 정보(해당없음 · 검열됨 · 모자이크파괴 · 무수정 · 무수정-유출).</li><li><b>배우 · 태그 칩</b> - 글자를 치면 자동 완성 목록이 나옵니다. 칩의 × 로 빼고, ⌄ 로 목록 창에서 고릅니다. 목록에 없는 이름은 새로 추가됩니다. 태그 칩에 마우스를 올리면 태그 카드가 팝업으로 나옵니다.</li><li><b>제작사 · 레이블 카드</b> - 로고와 이름. 품번으로 자동으로 정해지고, 제작사 카드를 더블클릭하면 다른 제작사로 바꿉니다.</li><li><b>시리즈</b> - 작품의 시리즈 이름을 자유롭게 적습니다 (검색에 포함).</li><li><b>맨 아래 띠</b> - 출연 배우 카드(더블클릭 = 배우 출연작으로). 설정 [상세 화면] 에서 스크린샷(오른쪽 클릭 [스크린샷 추출] 로 만든 장면)으로 바꿀 수 있습니다. 스크린샷은 영상 폴더 안 <code>품번_Screenshot</code> 폴더에 저장됩니다 (품번이 없으면 <code>Screenshot</code>, 예전 Screenshot 폴더도 그대로 보임).</li></ul>
 <figure class="anim" title="누르면 멈춤 / 다시 재생"><svg viewBox="0 0 760 150" role="img" aria-label="별점 · 물방울 누르기" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
 <text x="40" y="66" font-size="13" fill="#A7B6C2" text-anchor="start" font-weight="normal">별점</text>
 <text x="90" y="70" font-size="24" fill="#F2B824" text-anchor="start" font-weight="normal">☆</text>
@@ -1048,6 +1048,35 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 <text x="360" y="108" font-size="12" fill="#F5F8FA" text-anchor="start" font-weight="bold">3. 마우스를 빼면 사라짐</text>
 </g>
 </svg><figcaption><span class="badge">움직이는 그림</span> 태그 칩 위에 마우스 → 태그 카드 팝업</figcaption></figure>
+</section><section id="player"><h2>내장 플레이어</h2>
+<p>영상을 다른 플레이어를 열지 않고 프로그램 안에서 재생합니다. <b>libmpv</b> 를 쓰며, 켜지 않으면 지금처럼 Windows 기본 플레이어로 엽니다.</p>
+<h3>켜기</h3>
+<ol class="callouts"><li><b>libmpv-2.dll</b> (64비트, mpv 개발용 배포판에 들어 있음) 을 RuliManager.exe 와 같은 폴더에 둡니다. 이름이 <code>mpv-2.dll</code> 이어도 됩니다.</li><li>설정 <b>[플레이어]</b> 탭에서 <b>[내장 플레이어 사용]</b> 을 체크합니다. 체크할 때 DLL 을 실제로 읽어 보고, 없거나 읽지 못하면 이유를 알려 주고 체크를 풉니다.</li></ol>
+<p class="note"><b>주의</b> DLL 은 프로그램에 들어 있지 않습니다. 따로 받은 DLL 의 라이선스(GPL / LGPL)는 받은 곳의 안내를 따르세요.</p>
+<h3>화면</h3>
+<p>영상을 더블클릭하거나 [재생] 을 누르면 왼쪽 카드 자리 전체가 플레이어로 바뀝니다. 오른쪽 <a href="#detail">영상 상세</a>는 그대로라 재생하면서 별점 · 태그 등을 고칠 수 있습니다.</p>
+<ul><li><b>위</b> - <b>[◀ 목록]</b> (목록으로 돌아가기) · 품번 · 제목.</li><li><b>탐색 바</b> - 누르거나 끌어서 이동 (끄는 동안은 빠르게, 놓으면 정확한 위치). 마우스를 올리면 그 위치 시간이 아래 시간 옆에 나옵니다.</li><li><b>아래 줄</b> - 재생 / 일시정지, ◀◀ 10 · 10 ▶▶ (10초), 시간, 속도 (누를 때마다 다음 속도), 음소거, 볼륨 막대, 전체 화면.</li><li><b>영상</b> - 한 번 클릭 = 재생 / 일시정지, 더블클릭 = 전체 화면. 마우스 휠 = 볼륨.</li><li><b>전체 화면</b> - 마우스가 잠시 멈추면 컨트롤 · 커서가 숨고, 움직이면 다시 나옵니다. <kbd>Esc</kbd> 또는 더블클릭으로 돌아옵니다.</li></ul>
+<p>[◀ 목록] · <kbd>Esc</kbd> 를 누르거나 위쪽 탭을 누르면 재생을 끄고 보던 목록(스크롤 · 선택 그대로)으로 돌아갑니다.
+보던 위치는 기억해서 다음에 그 영상을 열면 이어서 재생합니다 (10초 넘게 보고 끝나기 20초 전까지만). 볼륨 · 음소거도 기억합니다.</p>
+<h3>단축키</h3>
+<table>
+<tr><th>키</th><th>동작</th></tr>
+<tr><td><kbd>Space</kbd> / <kbd>K</kbd></td><td>재생 / 일시정지</td></tr>
+<tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>뒤로 / 앞으로 (기본 5초, <kbd>Shift</kbd> 30초, <kbd>Ctrl</kbd> 1초 - 초는 설정에서 바꿈). 빠르게 연속으로 누르면 잠깐 멈춘 채 이동하고, 멈추면 다시 재생</td></tr>
+<tr><td><kbd>J</kbd> <kbd>L</kbd></td><td>10초 뒤로 / 앞으로</td></tr>
+<tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>볼륨</td></tr>
+<tr><td><kbd>M</kbd></td><td>음소거</td></tr>
+<tr><td><kbd>D</kbd> <kbd>F</kbd> (또는 <kbd>,</kbd> <kbd>.</kbd>)</td><td>이전 / 다음 프레임 (일시정지)</td></tr>
+<tr><td><kbd>[</kbd> <kbd>]</kbd> / <kbd>Backspace</kbd></td><td>느리게 / 빠르게 / 1배속</td></tr>
+<tr><td><kbd>Home</kbd> / <kbd>0</kbd> ~ <kbd>9</kbd></td><td>처음으로 / 영상의 그 비율 위치 (5 = 가운데)</td></tr>
+<tr><td><kbd>Esc</kbd></td><td>전체 화면 끝, 한 번 더 누르면 목록으로</td></tr>
+</table>
+<p class="tip"><b>팁</b> 글자 입력 칸(제목 · 태그 등)에 커서가 있으면 키는 그 칸에 들어갑니다. 영상이나 컨트롤 줄을 한 번 누르면 다시 단축키가 동작합니다.</p>
+<h3>설정 [플레이어] 탭</h3>
+<ul><li><b>영상을 열면 바로 재생</b> - 끄면 첫 장면 (또는 이어 볼 위치) 에서 멈춘 채로 열립니다.</li><li><b>보던 위치부터 이어서 재생</b> - 끄면 늘 처음부터 (위치도 저장하지 않음).</li><li><b>하드웨어 디코딩 (GPU)</b> - 영상이 깨지거나 검게 나오면 끄세요.</li><li><b>같은 이름의 자막 자동 불러오기</b> - <code>영상이름.srt</code> · <code>.ass</code> 등.</li><li><b>← → 이동 초 · Shift + ← → 초</b> (1 ~ 600).</li><li><b>영상이 끝나면</b> - 마지막 장면에서 멈춤 / 목록으로 돌아가기 / 처음부터 반복.</li><li><b>전체 화면 컨트롤</b> - 마우스가 몇 초 멈추면 숨길지 (1 ~ 10초).</li><li>설정은 다음에 영상을 열 때부터 적용됩니다.</li></ul>
+<h3 id="play-count">재생 기록</h3>
+<p>영상마다 <b>재생 횟수</b>와 <b>마지막 재생 날짜</b>를 저장합니다.</p>
+<ul><li><b>내장 플레이어</b> - 한 번 열어서 실제로 재생한 시간(일시정지 · 건너뛴 구간 빼고)이 1분 또는 영상 길이의 10% 를 넘으면 1회.</li><li><b>외부 플레이어</b> - 열 때 1회.</li><li>분할 영상은 어느 파트를 재생해도 묶음 전체가 1회입니다. 정보를 저장하기 전인 <span class="temp">● 임시</span> 영상은 기록하지 않습니다.</li><li><b>보는 곳</b> - 영상 카드 아래 ▶ 원 아이콘, <a href="#detail">영상 상세</a> 물방울 오른쪽, [리스트] 의 [재생] 열. 정렬 [재생 횟수] · [최근 재생] (많이 본 순 · 최근 본 순).</li><li><b>지우기</b> - 영상 상세 재생 기록 오른쪽 클릭 [초기화], 영상 오른쪽 클릭 [재생 기록 지우기], 체크한 영상 [재생 기록 지우기(n)].</li></ul>
 </section><section id="input"><h2>정보 입력 (txt · 붙여넣기)</h2>
 <p>영상 정보를 하나하나 치지 않고 한 번에 채우는 방법이 세 가지 있습니다.</p>
 <h3>웹페이지 내용 붙여넣기</h3>
@@ -1726,7 +1755,7 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 <text x="470" y="108" font-size="12" fill="#F5F8FA" text-anchor="start" font-weight="bold">3. + 를 다시 누르면 펼침 (↓ 키도 됨)</text>
 </g>
 </svg><figcaption><span class="badge">움직이는 그림</span> − / + 로 하위 제작사 접고 펼치기</figcaption></figure>
-<ul><li><b>격자</b> - 정렬([이름 | 영상수])과 검색 순서대로.</li><li><b>리스트</b> - 이름 · 영상 수 표. 열 머리글로 정렬.</li><li><b>계층</b> - 상위 → 하위 트리. − / + 로 접고 펼칩니다.</li><li>빈 곳 오른쪽 클릭 → [새 제작사 추가...], 카드 오른쪽 클릭 → 편집.</li><li><b>체크</b> - 카드 · [계층] 노드 왼쪽 위에 마우스를 올리면 체크 칸. 여러 개 체크한 뒤 오른쪽 클릭으로 한꺼번에 삭제 · 병합합니다.</li><li><b>병합</b> - 카드 오른쪽 클릭 <b>[다른 제작사와 병합...]</b>, 또는 체크한 제작사에서 <b>[제작사 병합(n) - 이름 기준]</b> (오른쪽 클릭한 제작사로 합침). 영상 · 하위 제작사 · 레이블 · 품번 DB 항목이 대상으로 옮겨지고, 원래 이름은 대상의 서브이름이 되어 붙여넣기 · txt 에서도 대상으로 인식됩니다.</li></ul>
+<ul><li><b>격자</b> - 정렬([이름 | 영상수])과 검색 순서대로.</li><li><b>리스트</b> - 영상 [리스트] 와 같은 표: 로고 + 이름 · 상위 제작사 · 영상 수 · 배우 수 · 메모. 순서는 상위 → 하위 제작사 → 그 레이블. [이름] · [영상 수] 머리글을 누르면 정렬 (다시 누르면 방향 전환).</li><li><b>계층</b> - 상위 → 하위 트리. − / + 로 접고 펼칩니다.</li><li>빈 곳 오른쪽 클릭 → [새 제작사 추가...], 카드 오른쪽 클릭 → 편집.</li><li><b>체크</b> - 카드 · [계층] 노드 왼쪽 위에 마우스를 올리면 체크 칸. 여러 개 체크한 뒤 오른쪽 클릭으로 한꺼번에 삭제 · 병합합니다.</li><li><b>병합</b> - 카드 오른쪽 클릭 <b>[다른 제작사와 병합...]</b>, 또는 체크한 제작사에서 <b>[제작사 병합(n) - 이름 기준]</b> (오른쪽 클릭한 제작사로 합침). 영상 · 하위 제작사 · 레이블 · 품번 DB 항목이 대상으로 옮겨지고, 원래 이름은 대상의 서브이름이 되어 붙여넣기 · txt 에서도 대상으로 인식됩니다.</li></ul>
 <p>제작사 카드를 더블클릭하면 <a href="#studio-drill">제작사 영상 화면</a>으로 들어갑니다.</p>
 </section><section id="studio-drill"><h2>제작사 영상 화면</h2>
 <p>제작사 카드를 더블클릭(또는 <kbd>Space</kbd>)하면 들어가는 화면입니다. 위에는 제작사 정보, 아래에는 그 제작사의 영상이 나옵니다.</p>
@@ -2473,8 +2502,8 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 <p class="note"><b>주의</b> 플러그인은 일반 프로그램처럼 이 PC 에서 그대로 실행됩니다. 믿을 수 있는 곳에서 받은 플러그인만 넣으세요.</p>
 <p class="note"><b>주의</b> python 플러그인은 python 이 설치되어 있고 PATH 에 등록되어 있어야 합니다. Microsoft Store 의 python 바로 가기만 있으면 실행되지 않습니다 (실행 창 기록에 이유가 나옴).</p>
 </section><section id="settings"><h2>설정</h2>
-<p>오른쪽 위 톱니바퀴. 탭 다섯 개로 나뉩니다.</p>
-<ul><li><b>표시</b> - 카드에 해상도 · 재생 시간 표시, SFW(배우 · 영상 이미지를 모자이크로), 분할 영상 합쳐서 보기, 별점 단위(1점 / 0.5점).</li><li><b>상세 화면</b> - 상세 화면 위치(왼쪽 / 오른쪽), 영상 상세 맨 아래 띠(출연 배우 카드 / 스크린샷), 스크린샷 가로 배치 수.</li><li><b>테마</b> - 색상표(Stash · Dark · Midnight). 미리보기로 확인하고, 다시 시작하면 적용됩니다.</li><li><b>DB 관리</b> - DB 삭제(영상 / 배우 / 제작사 / 태그), 텍스트 내보내기 · 일괄 등록, 미리보기 영상 품질(기본 / 간소화 · 소리 포함) · 일괄 만들기 · 재생성 · 모두 삭제.</li><li><b>플러그인</b> - 플러그인 목록 · 켜고 끄기 · 폴더 열기 (<a href="#plugin">플러그인</a> 장).</li></ul>
+<p>오른쪽 위 톱니바퀴. 탭 여섯 개로 나뉩니다.</p>
+<ul><li><b>표시</b> - 카드에 해상도 · 재생 시간 표시, SFW(배우 · 영상 이미지를 모자이크로), 분할 영상 합쳐서 보기, 별점 단위(1점 / 0.5점).</li><li><b>상세 화면</b> - 상세 화면 위치(왼쪽 / 오른쪽), 영상 상세 맨 아래 띠(출연 배우 카드 / 스크린샷), 스크린샷 가로 배치 수.</li><li><b>플레이어</b> - 내장 플레이어 사용, 바로 재생 · 이어서 재생 · 하드웨어 디코딩 · 자막 · 이동 초 · 끝나면 · 전체 화면 컨트롤 (<a href="#player">내장 플레이어</a> 장).</li><li><b>테마</b> - 색상표(Stash · Dark · Midnight). 미리보기로 확인하고, 다시 시작하면 적용됩니다.</li><li><b>DB 관리</b> - DB 삭제(영상 / 배우 / 제작사 / 태그), 텍스트 내보내기 · 일괄 등록, 미리보기 영상 품질(기본 / 간소화 · 소리 포함) · 일괄 만들기 · 재생성 · 모두 삭제.</li><li><b>플러그인</b> - 플러그인 목록 · 켜고 끄기 · 폴더 열기 (<a href="#plugin">플러그인</a> 장).</li></ul>
 </section><section id="data"><h2>데이터와 백업</h2>
 <ul><li>DB 는 실행 파일 폴더의 <code>library.vmdb</code>(정보)와 <code>images.vmdb</code>(배우 사진 · 제작사 이미지) 두 파일입니다. 두 파일만 옮기면 다른 PC 에서도 그대로 쓸 수 있습니다. 아래 [DB 폴더 열기] 로 폴더를 엽니다.</li><li>실행 중에는 작업용 사본에 저장하고, <b>[DB 반영]</b> 이나 종료할 때 원본에 반영합니다.</li><li>프로그램을 켤 때마다 DB 폴더의 <code>backup</code> 에 자동 백업합니다 (파일마다 최근 10개). 되돌리려면 프로그램을 끄고 백업 파일을 원래 이름으로 바꿔 덮어씁니다.</li><li>프로그램 버전이 바뀌어 DB 형식을 고칠 때는 <code>DbBackup</code> 폴더에 원본을 먼저 백업합니다.</li><li>이동식 디스크 영상의 커버는 캐시에 보관해서 디스크를 빼도 카드 이미지가 보입니다.</li></ul>
 </section><section id="keys"><h2>단축키</h2>
@@ -2488,9 +2517,11 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 <tr><td><kbd>Del</kbd></td><td>DB 에서 삭제 (파일은 그대로), 체크한 카드가 있으면 모두</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>검색 칸으로</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>체크 칸이 있는 목록에서 지금 보이는 카드 모두 체크 (영상 · 배우 · 제작사 · 태그 · 컬렉션)</td></tr>
+<tr><td><kbd>Ctrl</kbd>+클릭</td><td>카드 체크 전환 (카드 어디를 눌러도)</td></tr>
 <tr><td><kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd></td><td>카드 이동 (제작사 [계층] 보기: ↑ 상위, ↓ 첫 하위)</td></tr>
 <tr><td>마우스 휠 / <kbd>←</kbd> <kbd>→</kbd> (확대 슬라이더에서)</td><td>카드 크기</td></tr>
 </table>
+<p>내장 플레이어의 단축키는 <a href="#player">내장 플레이어</a> 장에 있습니다.</p>
 </section>
 </main>
 <script>

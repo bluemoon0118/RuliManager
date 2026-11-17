@@ -1550,13 +1550,17 @@ namespace
 			v.censor = (std::max)(0, (std::min)(CVideoLibrary::kCensorCount - 1, _wtoi(fields[17])));
 		if (fields.size() >= 19)         // 컬렉션 (쉼표 구분)
 			v.collections = Unescape(fields[18]);
+		if (fields.size() >= 20)         // 재생 횟수 (0.91~)
+			v.playCount = (std::max)(0, _wtoi(fields[19]));
+		if (fields.size() >= 21)         // 마지막 재생 "YYYY-MM-DD HH:MM"
+			v.lastPlayed = Unescape(fields[20]);
 	}
 
 	// 영상 줄 (내보내기용: 배우 칸은 번호가 아닌 이름 그대로)
 	CString VideoExportLine(const VideoItem& v)
 	{
 		CString line;
-		line.Format(L"V\t%s\t%llu\t%llu\t%s\t%s\t\t%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\n",
+		line.Format(L"V\t%s\t%llu\t%llu\t%s\t%s\t\t%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%d\t%s\n",
 			static_cast<LPCWSTR>(Escape(v.path)), v.size, v.modified,
 			static_cast<LPCWSTR>(CVideoLibrary::RatingValueText(v.rating)),
 			static_cast<LPCWSTR>(Escape(v.tags)),
@@ -1571,7 +1575,9 @@ namespace
 			static_cast<LPCWSTR>(Escape(v.series)),
 			static_cast<LPCWSTR>(Escape(v.seriesTitle)),
 			v.censor,
-			static_cast<LPCWSTR>(Escape(v.collections)));
+			static_cast<LPCWSTR>(Escape(v.collections)),
+			v.playCount,
+			static_cast<LPCWSTR>(Escape(v.lastPlayed)));
 		return line;
 	}
 
@@ -2107,7 +2113,7 @@ bool CVideoLibrary::Save() const
 		}
 		CString line;
 		const CString ratingText = v.rating > 0 ? RatingValueText(v.rating) : CString(L"0");   // 별점 "3.5" (예전 프로그램도 정수 부분은 읽음)
-		line.Format(L"V\t%s\t%llu\t%llu\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\n",   // 15번째 칸: 레이블, 16번째 칸: 시리즈(품번), 17번째 칸: 시리즈 이름, 18번째 칸: 검열, 19번째 칸: 컬렉션
+		line.Format(L"V\t%s\t%llu\t%llu\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%d\t%s\n",   // 15번째 칸: 레이블, 16번째 칸: 시리즈(품번), 17번째 칸: 시리즈 이름, 18번째 칸: 검열, 19번째 칸: 컬렉션, 20번째 칸: 재생 횟수, 21번째 칸: 마지막 재생
 			static_cast<LPCWSTR>(Escape(v.path)),
 			v.size, v.modified, static_cast<LPCWSTR>(ratingText),
 			static_cast<LPCWSTR>(Escape(v.tags)),
@@ -2123,7 +2129,9 @@ bool CVideoLibrary::Save() const
 			static_cast<LPCWSTR>(Escape(v.series)),
 			static_cast<LPCWSTR>(Escape(v.seriesTitle)),
 			v.censor,
-			static_cast<LPCWSTR>(Escape(v.collections)));
+			static_cast<LPCWSTR>(Escape(v.collections)),
+			v.playCount,
+			static_cast<LPCWSTR>(Escape(v.lastPlayed)));
 		text += line;
 	}
 
@@ -2394,12 +2402,15 @@ namespace
 		dst.series       = src.series;
 		dst.tags         = src.tags;
 		dst.collections  = src.collections;   // 컬렉션도 묶음 전체
+		dst.playCount    = src.playCount;     // 재생 기록도 묶음 전체 (파트 하나를 재생해도 묶음 1회)
+		dst.lastPlayed   = src.lastPlayed;
 	}
 	bool SamePartInfo(const VideoItem& a, const VideoItem& b)
 	{
 		return a.code == b.code && a.title == b.title && a.rating == b.rating && a.censor == b.censor && a.oCount == b.oCount &&
 			a.release == b.release && a.actors == b.actors && a.actorAliases == b.actorAliases &&
-			a.studio == b.studio && a.label == b.label && a.series == b.series && a.tags == b.tags && a.collections == b.collections;
+			a.studio == b.studio && a.label == b.label && a.series == b.series && a.tags == b.tags && a.collections == b.collections &&
+			a.playCount == b.playCount && a.lastPlayed == b.lastPlayed;
 	}
 }
 
@@ -2465,6 +2476,8 @@ int CVideoLibrary::UnifyPartGroups()
 			if (merged.tags.IsEmpty())         merged.tags = o.tags;
 			if (merged.seriesTitle.IsEmpty())  merged.seriesTitle = o.seriesTitle;
 			if (merged.collections.IsEmpty())  merged.collections = o.collections;
+			if (o.playCount > merged.playCount) merged.playCount = o.playCount;   // 재생 기록: 많은 쪽 / 늦은 쪽
+			if (o.lastPlayed.Compare(merged.lastPlayed) > 0) merged.lastPlayed = o.lastPlayed;
 		}
 		for (size_t i : list)
 		{
@@ -7066,6 +7079,8 @@ bool CVideoLibrary::ImportListFile(int what, const CString& path, int& added, in
 			ch |= put(dst.collections, src.collections);
 			if (src.rating > 0 && src.rating != dst.rating) { dst.rating = src.rating; ch = true; }
 			if (src.oCount > 0 && src.oCount != dst.oCount) { dst.oCount = src.oCount; ch = true; }
+			if (src.playCount > dst.playCount) { dst.playCount = src.playCount; ch = true; }   // 재생 기록 (가져온 쪽이 많을 때만)
+			if (src.lastPlayed.Compare(dst.lastPlayed) > 0) { dst.lastPlayed = src.lastPlayed; ch = true; }
 			if (src.censor > 0 && src.censor != dst.censor) { dst.censor = src.censor; ch = true; }
 			if (ch && dst.pending) dst.pending = false;   // 정보를 넣었으면 정식 등록
 			if (ch) ++updated;
