@@ -1065,8 +1065,161 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 <ol class="callouts"><li><b>libmpv-2.dll</b> (64비트, mpv 개발용 배포판에 들어 있음) 을 RuliManager.exe 와 같은 폴더에 둡니다. 이름이 <code>mpv-2.dll</code> 이어도 됩니다.</li><li>설정 <b>[플레이어]</b> 탭에서 <b>[내장 플레이어 사용]</b> 을 체크합니다. 체크할 때 DLL 을 실제로 읽어 보고, 없거나 읽지 못하면 이유를 알려 주고 체크를 풉니다.</li></ol>
 <p class="note"><b>주의</b> DLL 은 프로그램에 들어 있지 않습니다. 따로 받은 DLL 의 라이선스(GPL / LGPL)는 받은 곳의 안내를 따르세요.</p>
 <h3>화면</h3>
-<p>영상을 더블클릭하거나 [재생] 을 누르면 왼쪽 카드 자리 전체가 플레이어로 바뀝니다. 오른쪽 <a href="#detail">영상 상세</a>는 그대로라 재생하면서 별점 · 태그 등을 고칠 수 있습니다.</p>
-<ul><li><b>위</b> - <b>[◀ 목록]</b> (목록으로 돌아가기) · 품번 · 제목.</li><li><b>탐색 바</b> - 누르거나 끌어서 이동 (끄는 동안은 빠르게, 놓으면 정확한 위치). 마우스를 올리면 그 위치 시간이 아래 시간 옆에 나옵니다.</li><li><b>아래 줄</b> - 재생 / 일시정지, ◀◀ 10 · 10 ▶▶ (10초), 시간, 속도 (누를 때마다 다음 속도), 음소거, 볼륨 막대, 전체 화면.</li><li><b>영상</b> - 한 번 클릭 = 재생 / 일시정지, 더블클릭 = 전체 화면. 마우스 휠 = 볼륨.</li><li><b>전체 화면</b> - 마우스가 잠시 멈추면 컨트롤 · 커서가 숨고, 움직이면 다시 나옵니다. <kbd>Esc</kbd> 또는 더블클릭으로 돌아옵니다.</li></ul>
+<p>영상을 더블클릭하거나 [재생] 을 누르면 왼쪽 카드 자리 전체가 플레이어로 바뀝니다.</p>
+<figure><svg viewBox="0 0 900 520" role="img" aria-label="내장 플레이어 화면" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
+<rect x="0" y="0" width="900" height="520" rx="6" fill="#202B33" stroke="#10161A" stroke-width="1.5"/>
+<path d="M0,26 L0,6 Q0,0 6,0 L894,0 Q900,0 900,6 L900,26 Z" fill="#182026"/>
+<text x="12" y="17" font-size="11" fill="#A7B6C2" text-anchor="start" font-weight="normal">RuliManager v0.92</text>
+<text x="840" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">—</text>
+<text x="860" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">☐</text>
+<text x="880" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">✕</text>
+<rect x="12" y="36" width="54" height="20" rx="3" fill="#137CBD"/>
+<text x="39.0" y="49.96" font-size="11" fill="#F5F8FA" text-anchor="middle" font-weight="normal">영상</text>
+<rect x="70" y="36" width="54" height="20" rx="3" fill="#394B59"/>
+<text x="97.0" y="49.96" font-size="11" fill="#F5F8FA" text-anchor="middle" font-weight="normal">배우</text>
+<rect x="128" y="36" width="62" height="20" rx="3" fill="#394B59"/>
+<text x="159.0" y="49.96" font-size="11" fill="#F5F8FA" text-anchor="middle" font-weight="normal">제작사</text>
+<rect x="194" y="36" width="54" height="20" rx="3" fill="#394B59"/>
+<text x="221.0" y="49.96" font-size="11" fill="#F5F8FA" text-anchor="middle" font-weight="normal">태그</text>
+<rect x="252" y="36" width="62" height="20" rx="3" fill="#394B59"/>
+<text x="283.0" y="49.96" font-size="11" fill="#F5F8FA" text-anchor="middle" font-weight="normal">컬렉션</text>
+<rect x="12" y="64" width="560" height="444" rx="2" fill="#202B33" stroke="#394B59" stroke-width="1"/>
+<rect x="20" y="71" width="64" height="20" rx="3" fill="#394B59"/>
+<text x="52.0" y="84.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">◀ 목록</text>
+<text x="96" y="85" font-size="12" fill="#F5F8FA" text-anchor="start" font-weight="bold">ABC-123   영상 제목</text>
+<rect x="12" y="98" width="560" height="330" rx="0" fill="#0B0F12"/>
+<rect x="72" y="108" width="440" height="310" rx="2" fill="#3B5163"/>
+<g opacity="0.35">
+<circle cx="292.0" cy="263.0" r="30" fill="none" stroke="#F5F8FA" stroke-width="4.285714285714286"/>
+<path d="M283.0,249.5 L307.0,263.0 L283.0,276.5 Z" fill="#F5F8FA"/>
+</g>
+<line x1="22" y1="438" x2="562" y2="438" stroke="#4A5C6B" stroke-width="4"/>
+<line x1="22" y1="438" x2="222" y2="438" stroke="#137CBD" stroke-width="4"/>
+<circle cx="222" cy="438" r="6" fill="#F5F8FA"/>
+<line x1="342" y1="433" x2="342" y2="443" stroke="#F5F8FA" stroke-width="2"/>
+<rect x="20" y="452" width="26" height="26" rx="4" fill="#394B59"/>
+<rect x="28" y="459" width="3.5" height="12" rx="0" fill="#F5F8FA"/>
+<rect x="35" y="459" width="3.5" height="12" rx="0" fill="#F5F8FA"/>
+<text x="70" y="469" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">◀◀ 10</text>
+<text x="116" y="469" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">10 ▶▶</text>
+<text x="148" y="469" font-size="11" fill="#F5F8FA" text-anchor="start" font-weight="normal">0:45:10 / 2:03:15</text>
+<text x="262" y="469" font-size="11" fill="#137CBD" text-anchor="start" font-weight="normal">▸ 1:12:30</text>
+<text x="374" y="469" font-size="11" fill="#F5F8FA" text-anchor="middle" font-weight="normal">1x</text>
+<path d="M404,462 l4,0 l5,-5 l0,16 l-5,-5 l-4,0 Z" fill="#F5F8FA"/>
+<path d="M417,461 q4,4 0,8" fill="none" stroke="#F5F8FA" stroke-width="1.5"/>
+<line x1="432" y1="465" x2="522" y2="465" stroke="#4A5C6B" stroke-width="4"/>
+<line x1="432" y1="465" x2="497" y2="465" stroke="#137CBD" stroke-width="4"/>
+<path d="M542,457 l5,0 M542,457 l0,5" fill="none" stroke="#F5F8FA" stroke-width="1.6"/>
+<path d="M558,457 l-5,0 M558,457 l0,5" fill="none" stroke="#F5F8FA" stroke-width="1.6"/>
+<path d="M558,473 l-5,0 M558,473 l0,-5" fill="none" stroke="#F5F8FA" stroke-width="1.6"/>
+<path d="M542,473 l5,0 M542,473 l0,-5" fill="none" stroke="#F5F8FA" stroke-width="1.6"/>
+<g transform="translate(584,64) scale(0.94)">
+<rect x="0" y="0" width="320" height="135.0" rx="3" fill="#3B5163"/>
+<g opacity="0.35">
+<circle cx="160.0" cy="67.5" r="21.6" fill="none" stroke="#F5F8FA" stroke-width="3.085714285714286"/>
+<path d="M153.52,57.78 L170.8,67.5 L153.52,77.22 Z" fill="#F5F8FA"/>
+</g>
+<text x="0" y="151.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">파일</text>
+<text x="40" y="151.0" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="normal">ABC-123.mp4</text>
+<text x="320" y="151.0" font-size="8" fill="#A7B6C2" text-anchor="end" font-weight="normal">123분 | 29.97 | 1080p</text>
+<text x="40" y="167.0" font-size="9" fill="#738694" text-anchor="start" font-weight="normal">ABC-123.jpg</text>
+<rect x="170" y="156.0" width="72" height="14" rx="3" fill="#137CBD"/>
+<text x="206.0" y="165.88" font-size="8" fill="#F5F8FA" text-anchor="middle" font-weight="normal">이미지 검색...</text>
+<rect x="246" y="156.0" width="74" height="14" rx="3" fill="#137CBD"/>
+<text x="283.0" y="165.88" font-size="8" fill="#F5F8FA" text-anchor="middle" font-weight="normal">이미지 변경...</text>
+<text x="0" y="187.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">품번</text>
+<rect x="40" y="175.0" width="110" height="16" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="46" y="186.24" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">ABC-123</text>
+<rect x="153" y="175.0" width="16" height="16" rx="3" fill="#394B59"/>
+<text x="161.0" y="186.24" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">⧉</text>
+<text x="0" y="207.0" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">제목</text>
+<rect x="40" y="195.0" width="280" height="35.2" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="46" y="215.84" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">영상 제목 (여러 줄)</text>
+<text x="0" y="246.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">별점</text>
+<text x="40" y="247.2" font-size="13" fill="#F2B824" text-anchor="start" font-weight="normal">★★★☆☆</text>
+<path d="M132,236.2 q6,8 0,12 q-6,-4 0,-12 Z" fill="#48AFF0"/>
+<text x="142" y="247.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">3</text>
+<circle cx="160" cy="243.2" r="5" fill="#A7B6C2"/>
+<path d="M158.388,240.6 L162.47,243.2 L158.388,245.79999999999998 Z" fill="#1D272E"/>
+<text x="168" y="247.2" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="normal">12</text>
+<text x="181" y="247.2" font-size="8" fill="#738694" text-anchor="start" font-weight="normal">· 2026-11-17</text>
+<rect x="266" y="234.2" width="54" height="16" rx="3" fill="#0F9960"/>
+<text x="293.0" y="245.44" font-size="9" fill="#F5F8FA" text-anchor="middle" font-weight="normal">저장</text>
+<text x="0" y="266.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">발매일</text>
+<rect x="40" y="254.2" width="90" height="16" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="46" y="265.44" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">2024-05-17</text>
+<rect x="136" y="254.2" width="84" height="16" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="142" y="265.44" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">해당없음 ▾</text>
+<text x="0" y="286.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">배우</text>
+<rect x="40" y="274.2" width="71.6" height="16" rx="8.0" fill="#394B59"/>
+<text x="48" y="285.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">♀ 배우 A ×</text>
+<rect x="116.6" y="274.2" width="71.6" height="16" rx="8.0" fill="#394B59"/>
+<text x="124.6" y="285.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">♀ 배우 B ×</text>
+<text x="0" y="311.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">제작사</text>
+<rect x="40" y="294.2" width="280" height="26" rx="3" fill="#30404D"/>
+<rect x="44" y="298.2" width="32.0" height="18" rx="2" fill="#4A5C6B"/>
+<text x="82.0" y="311.2" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="bold">제작사 이름</text>
+<text x="0" y="340.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">레이블</text>
+<rect x="40" y="323.2" width="280" height="26" rx="3" fill="#2B3A46"/>
+<rect x="44" y="327.2" width="32.0" height="18" rx="2" fill="#4A5C6B"/>
+<text x="82.0" y="340.2" font-size="9" fill="#F5F8FA" text-anchor="start" font-weight="bold">레이블 이름</text>
+<text x="0" y="365.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">시리즈</text>
+<rect x="40" y="353.2" width="280" height="16" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="0" y="385.2" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">태그</text>
+<rect x="40" y="373.2" width="48.8" height="16" rx="8.0" fill="#394B59"/>
+<text x="48" y="384.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">드라마 ×</text>
+<rect x="93.8" y="373.2" width="48.8" height="16" rx="8.0" fill="#394B59"/>
+<text x="101.8" y="384.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">코미디 ×</text>
+<rect x="147.6" y="373.2" width="44.4" height="16" rx="8.0" fill="#1B252C"/>
+<text x="155.6" y="384.08" font-size="8" fill="#F5F8FA" text-anchor="start" font-weight="normal">+ 입력</text>
+<rect x="0.0" y="397.2" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="0.0" y="397.2" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+<g opacity="0.7">
+<circle cx="38.5" cy="420.8775" r="11.858000000000002" fill="#F5F8FA"/>
+<path d="M15.207499999999996,458.9925 Q15.207499999999996,436.54699999999997 38.5,436.54699999999997 Q61.792500000000004,436.54699999999997 61.792500000000004,458.9925 Z" fill="#F5F8FA"/>
+</g>
+<text x="4.0" y="485.75" font-size="7" fill="#F5F8FA" text-anchor="start" font-weight="normal">배우 A</text>
+<rect x="81.0" y="397.2" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="81.0" y="397.2" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+<g opacity="0.7">
+<circle cx="119.5" cy="420.8775" r="11.858000000000002" fill="#F5F8FA"/>
+<path d="M96.2075,458.9925 Q96.2075,436.54699999999997 119.5,436.54699999999997 Q142.79250000000002,436.54699999999997 142.79250000000002,458.9925 Z" fill="#F5F8FA"/>
+</g>
+<text x="85.0" y="485.75" font-size="7" fill="#F5F8FA" text-anchor="start" font-weight="normal">배우 B</text>
+<rect x="162.0" y="397.2" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="162.0" y="397.2" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+<rect x="243.0" y="397.2" width="77.0" height="96.25" rx="3" fill="#30404D"/>
+<rect x="243.0" y="397.2" width="77.0" height="73.14999999999999" rx="3" fill="#3E4F5E"/>
+</g>
+<circle cx="274" cy="81" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="274" y="85" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">1</text>
+<circle cx="152" cy="158" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="152" y="162" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">2</text>
+<line x1="342" y1="438" x2="342" y2="412" stroke="#F29D49" stroke-width="1" stroke-dasharray="3 2"/>
+<circle cx="342" cy="412" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="342" y="416" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">3</text>
+<line x1="33" y1="465" x2="33" y2="492" stroke="#F29D49" stroke-width="1" stroke-dasharray="3 2"/>
+<circle cx="33" cy="492" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="33" y="496" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">4</text>
+<line x1="92" y1="465" x2="92" y2="492" stroke="#F29D49" stroke-width="1" stroke-dasharray="3 2"/>
+<circle cx="92" cy="492" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="92" y="496" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">5</text>
+<line x1="192" y1="465" x2="192" y2="492" stroke="#F29D49" stroke-width="1" stroke-dasharray="3 2"/>
+<circle cx="192" cy="492" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="192" y="496" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">6</text>
+<line x1="374" y1="465" x2="374" y2="492" stroke="#F29D49" stroke-width="1" stroke-dasharray="3 2"/>
+<circle cx="374" cy="492" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="374" y="496" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">7</text>
+<line x1="467" y1="465" x2="467" y2="492" stroke="#F29D49" stroke-width="1" stroke-dasharray="3 2"/>
+<circle cx="467" cy="492" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="467" y="496" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">8</text>
+<line x1="550" y1="465" x2="550" y2="492" stroke="#F29D49" stroke-width="1" stroke-dasharray="3 2"/>
+<circle cx="550" cy="492" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="550" y="496" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">9</text>
+<circle cx="868" cy="80" r="10" fill="#F29D49" stroke="#10161A" stroke-width="1.5"/>
+<text x="868" y="84" font-size="11" fill="#10161A" text-anchor="middle" font-weight="bold">10</text>
+</svg><figcaption>내장 플레이어 화면</figcaption></figure>
+<ol class="callouts"><li><b>[◀ 목록] · 품번 · 제목</b> - [◀ 목록] (또는 <kbd>Esc</kbd>, 위쪽 탭) 을 누르면 재생을 끄고 보던 목록으로 돌아갑니다.</li><li><b>영상</b> - 한 번 클릭 = 재생 / 일시정지, 더블클릭 = 전체 화면, 마우스 휠 = 볼륨.</li><li><b>탐색 바</b> - 누르거나 끌어서 이동 (끄는 동안은 빠르게, 놓으면 정확한 위치). 마우스를 올리면 하얀 표시와 함께 그 위치 시간이 ⑥ 옆에 나옵니다.</li><li><b>재생 / 일시정지</b></li><li><b>◀◀ 10 · 10 ▶▶</b> - 10초 뒤로 / 앞으로.</li><li><b>시간</b> - 지금 / 전체. 탐색 바에 마우스를 올리면 그 위치 시간 (▸ 1:12:30) 이 함께 나옵니다.</li><li><b>속도</b> - 누를 때마다 다음 속도 (0.25 ~ 3배, 3배 다음은 1배). 1배가 아니면 강조색.</li><li><b>음소거 · 볼륨</b> - 스피커를 누르면 음소거, 막대를 누르거나 끌어서 볼륨.</li><li><b>전체 화면</b> - 마우스가 잠시 멈추면 컨트롤 · 커서가 숨고, 움직이면 다시 나옵니다. <kbd>Esc</kbd> 또는 더블클릭으로 돌아옵니다.</li><li><b><a href="#detail">영상 상세</a></b> - 그대로 보여서 재생하면서 별점 · 태그 등을 고칠 수 있습니다.</li></ol>
 <p>[◀ 목록] · <kbd>Esc</kbd> 를 누르거나 위쪽 탭을 누르면 재생을 끄고 보던 목록(스크롤 · 선택 그대로)으로 돌아갑니다.
 보던 위치는 기억해서 다음에 그 영상을 열면 이어서 재생합니다 (10초 넘게 보고 끝나기 20초 전까지만). 볼륨 · 음소거도 기억합니다.</p>
 <h3>단축키</h3>
@@ -1084,6 +1237,65 @@ figure.anim.paused figcaption::after{content:'  (멈춤 - 누르면 다시 재�
 </table>
 <p class="tip"><b>팁</b> 글자 입력 칸(제목 · 태그 등)에 커서가 있으면 키는 그 칸에 들어갑니다. 영상이나 컨트롤 줄을 한 번 누르면 다시 단축키가 동작합니다.</p>
 <h3>설정 [플레이어] 탭</h3>
+<figure><svg viewBox="0 0 640 346" role="img" aria-label="설정 [플레이어] 탭" xmlns="http://www.w3.org/2000/svg" font-family="'Malgun Gothic','맑은 고딕',sans-serif">
+<rect x="0" y="0" width="640" height="346" rx="6" fill="#202B33" stroke="#10161A" stroke-width="1.5"/>
+<path d="M0,26 L0,6 Q0,0 6,0 L634,0 Q640,0 640,6 L640,26 Z" fill="#182026"/>
+<text x="12" y="17" font-size="11" fill="#A7B6C2" text-anchor="start" font-weight="normal">설정</text>
+<text x="580" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">—</text>
+<text x="600" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">☐</text>
+<text x="620" y="17" font-size="10" fill="#738694" text-anchor="middle" font-weight="normal">✕</text>
+<rect x="12" y="36" width="96" height="22" rx="3" fill="#394B59"/>
+<text x="60.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">표시</text>
+<rect x="114" y="36" width="96" height="22" rx="3" fill="#394B59"/>
+<text x="162.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">상세 화면</text>
+<rect x="216" y="36" width="96" height="22" rx="3" fill="#137CBD"/>
+<text x="264.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">플레이어</text>
+<rect x="318" y="36" width="96" height="22" rx="3" fill="#394B59"/>
+<text x="366.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">테마</text>
+<rect x="420" y="36" width="96" height="22" rx="3" fill="#394B59"/>
+<text x="468.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">DB 관리</text>
+<rect x="522" y="36" width="96" height="22" rx="3" fill="#394B59"/>
+<text x="570.0" y="50.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">플러그인</text>
+<rect x="12" y="68" width="616" height="56" rx="3" fill="none" stroke="#394B59" stroke-width="1"/>
+<text x="22" y="80" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">내장 플레이어</text>
+<rect x="22" y="88" width="12" height="12" rx="2" fill="#137CBD"/>
+<path d="M24.5,94 l2.5,2.5 l4,-5" fill="none" stroke="#F5F8FA" stroke-width="1.6"/>
+<text x="40" y="98" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">내장 플레이어 사용 (영상 더블클릭 · 재생 = 프로그램 안에서 재생)</text>
+<text x="40" y="116" font-size="9" fill="#A7B6C2" text-anchor="start" font-weight="normal">libmpv 찾음: C:\RuliManager\libmpv-2.dll  ·  끄면 지금처럼 기본 플레이어로 엽니다.</text>
+<rect x="12" y="132" width="616" height="172" rx="3" fill="none" stroke="#394B59" stroke-width="1"/>
+<text x="22" y="144" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">재생</text>
+<rect x="22" y="152" width="12" height="12" rx="2" fill="#137CBD"/>
+<path d="M24.5,158 l2.5,2.5 l4,-5" fill="none" stroke="#F5F8FA" stroke-width="1.6"/>
+<text x="40" y="162" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">영상을 열면 바로 재생 (끄면 첫 장면에서 멈춘 채로 열림)</text>
+<rect x="22" y="171" width="12" height="12" rx="2" fill="#137CBD"/>
+<path d="M24.5,177 l2.5,2.5 l4,-5" fill="none" stroke="#F5F8FA" stroke-width="1.6"/>
+<text x="40" y="181" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">보던 위치부터 이어서 재생 (10초 넘게 보고 끝나기 20초 전까지)</text>
+<rect x="22" y="190" width="12" height="12" rx="2" fill="#137CBD"/>
+<path d="M24.5,196 l2.5,2.5 l4,-5" fill="none" stroke="#F5F8FA" stroke-width="1.6"/>
+<text x="40" y="200" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">하드웨어 디코딩 (GPU) - 영상이 깨지거나 검게 나오면 끄세요</text>
+<rect x="22" y="209" width="12" height="12" rx="2" fill="#137CBD"/>
+<path d="M24.5,215 l2.5,2.5 l4,-5" fill="none" stroke="#F5F8FA" stroke-width="1.6"/>
+<text x="40" y="219" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">같은 이름의 자막 파일(.srt · .ass 등) 자동으로 불러오기</text>
+<text x="22" y="240" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">← → 이동</text>
+<rect x="90" y="228" width="34" height="18" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="96" y="240.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">5</text>
+<text x="130" y="240" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">초,  Shift + ← →</text>
+<rect x="232" y="228" width="34" height="18" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="238" y="240.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">30</text>
+<text x="272" y="240" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">초  (1 ~ 600)</text>
+<text x="22" y="264" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">영상이 끝나면</text>
+<rect x="110" y="252" width="160" height="18" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="116" y="264.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">마지막 장면에서 멈춤 ▾</text>
+<text x="22" y="288" font-size="10" fill="#F5F8FA" text-anchor="start" font-weight="normal">전체 화면 컨트롤</text>
+<rect x="118" y="276" width="34" height="18" rx="2" fill="#1B252C" stroke="#10161A" stroke-width="1"/>
+<text x="124" y="288.6" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">3</text>
+<text x="158" y="288" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">초 동안 마우스가 멈추면 숨김 (1 ~ 10)</text>
+<text x="12" y="330" font-size="10" fill="#A7B6C2" text-anchor="start" font-weight="normal">설정은 다음에 영상을 열 때부터 적용됩니다.</text>
+<rect x="500" y="316" width="60" height="20" rx="3" fill="#137CBD"/>
+<text x="530.0" y="329.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">확인</text>
+<rect x="568" y="316" width="60" height="20" rx="3" fill="#394B59"/>
+<text x="598.0" y="329.6" font-size="10" fill="#F5F8FA" text-anchor="middle" font-weight="normal">취소</text>
+</svg><figcaption>설정 [플레이어] 탭</figcaption></figure>
 <ul><li><b>영상을 열면 바로 재생</b> - 끄면 첫 장면 (또는 이어 볼 위치) 에서 멈춘 채로 열립니다.</li><li><b>보던 위치부터 이어서 재생</b> - 끄면 늘 처음부터 (위치도 저장하지 않음).</li><li><b>하드웨어 디코딩 (GPU)</b> - 영상이 깨지거나 검게 나오면 끄세요.</li><li><b>같은 이름의 자막 자동 불러오기</b> - <code>영상이름.srt</code> · <code>.ass</code> 등.</li><li><b>← → 이동 초 · Shift + ← → 초</b> (1 ~ 600).</li><li><b>영상이 끝나면</b> - 마지막 장면에서 멈춤 / 목록으로 돌아가기 / 처음부터 반복.</li><li><b>전체 화면 컨트롤</b> - 마우스가 몇 초 멈추면 숨길지 (1 ~ 10초).</li><li>설정은 다음에 영상을 열 때부터 적용됩니다.</li></ul>
 </section><section id="play-count"><h2>재생 기록</h2>
 <p>영상마다 <b>재생 횟수</b>와 <b>마지막 재생 날짜</b>를 저장합니다. 내장 플레이어를 쓰지 않아도 기록됩니다.</p>

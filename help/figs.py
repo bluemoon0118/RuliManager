@@ -723,3 +723,101 @@ def fig_settings_plugin():
     s.button(500, 268, 60, '확인', ACC, 20, 10)
     s.button(568, 268, 60, '취소', COMBO, 20, 10)
     return s.render()
+
+
+def fig_player():
+    s = Svg(900, 520, '내장 플레이어 화면')
+    s.window(0, 0, 900, 520, 'RuliManager v0.92')
+    x = 12
+    for i, t in enumerate(('영상', '배우', '제작사', '태그', '컬렉션')):
+        w = 54 if len(t) == 2 else 62
+        s.button(x, 36, w, t, ACC if i == 0 else COMBO)
+        x += w + 4
+    # 왼쪽 플레이어 View
+    px, py, pw, ph = 12, 64, 560, 444
+    s.rect(px, py, pw, ph, BACK, COMBO, r=2)
+    s.button(px + 8, py + 7, 64, '◀ 목록', COMBO, 20, 10)
+    s.text(px + 84, py + 21, 'ABC-123   영상 제목', 12, TEXT, weight='bold')
+    vy, vh = py + 34, 330
+    s.rect(px, vy, pw, vh, '#0B0F12', r=0)
+    s.rect(px + 60, vy + 10, pw - 120, vh - 20, '#3B5163', r=2)
+    s.play(px + pw / 2, vy + vh / 2, 30, op=0.35)
+    # 탐색 바
+    sy = vy + vh + 10
+    s.line(px + 10, sy, px + pw - 10, sy, '#4A5C6B', 4)
+    s.line(px + 10, sy, px + 210, sy, ACC, 4)
+    s.circle(px + 210, sy, 6, TEXT)
+    s.line(px + 330, sy - 5, px + 330, sy + 5, TEXT, 2)
+    # 컨트롤 줄
+    cy = sy + 14
+    s.rect(px + 8, cy, 26, 26, COMBO, r=4)
+    s.rect(px + 16, cy + 7, 3.5, 12, TEXT, r=0)
+    s.rect(px + 23, cy + 7, 3.5, 12, TEXT, r=0)
+    s.text(px + 58, cy + 17, '◀◀ 10', 10, TEXT, 'middle')
+    s.text(px + 104, cy + 17, '10 ▶▶', 10, TEXT, 'middle')
+    s.text(px + 136, cy + 17, '0:45:10 / 2:03:15', 11, TEXT)
+    s.text(px + 250, cy + 17, '▸ 1:12:30', 11, ACC)
+    s.text(px + 362, cy + 17, '1x', 11, TEXT, 'middle')
+    s.path(f'M{px + 392},{cy + 10} l4,0 l5,-5 l0,16 l-5,-5 l-4,0 Z', TEXT)
+    s.path(f'M{px + 405},{cy + 9} q4,4 0,8', 'none', TEXT, 1.5)
+    s.line(px + 420, cy + 13, px + 510, cy + 13, '#4A5C6B', 4)
+    s.line(px + 420, cy + 13, px + 485, cy + 13, ACC, 4)
+    fx, fy = px + 538, cy + 13
+    for dx, dy in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+        ax, ay = fx + dx * 8, fy + dy * 8
+        s.path(f'M{ax},{ay} l{-dx * 5},0 M{ax},{ay} l0,{-dy * 5}', 'none', TEXT, 1.6)
+    # 오른쪽 영상 상세 (그대로)
+    s.add('<g transform="translate(584,64) scale(0.94)">')
+    detail_panel(s, 0, 0, 320, compact=True)
+    s.add('</g>')
+    # 번호
+    pts = [((px + 262, py + 17), (px + 262, py + 17)), ((px + 140, vy + 60), (px + 140, vy + 60)),
+           ((px + 330, sy), (px + 330, sy - 26)), ((px + 21, cy + 13), (px + 21, cy + 40)),
+           ((px + 80, cy + 13), (px + 80, cy + 40)), ((px + 180, cy + 13), (px + 180, cy + 40)),
+           ((px + 362, cy + 13), (px + 362, cy + 40)), ((px + 455, cy + 13), (px + 455, cy + 40)),
+           ((fx, fy), (fx, fy + 27)), ((868, 80), (868, 80))]
+    for i, ((ax, ay), (tx, ty)) in enumerate(pts, 1):
+        if (ax, ay) != (tx, ty):
+            s.line(ax, ay, tx, ty, CALL, 1, '3 2')
+        s.call(tx, ty, i)
+    return s.render()
+
+
+def fig_settings_player():
+    s = Svg(640, 346, '설정 [플레이어] 탭')
+    s.window(0, 0, 640, 346, '설정')
+    x = 12
+    for t in ('표시', '상세 화면', '플레이어', '테마', 'DB 관리', '플러그인'):
+        s.button(x, 36, 96, t, ACC if t == '플레이어' else COMBO, 22, 10)
+        x += 102
+    s.rect(12, 68, 616, 56, 'none', COMBO, r=3)
+    s.text(22, 80, '내장 플레이어', 10, SUB)
+    _check(s, 22, 88, True)
+    s.text(40, 98, '내장 플레이어 사용 (영상 더블클릭 · 재생 = 프로그램 안에서 재생)', 10, TEXT)
+    s.text(40, 116, 'libmpv 찾음: C:\\RuliManager\\libmpv-2.dll  ·  끄면 지금처럼 기본 플레이어로 엽니다.', 9, SUB)
+    s.rect(12, 132, 616, 172, 'none', COMBO, r=3)
+    s.text(22, 144, '재생', 10, SUB)
+    y = 152
+    for t, on in (('영상을 열면 바로 재생 (끄면 첫 장면에서 멈춘 채로 열림)', True),
+                  ('보던 위치부터 이어서 재생 (10초 넘게 보고 끝나기 20초 전까지)', True),
+                  ('하드웨어 디코딩 (GPU) - 영상이 깨지거나 검게 나오면 끄세요', True),
+                  ('같은 이름의 자막 파일(.srt · .ass 등) 자동으로 불러오기', True)):
+        _check(s, 22, y, on)
+        s.text(40, y + 10, t, 10, TEXT)
+        y += 19
+    s.text(22, y + 12, '← → 이동', 10, TEXT)
+    s.edit(90, y, 34, '5', 18, 10)
+    s.text(130, y + 12, '초,  Shift + ← →', 10, TEXT)
+    s.edit(232, y, 34, '30', 18, 10)
+    s.text(272, y + 12, '초  (1 ~ 600)', 10, SUB)
+    y += 24
+    s.text(22, y + 12, '영상이 끝나면', 10, TEXT)
+    s.edit(110, y, 160, '마지막 장면에서 멈춤 ▾', 18, 10)
+    y += 24
+    s.text(22, y + 12, '전체 화면 컨트롤', 10, TEXT)
+    s.edit(118, y, 34, '3', 18, 10)
+    s.text(158, y + 12, '초 동안 마우스가 멈추면 숨김 (1 ~ 10)', 10, SUB)
+    s.text(12, 330, '설정은 다음에 영상을 열 때부터 적용됩니다.', 10, SUB)
+    s.button(500, 316, 60, '확인', ACC, 20, 10)
+    s.button(568, 316, 60, '취소', COMBO, 20, 10)
+    return s.render()
